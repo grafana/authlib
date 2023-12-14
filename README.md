@@ -79,7 +79,7 @@ type dash struct {
 
 func main() {
 	userPermissions := models.Permissions{
-		"dashboards:read": {"dashAABBCC", "foldCCDDEE"},
+		"dashboards:read": {"dashboards:uid:dashAABBCC", "folders:uid:foldCCDDEE"},
 	}
 
 	canRead := checker.GenerateChecker(context.Background(), userPermissions, "dashboards:read", "dashboards:uid:", "folders:uid:")
@@ -91,7 +91,7 @@ func main() {
 	}
 
 	for i := range dashboards {
-		if canRead(dashboards[i].uid) || canRead(dashboards[i].parentUid) {
+		if canRead("dashboards:uid:"+dashboards[i].uid) || canRead("folders:uid:"+dashboards[i].parentUid) {
 			fmt.Printf("OK: %v\n", dashboards[i].uid)
 			continue
 		}
