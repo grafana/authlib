@@ -4,6 +4,7 @@ go 1.21.3
 
 require (
 	github.com/go-kit/log v0.2.1
+	github.com/google/go-querystring v1.1.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/sync v0.5.0

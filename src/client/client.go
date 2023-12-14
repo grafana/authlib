@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
+	goquery "github.com/google/go-querystring/query"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/grafana/rbac-client-poc/src/cache"
@@ -41,10 +42,10 @@ type ClientCfg struct {
 }
 
 type SearchQuery struct {
-	ActionPrefix string `json:"actionPrefix"`
-	Action       string `json:"action"`
-	Scope        string `json:"scope"`
-	UserID       int64  `json:"userID"`
+	ActionPrefix string `json:"actionPrefix,omitempty" url:"actionPrefix,omitempty"`
+	Action       string `json:"action,omitempty" url:"action,omitempty"`
+	Scope        string `json:"scope,omitempty" url:"scope,omitempty"`
+	UserID       int64  `json:"userID" url:"userID"`
 }
 
 func searchCacheKey(query SearchQuery) string {
@@ -113,8 +114,9 @@ func (c *RBACClientImpl) SearchUserPermissions(ctx context.Context, query Search
 	}
 
 	res, err, _ := c.singlef.Do(key, func() (interface{}, error) {
-		url := c.cfg.GrafanaURL + fmt.Sprintf(searchPath, query.UserID)
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader(key))
+		v, _ := goquery.Values(query)
+		url := c.cfg.GrafanaURL + fmt.Sprintf(searchPath, query.UserID) + "?" + v.Encode()
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, strings.NewReader(key))
 		if err != nil {
 			return nil, err
 		}

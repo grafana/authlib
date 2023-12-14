@@ -65,7 +65,7 @@ func TestRBACClientImpl_SearchUserPermissions(t *testing.T) {
 				d, _ = json.Marshal(map[string][]string{tt.query.Action: perms[tt.query.Action]})
 			}
 			require.Equal(t, r.Header.Get("Authorization"), "Bearer aabbcc")
-			require.Equal(t, r.URL.String(), fmt.Sprintf(searchPath, tt.query.UserID))
+			require.Equal(t, r.URL.Path, fmt.Sprintf(searchPath, tt.query.UserID))
 			w.Write(d)
 		}))
 		defer server.Close()
