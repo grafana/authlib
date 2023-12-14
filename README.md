@@ -1,2 +1,108 @@
-# rbac-client-poc
-RBAC client library
+# rbac-client
+
+This is an RBAC client library that contains a set of utilities to fetch and check users permissions from Grafana.
+
+## Grafana Configuration
+
+Grafana needs to be configured with the `accessControlOnCall` feature toggle set for the search permissions endpoint to be registered.
+
+```ini
+[feature_toggles]
+enable = accessControlOnCall 
+```
+
+## Examples
+
+### client usage
+
+This repository is private for now, to use the library:
+```bash
+GOPRIVATE=github.com/grafana/rbac-client-poc
+```
+
+Here is an example on how to fetch a user's permission filtering on a specific action `users:read`.
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/grafana/rbac-client-poc/src/cache"
+	"github.com/grafana/rbac-client-poc/src/client"
+)
+
+func main() {
+	c := client.NewRBACClient(client.ClientCfg{
+		Timeout:    time.Minute,
+		GrafanaURL: "http://localhost:3000",
+		Token:      "Your Service Account Token",
+	}, cache.NewLocalCache())
+
+	perms, err := c.SearchUserPermissions(context.Background(), client.SearchQuery{
+		Action: "users:read",
+		UserID: 1,
+	})
+	if err != nil {
+		fmt.Printf("Error fetching permissions %v\n", err)
+	}
+
+	fmt.Println("Got permissions from Grafana", perms)
+}
+```
+
+The program here would output:
+```
+Got permissions from Grafana map[users:read:[global.users:*]]
+```
+
+### checker usage (to search and filter)
+
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/grafana/rbac-client-poc/src/checker"
+	"github.com/grafana/rbac-client-poc/src/models"
+)
+
+type dash struct {
+	uid       string
+	parentUid string
+}
+
+func main() {
+	userPermissions := models.Permissions{
+		"dashboards:read": {"dashAABBCC", "foldCCDDEE"},
+	}
+
+	canRead := checker.GenerateChecker(context.Background(), userPermissions, "dashboards:read", "dashboards:uid:", "folders:uid:")
+
+	dashboards := []dash{
+		{uid: "dashAABBCC", parentUid: "foldAABBCC"},
+		{uid: "dashBBCCDD", parentUid: "foldBBCCDD"},
+		{uid: "dashCCDDEE", parentUid: "foldCCDDEE"},
+	}
+
+	for i := range dashboards {
+		if canRead(dashboards[i].uid) || canRead(dashboards[i].parentUid) {
+			fmt.Printf("OK: %v\n", dashboards[i].uid)
+			continue
+		}
+		fmt.Printf("KO: %v\n", dashboards[i].uid)
+	}
+}
+```
+
+The program here would output:
+```
+OK: dashAABBCC
+KO: dashBBCCDD
+OK: dashCCDDEE
+```
