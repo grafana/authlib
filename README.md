@@ -58,6 +58,8 @@ The program here would output:
 Got permissions from Grafana map[1:map[users:read:[global.users:*]]]
 ```
 
+More filters are available to search `userLogin`, `userId`, `action`, `actionPrefix`, `scope`.
+
 ### checker usage (to search and filter)
 
 
