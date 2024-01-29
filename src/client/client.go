@@ -45,7 +45,7 @@ type SearchQuery struct {
 	ActionPrefix string `json:"actionPrefix,omitempty" url:"actionPrefix,omitempty"`
 	Action       string `json:"action,omitempty" url:"action,omitempty"`
 	Scope        string `json:"scope,omitempty" url:"scope,omitempty"`
-	UserID       int64  `json:"userID" url:"userID"`
+	UserID       int64  `json:"userId" url:"userId"`
 	UserLogin    string `json:"userLogin" url:"userLogin"`
 }
 
