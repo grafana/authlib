@@ -45,8 +45,8 @@ type SearchQuery struct {
 	ActionPrefix string `json:"actionPrefix,omitempty" url:"actionPrefix,omitempty"`
 	Action       string `json:"action,omitempty" url:"action,omitempty"`
 	Scope        string `json:"scope,omitempty" url:"scope,omitempty"`
-	UserID       int64  `json:"userId" url:"userId"`
-	UserLogin    string `json:"userLogin" url:"userLogin"`
+	UserID       int64  `json:"userId" url:"userId,omitempty"`
+	UserLogin    string `json:"userLogin" url:"userLogin,omitempty"`
 }
 
 func searchCacheKey(query SearchQuery) string {
@@ -146,7 +146,7 @@ func (c *RBACClientImpl) SearchUserPermissions(ctx context.Context, query Search
 			return nil, fmt.Errorf("%w: %s", ErrUnexpectedStatus, res.Status)
 		}
 
-		response := models.Permissions{}
+		response := models.UsersPermissions{}
 		if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
 			return nil, fmt.Errorf("%w: %s", ErrInvalidResponse, err)
 		}

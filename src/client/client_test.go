@@ -48,13 +48,13 @@ func TestRBACClientImpl_SearchUserPermissions(t *testing.T) {
 	tests := []struct {
 		name    string
 		query   SearchQuery
-		want    models.Permissions
+		want    models.UsersPermissions
 		wantErr bool
 	}{
 		{
 			name:  "userID 1 no error",
 			query: SearchQuery{Action: "users:read", UserID: 1},
-			want:  models.Permissions{"users:read": {"org.users:*"}},
+			want:  models.UsersPermissions{1: {"users:read": {"org.users:*"}}},
 		},
 	}
 	for _, tt := range tests {
@@ -62,10 +62,11 @@ func TestRBACClientImpl_SearchUserPermissions(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			d := []byte{}
 			if tt.query.Action != "" {
-				d, _ = json.Marshal(map[string][]string{tt.query.Action: perms[tt.query.Action]})
+				// Using a string instead of an int on purpose as this is what is returned by the API.
+				d, _ = json.Marshal(map[string]map[string][]string{fmt.Sprintf("%v", tt.query.UserID): {tt.query.Action: perms[tt.query.Action]}})
 			}
 			require.Equal(t, r.Header.Get("Authorization"), "Bearer aabbcc")
-			require.Equal(t, r.URL.Path, fmt.Sprintf(searchPath, tt.query.UserID))
+			require.Equal(t, r.URL.Path, searchPath)
 			w.Write(d)
 		}))
 		defer server.Close()
