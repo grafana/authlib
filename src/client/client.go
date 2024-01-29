@@ -32,7 +32,7 @@ var (
 	TimeNow  = time.Now
 	CacheExp = 5 * time.Minute
 
-	searchPath = "/api/access-control/user/%d/permissions/search"
+	searchPath = "/api/access-control/users/permissions/search"
 )
 
 type ClientCfg struct {
@@ -46,6 +46,7 @@ type SearchQuery struct {
 	Action       string `json:"action,omitempty" url:"action,omitempty"`
 	Scope        string `json:"scope,omitempty" url:"scope,omitempty"`
 	UserID       int64  `json:"userID" url:"userID"`
+	UserLogin    string `json:"userLogin" url:"userLogin"`
 }
 
 func searchCacheKey(query SearchQuery) string {
@@ -79,11 +80,16 @@ type RBACClientImpl struct {
 }
 
 func validateQuery(query SearchQuery) error {
-	if query.UserID <= 0 {
-		return fmt.Errorf("%w: %v", ErrInvalidQuery, "userID must be strictly positive")
+	// Validate inputs
+	if (query.ActionPrefix != "") && (query.Action != "") {
+		return fmt.Errorf("%w: %v", ErrInvalidQuery, "'action' and 'actionPrefix' are mutually exclusive")
 	}
-	if query.Action == "" && query.ActionPrefix == "" {
-		return fmt.Errorf("%w: %v", ErrInvalidQuery, "Action filter required")
+	if (query.UserLogin != "") && (query.UserID > 0) {
+		return fmt.Errorf("%w: %v", ErrInvalidQuery, "'userId' and 'userLogin' are mutually exclusive")
+	}
+	if query.UserID <= 0 && query.UserLogin == "" &&
+		query.ActionPrefix == "" && query.Action == "" {
+		return fmt.Errorf("%w: %v", ErrInvalidQuery, "at least one search option must be provided")
 	}
 	return nil
 }
@@ -115,7 +121,7 @@ func (c *RBACClientImpl) SearchUserPermissions(ctx context.Context, query Search
 
 	res, err, _ := c.singlef.Do(key, func() (interface{}, error) {
 		v, _ := goquery.Values(query)
-		url := c.cfg.GrafanaURL + fmt.Sprintf(searchPath, query.UserID) + "?" + v.Encode()
+		url := c.cfg.GrafanaURL + searchPath + "?" + v.Encode()
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, strings.NewReader(key))
 		if err != nil {
 			return nil, err
@@ -132,7 +138,7 @@ func (c *RBACClientImpl) SearchUserPermissions(ctx context.Context, query Search
 
 		defer res.Body.Close()
 
-		if res.StatusCode == http.StatusUnauthorized {
+		if res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusForbidden {
 			return nil, ErrInvalidToken
 		}
 
