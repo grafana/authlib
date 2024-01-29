@@ -43,7 +43,7 @@ func main() {
 
 	perms, err := c.SearchUserPermissions(context.Background(), client.SearchQuery{
 		Action: "users:read",
-		UserID: 1,
+		UserLogin: "admin",
 	})
 	if err != nil {
 		fmt.Printf("Error fetching permissions %v\n", err)
@@ -55,7 +55,7 @@ func main() {
 
 The program here would output:
 ```
-Got permissions from Grafana map[users:read:[global.users:*]]
+Got permissions from Grafana map[1:map[users:read:[global.users:*]]]
 ```
 
 ### checker usage (to search and filter)
