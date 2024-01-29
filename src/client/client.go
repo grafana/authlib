@@ -56,7 +56,7 @@ func searchCacheKey(query SearchQuery) string {
 }
 
 type RBACClient interface {
-	SearchUserPermissions(ctx context.Context, query SearchQuery) (models.Permissions, error)
+	SearchUserPermissions(ctx context.Context, query SearchQuery) (models.UsersPermissions, error)
 }
 
 func NewRBACClient(cfg ClientCfg, cache cache.Cache) *RBACClientImpl {
@@ -95,7 +95,7 @@ func validateQuery(query SearchQuery) error {
 }
 
 // SearchUserPermissions implements RBACClient.
-func (c *RBACClientImpl) SearchUserPermissions(ctx context.Context, query SearchQuery) (models.Permissions, error) {
+func (c *RBACClientImpl) SearchUserPermissions(ctx context.Context, query SearchQuery) (models.UsersPermissions, error) {
 	if err := validateQuery(query); err != nil {
 		level.Error(c.logger).Log("invalid query", "error", err)
 		return nil, err
@@ -109,7 +109,7 @@ func (c *RBACClientImpl) SearchUserPermissions(ctx context.Context, query Search
 	}
 
 	if ok {
-		perms := models.Permissions{}
+		perms := models.UsersPermissions{}
 		err := gob.NewDecoder(r).Decode(&perms)
 		if err != nil {
 			level.Warn(c.logger).Log("could not decode data from cache", "error", err)
@@ -158,13 +158,13 @@ func (c *RBACClientImpl) SearchUserPermissions(ctx context.Context, query Search
 		return nil, err
 	}
 
-	perms := res.(models.Permissions)
+	perms := res.(models.UsersPermissions)
 	c.cacheNoFail(ctx, perms, key)
 
 	return perms, nil
 }
 
-func (c *RBACClientImpl) cacheNoFail(ctx context.Context, perms models.Permissions, key string) {
+func (c *RBACClientImpl) cacheNoFail(ctx context.Context, perms models.UsersPermissions, key string) {
 	buf := bytes.Buffer{}
 	err := gob.NewEncoder(&buf).Encode(perms)
 	if err != nil {
