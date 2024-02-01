@@ -3,10 +3,12 @@ package client
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/gob"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -36,7 +38,6 @@ var (
 )
 
 type ClientCfg struct {
-	Timeout    time.Duration
 	GrafanaURL string
 	Token      string
 }
@@ -49,6 +50,11 @@ type SearchQuery struct {
 	UserLogin    string `json:"userLogin" url:"userLogin,omitempty"`
 }
 
+func (q *SearchQuery) String() string {
+	return fmt.Sprintf("actionPrefix=%s, action=%s, scope=%s, userId=%d, userLogin=%s",
+		q.ActionPrefix, q.Action, q.Scope, q.UserID, q.UserLogin)
+}
+
 func searchCacheKey(query SearchQuery) string {
 	// TODO : safe to ignore the error completely?
 	data, _ := json.Marshal(query)
@@ -59,21 +65,73 @@ type RBACClient interface {
 	SearchUserPermissions(ctx context.Context, query SearchQuery) (models.UsersPermissions, error)
 }
 
-func NewRBACClient(cfg ClientCfg, cache cache.Cache) *RBACClientImpl {
-	return &RBACClientImpl{
-		singlef: singleflight.Group{},
-		client: &http.Client{
-			Timeout: cfg.Timeout,
-		},
-		cache:  cache,
-		cfg:    cfg,
-		logger: log.NewJSONLogger(log.NewSyncWriter(os.Stdout)),
+// ClientOption allows setting custom parameters during construction.
+type ClientOption func(*RBACClientImpl) error
+
+// WithHTTPClient allows overriding the default Doer, which is
+// automatically created using http.Client. This is useful for tests.
+func WithHTTPClient(doer HTTPRequestDoer) ClientOption {
+	return func(c *RBACClientImpl) error {
+		c.client = doer
+
+		return nil
 	}
+}
+
+func WithCache(cache cache.Cache) ClientOption {
+	return func(c *RBACClientImpl) error {
+		c.cache = cache
+
+		return nil
+	}
+}
+
+func NewRBACClient(cfg ClientCfg, opts ...ClientOption) *RBACClientImpl {
+	client := &RBACClientImpl{
+		singlef: singleflight.Group{},
+		client:  nil,
+		cache:   nil,
+		cfg:     cfg,
+		logger:  log.NewJSONLogger(log.NewSyncWriter(os.Stdout)),
+	}
+
+	for _, opt := range opts {
+		if err := opt(client); err != nil {
+			_ = level.Error(client.logger).Log("msg", "error applying option", "err", err)
+		}
+	}
+
+	if client.cache == nil {
+		client.cache = cache.NewLocalCache()
+	}
+
+	// create httpClient, if not already present
+	if client.client == nil {
+		client.client = &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					Renegotiation: tls.RenegotiateFreelyAsClient,
+				},
+				Proxy: http.ProxyFromEnvironment,
+				DialContext: (&net.Dialer{
+					Timeout:   4 * time.Second,
+					KeepAlive: 15 * time.Second,
+				}).DialContext,
+				TLSHandshakeTimeout:   10 * time.Second,
+				ExpectContinueTimeout: 1 * time.Second,
+				MaxIdleConns:          100,
+				IdleConnTimeout:       30 * time.Second,
+			},
+			Timeout: 20 * time.Second,
+		}
+	}
+
+	return client
 }
 
 type RBACClientImpl struct {
 	singlef singleflight.Group
-	client  *http.Client
+	client  HTTPRequestDoer
 	cache   cache.Cache
 	cfg     ClientCfg
 	logger  log.Logger

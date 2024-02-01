@@ -67,15 +67,15 @@ func TestRBACClientImpl_SearchUserPermissions(t *testing.T) {
 			}
 			require.Equal(t, r.Header.Get("Authorization"), "Bearer aabbcc")
 			require.Equal(t, r.URL.Path, searchPath)
-			w.Write(d)
+			_, _ = w.Write(d)
+
 		}))
 		defer server.Close()
 		t.Run(tt.name, func(t *testing.T) {
 			c := NewRBACClient(ClientCfg{
-				Timeout:    time.Minute,
 				GrafanaURL: server.URL,
 				Token:      "aabbcc",
-			}, testCache)
+			}, WithCache(testCache))
 			c.client = server.Client()
 
 			got, err := c.SearchUserPermissions(context.Background(), tt.query)
