@@ -35,10 +35,13 @@ import (
 )
 
 func main() {
-	c := client.NewRBACClient(client.ClientCfg{
+	c, err := client.NewRBACClient(client.ClientCfg{
 		GrafanaURL: "http://localhost:3000",
 		Token:      "Your Service Account Token",
 	})
+	if err != nil {
+		fmt.Printf("Error creating client %v\n", err)
+	}
 
 	perms, err := c.SearchUserPermissions(context.Background(), client.SearchQuery{
 		Action: "users:read",

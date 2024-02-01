@@ -86,7 +86,7 @@ func WithCache(cache cache.Cache) ClientOption {
 	}
 }
 
-func NewRBACClient(cfg ClientCfg, opts ...ClientOption) *RBACClientImpl {
+func NewRBACClient(cfg ClientCfg, opts ...ClientOption) (*RBACClientImpl, error) {
 	client := &RBACClientImpl{
 		singlef: singleflight.Group{},
 		client:  nil,
@@ -126,7 +126,7 @@ func NewRBACClient(cfg ClientCfg, opts ...ClientOption) *RBACClientImpl {
 		}
 	}
 
-	return client
+	return client, nil
 }
 
 type RBACClientImpl struct {
