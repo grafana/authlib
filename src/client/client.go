@@ -50,11 +50,6 @@ type SearchQuery struct {
 	UserLogin    string `json:"userLogin" url:"userLogin,omitempty"`
 }
 
-func (q *SearchQuery) String() string {
-	return fmt.Sprintf("actionPrefix=%s, action=%s, scope=%s, userId=%d, userLogin=%s",
-		q.ActionPrefix, q.Action, q.Scope, q.UserID, q.UserLogin)
-}
-
 func searchCacheKey(query SearchQuery) string {
 	// TODO : safe to ignore the error completely?
 	data, _ := json.Marshal(query)
