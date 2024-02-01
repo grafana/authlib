@@ -36,10 +36,9 @@ import (
 
 func main() {
 	c := client.NewRBACClient(client.ClientCfg{
-		Timeout:    time.Minute,
 		GrafanaURL: "http://localhost:3000",
 		Token:      "Your Service Account Token",
-	}, cache.NewLocalCache())
+	})
 
 	perms, err := c.SearchUserPermissions(context.Background(), client.SearchQuery{
 		Action: "users:read",
