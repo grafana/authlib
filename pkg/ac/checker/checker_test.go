@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/grafana/rbac-client-poc/src/models"
+	"github.com/grafana/rbac-client-poc/pkg/ac/models"
 )
 
 func Test_WildcardsFromPrefixes(t *testing.T) {

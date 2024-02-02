@@ -6,7 +6,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/grafana/rbac-client-poc/src/models"
+	"github.com/grafana/rbac-client-poc/pkg/ac/models"
 )
 
 var (

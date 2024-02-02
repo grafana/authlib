@@ -12,8 +12,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/grafana/rbac-client-poc/src/cache"
-	"github.com/grafana/rbac-client-poc/src/models"
+	"github.com/grafana/rbac-client-poc/pkg/ac/cache"
+	"github.com/grafana/rbac-client-poc/pkg/ac/models"
 )
 
 type CacheWrap struct {
