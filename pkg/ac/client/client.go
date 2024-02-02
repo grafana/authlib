@@ -19,8 +19,8 @@ import (
 	goquery "github.com/google/go-querystring/query"
 	"golang.org/x/sync/singleflight"
 
-	"github.com/grafana/rbac-client-poc/src/cache"
-	"github.com/grafana/rbac-client-poc/src/models"
+	"github.com/grafana/rbac-client-poc/pkg/ac/cache"
+	"github.com/grafana/rbac-client-poc/pkg/ac/models"
 )
 
 var _ RBACClient = &RBACClientImpl{}

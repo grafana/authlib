@@ -30,8 +30,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/grafana/rbac-client-poc/src/cache"
-	"github.com/grafana/rbac-client-poc/src/client"
+	"github.com/grafana/rbac-client-poc/pkg/ac/cache"
+	"github.com/grafana/rbac-client-poc/pkg/ac/client"
 )
 
 func main() {
@@ -72,8 +72,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/grafana/rbac-client-poc/src/checker"
-	"github.com/grafana/rbac-client-poc/src/models"
+	"github.com/grafana/rbac-client-poc/pkg/ac/checker"
+	"github.com/grafana/rbac-client-poc/pkg/ac/models"
 )
 
 type dash struct {
