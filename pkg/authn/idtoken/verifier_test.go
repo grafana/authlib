@@ -124,6 +124,16 @@ func TestVerifier_Verify(t *testing.T) {
 		assert.Nil(t, claims)
 	})
 
+	t.Run("invalid: token audience not allowed", func(t *testing.T) {
+		verifier := NewVerifier[CustomClaims](Config{
+			SigningKeyURL:    server.URL,
+			AllowedAudiences: []string{"aud-1"},
+		})
+		claims, err := verifier.Verify(context.Background(), signPrimary(t, CustomClaims{}))
+		assert.ErrorIs(t, err, ErrInvalidAudience)
+		assert.Nil(t, claims)
+	})
+
 	t.Run("valid: token", func(t *testing.T) {
 		claims, err := verifier.Verify(context.Background(), signPrimary(t, CustomClaims{}))
 		assert.NoError(t, err)

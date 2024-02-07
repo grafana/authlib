@@ -46,6 +46,15 @@ func (v *VerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T],
 		return nil, err
 	}
 
+	if len(v.cfg.AllowedAudiences) > 0 {
+		for _, allowed := range v.cfg.AllowedAudiences {
+			if claims.Audience.Contains(allowed) {
+				return &claims, nil
+			}
+		}
+		return nil, ErrInvalidAudience
+	}
+
 	return &claims, nil
 }
 
