@@ -159,12 +159,12 @@ func (c *RBACClientImpl) SearchUserPermissions(ctx context.Context, query Search
 
 	key := searchCacheKey(query)
 
-	item, ok, err := c.cache.Get(ctx, key)
-	if err != nil {
+	item, err := c.cache.Get(ctx, key)
+	if err != nil && !errors.Is(err, cache.ErrNotFound) {
 		level.Warn(c.logger).Log("could not retrieve from cache", "error", err)
 	}
 
-	if ok {
+	if err == nil {
 		perms := models.UsersPermissions{}
 		err := gob.NewDecoder(bytes.NewReader(item)).Decode(&perms)
 		if err != nil {

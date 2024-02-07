@@ -16,18 +16,19 @@ import (
 )
 
 type CacheWrap struct {
-	successReadCnt  int
-	successWriteCnt int
-	cache           cache.Cache
+	successReadCnt   int
+	successWriteCnt  int
+	successDeleteCnt int
+	cache            cache.Cache
 }
 
 // Get implements cache.Cache.
-func (c *CacheWrap) Get(ctx context.Context, key string) ([]byte, bool, error) {
-	get, ok, err := c.cache.Get(ctx, key)
-	if ok && err == nil {
+func (c *CacheWrap) Get(ctx context.Context, key string) ([]byte, error) {
+	get, err := c.cache.Get(ctx, key)
+	if err == nil {
 		c.successReadCnt++
 	}
-	return get, ok, err
+	return get, err
 }
 
 // Set implements cache.Cache.
@@ -35,6 +36,14 @@ func (c *CacheWrap) Set(ctx context.Context, key string, data []byte, exp time.D
 	err := c.cache.Set(ctx, key, data, exp)
 	if err == nil {
 		c.successWriteCnt++
+	}
+	return err
+}
+
+func (c *CacheWrap) Delete(ctx context.Context, key string) error {
+	err := c.cache.Delete(ctx, key)
+	if err == nil {
+		c.successDeleteCnt++
 	}
 	return err
 }

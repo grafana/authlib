@@ -2,7 +2,7 @@ package cache
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"time"
 
 	"github.com/patrickmn/go-cache"
@@ -11,19 +11,25 @@ import (
 
 const NoExpiration = cache.NoExpiration
 
-// The Cache interface caches values in a persistent or ephemeral cache database
-type Cache interface {
-	// Get retrieves the data at "key" in the cache source as an io.Reader, and a bool denoting whether the key was found or not.
-	// For caching databases that don't automatically remove expired keys: if the cache key is found, but is expired, then "ErrorExpired" is returned.
-	Get(ctx context.Context, key string) ([]byte, bool, error)
+var (
+	ErrNotFound = errors.New("not found")
+	ErrRead     = errors.New("could not read value at cache key")
+)
 
-	// Set will set the value at `key` using data, with an expiration time of `exp`.
-	// If there is a value at `key` then it will be overwritten.
-	Set(ctx context.Context, key string, data []byte, exp time.Duration) error
+// Cache allows the caller to set, get and delete items in the cache.
+type Cache interface {
+	// Get gets the cache value as an byte array
+	Get(ctx context.Context, key string) ([]byte, error)
+
+	// Set saves the value as an byte array. if `expire` is set to zero it will default to 24h
+	Set(ctx context.Context, key string, value []byte, expire time.Duration) error
+
+	// Delete object from cache
+	Delete(ctx context.Context, key string) error
 }
 
 type LocalCache struct {
-	*gocache.Cache
+	c *gocache.Cache
 }
 
 type Config struct {
@@ -32,24 +38,29 @@ type Config struct {
 }
 
 func NewLocalCache(cfg Config) *LocalCache {
-	return &LocalCache{Cache: gocache.New(cfg.Expiry, cfg.CleanupInterval)}
+	return &LocalCache{c: gocache.New(cfg.Expiry, cfg.CleanupInterval)}
 }
 
-func (lc *LocalCache) Get(ctx context.Context, key string) ([]byte, bool, error) {
-	v, ok := lc.Cache.Get(key)
+func (lc *LocalCache) Get(ctx context.Context, key string) ([]byte, error) {
+	v, ok := lc.c.Get(key)
 	if !ok {
-		return nil, false, nil
+		return nil, ErrNotFound
 	}
 
 	vA, ok := v.([]byte)
 	if !ok {
-		return nil, false, fmt.Errorf("could not read value at cache key")
+		return nil, ErrRead
 	}
 
-	return vA, true, nil
+	return vA, nil
 }
 
 func (lc *LocalCache) Set(ctx context.Context, key string, data []byte, exp time.Duration) error {
-	lc.Cache.Set(key, data, exp)
+	lc.c.Set(key, data, exp)
+	return nil
+}
+
+func (lc *LocalCache) Delete(ctx context.Context, key string) error {
+	lc.c.Delete(key)
 	return nil
 }

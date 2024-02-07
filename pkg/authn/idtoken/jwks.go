@@ -97,9 +97,9 @@ func (s *keyService) fetchJWKS(ctx context.Context) (*jose.JSONWebKeySet, error)
 }
 
 func (s *keyService) getCachedItem(ctx context.Context, keyID string) (*jose.JSONWebKey, bool) {
-	data, ok, err := s.c.Get(ctx, keyID)
+	data, err := s.c.Get(ctx, keyID)
 	// error is a noop for local cache
-	if err != nil || !ok {
+	if err != nil {
 		return nil, false
 	}
 
