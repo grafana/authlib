@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -12,8 +11,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/grafana/rbac-client-poc/pkg/ac/cache"
 	"github.com/grafana/rbac-client-poc/pkg/ac/models"
+	"github.com/grafana/rbac-client-poc/pkg/cache"
 )
 
 type CacheWrap struct {
@@ -23,7 +22,7 @@ type CacheWrap struct {
 }
 
 // Get implements cache.Cache.
-func (c *CacheWrap) Get(ctx context.Context, key string) (io.Reader, bool, error) {
+func (c *CacheWrap) Get(ctx context.Context, key string) ([]byte, bool, error) {
 	get, ok, err := c.cache.Get(ctx, key)
 	if ok && err == nil {
 		c.successReadCnt++
@@ -32,8 +31,8 @@ func (c *CacheWrap) Get(ctx context.Context, key string) (io.Reader, bool, error
 }
 
 // Set implements cache.Cache.
-func (c *CacheWrap) Set(ctx context.Context, key string, exp time.Duration, r io.Reader) error {
-	err := c.cache.Set(ctx, key, exp, r)
+func (c *CacheWrap) Set(ctx context.Context, key string, data []byte, exp time.Duration) error {
+	err := c.cache.Set(ctx, key, data, exp)
 	if err == nil {
 		c.successWriteCnt++
 	}
@@ -58,7 +57,7 @@ func TestRBACClientImpl_SearchUserPermissions(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		testCache := &CacheWrap{cache: cache.NewLocalCache()}
+		testCache := &CacheWrap{cache: cache.NewLocalCache(cache.Config{Expiry: 10 * time.Minute, CleanupInterval: 10 * time.Minute})}
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			d := []byte{}
 			if tt.query.Action != "" {
