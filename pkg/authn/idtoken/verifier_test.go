@@ -17,8 +17,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var privateKeyID = "key-1"
-var privateKey = decodePrivateKey([]byte(`
+var firstKeyID = "key-1"
+var fistKey = decodePrivateKey([]byte(`
 -----BEGIN EC PRIVATE KEY-----
 MHcCAQEEID6lXWsmcv/UWn9SptjOThsy88cifgGIBj2Lu0M9I8tQoAoGCCqGSM49
 AwEHoUQDQgAEsf6eNnNMNhl+q7jXsbdUf3ADPh248uoFUSSV9oBzgptyokHCjJz6
@@ -26,8 +26,8 @@ n6PKDm2W7i3S2+dAs5M5f3s7d8KiLjGZdQ==
 -----END EC PRIVATE KEY-----
 `))
 
-var secondPrivateKeyID = "key-2"
-var secondPrivateKey = decodePrivateKey([]byte(`
+var secondKeyId = "key-2"
+var secondKey = decodePrivateKey([]byte(`
 -----BEGIN EC PRIVATE KEY-----
 MHcCAQEEIAu+avTG/oVGwVv1f52UBJ9afHZLnbfCxKowdDidrRPToAoGCCqGSM49
 AwEHoUQDQgAEyg76i36+fP79FOQhsIhvAE4St9GJBjDm1119oaOtSzhQyx/tYZIi
@@ -58,7 +58,7 @@ func TestVerifier_Verify(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		response, err := json.Marshal(jose.JSONWebKeySet{
 			Keys: []jose.JSONWebKey{
-				{Key: privateKey.Public(), KeyID: privateKeyID, Algorithm: string(jose.ES256)},
+				{Key: fistKey.Public(), KeyID: firstKeyID, Algorithm: string(jose.ES256)},
 			},
 		})
 		require.NoError(t, err)
@@ -78,7 +78,7 @@ func TestVerifier_Verify(t *testing.T) {
 	})
 
 	t.Run("invalid: unknown signing key", func(t *testing.T) {
-		claims, err := verifier.Verify(context.Background(), signSecodary(t, CustomClaims{}))
+		claims, err := verifier.Verify(context.Background(), signSecond(t, CustomClaims{}))
 		assert.ErrorIs(t, err, ErrInvalidSigningKey)
 		assert.Nil(t, claims)
 	})
@@ -87,7 +87,7 @@ func TestVerifier_Verify(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](Config{
 			SigningKeyURL: "http://localhost:8000/v1/unknown",
 		})
-		claims, err := verifier.Verify(context.Background(), signPrimary(t, CustomClaims{}))
+		claims, err := verifier.Verify(context.Background(), signFist(t, CustomClaims{}))
 		assert.ErrorIs(t, err, ErrFetchingSigningKey)
 		assert.Nil(t, claims)
 	})
@@ -99,7 +99,7 @@ func TestVerifier_Verify(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](Config{
 			SigningKeyURL: server.URL,
 		})
-		claims, err := verifier.Verify(context.Background(), signPrimary(t, CustomClaims{}))
+		claims, err := verifier.Verify(context.Background(), signFist(t, CustomClaims{}))
 		assert.ErrorIs(t, err, ErrFetchingSigningKey)
 		assert.Nil(t, claims)
 	})
@@ -109,7 +109,7 @@ func TestVerifier_Verify(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 			response, err := json.Marshal(jose.JSONWebKeySet{
 				Keys: []jose.JSONWebKey{
-					{Key: secondPrivateKey.Public(), KeyID: privateKeyID, Algorithm: string(jose.ES256)},
+					{Key: secondKey.Public(), KeyID: firstKeyID, Algorithm: string(jose.ES256)},
 				},
 			})
 			require.NoError(t, err)
@@ -119,7 +119,7 @@ func TestVerifier_Verify(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](Config{
 			SigningKeyURL: server.URL,
 		})
-		claims, err := verifier.Verify(context.Background(), signSecodary(t, CustomClaims{}))
+		claims, err := verifier.Verify(context.Background(), signSecond(t, CustomClaims{}))
 		assert.ErrorIs(t, err, ErrInvalidSigningKey)
 		assert.Nil(t, claims)
 	})
@@ -129,7 +129,7 @@ func TestVerifier_Verify(t *testing.T) {
 			SigningKeyURL:    server.URL,
 			AllowedAudiences: []string{"stack:2"},
 		})
-		claims, err := verifier.Verify(context.Background(), signPrimary(t, CustomClaims{}))
+		claims, err := verifier.Verify(context.Background(), signFist(t, CustomClaims{}))
 		assert.ErrorIs(t, err, ErrInvalidAudience)
 		assert.Nil(t, claims)
 	})
@@ -139,24 +139,24 @@ func TestVerifier_Verify(t *testing.T) {
 			SigningKeyURL:    server.URL,
 			AllowedAudiences: []string{"stack:1"},
 		})
-		claims, err := verifier.Verify(context.Background(), signPrimary(t, CustomClaims{}))
+		claims, err := verifier.Verify(context.Background(), signFist(t, CustomClaims{}))
 		assert.NoError(t, err)
 		assert.NotNil(t, claims)
 	})
 
 	t.Run("valid: token", func(t *testing.T) {
-		claims, err := verifier.Verify(context.Background(), signPrimary(t, CustomClaims{}))
+		claims, err := verifier.Verify(context.Background(), signFist(t, CustomClaims{}))
 		assert.NoError(t, err)
 		assert.NotNil(t, claims)
 	})
 }
 
-func signPrimary(t *testing.T, claims any) string {
-	return signToken(t, privateKeyID, privateKey, claims)
+func signFist(t *testing.T, claims any) string {
+	return signToken(t, firstKeyID, fistKey, claims)
 }
 
-func signSecodary(t *testing.T, claims any) string {
-	return signToken(t, secondPrivateKeyID, secondPrivateKey, claims)
+func signSecond(t *testing.T, claims any) string {
+	return signToken(t, secondKeyId, secondKey, claims)
 }
 
 func signToken(t *testing.T, keyID string, key *ecdsa.PrivateKey, claims any) string {

@@ -19,7 +19,7 @@ const (
 	cacheCleanupInterval = 10 * time.Minute
 )
 
-func newJWKSService(jwksURL string) *keyService {
+func newKeyService(jwksURL string) *keyService {
 	return &keyService{
 		url: jwksURL,
 		c: cache.NewLocalCache(cache.Config{
