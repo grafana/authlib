@@ -127,11 +127,21 @@ func TestVerifier_Verify(t *testing.T) {
 	t.Run("invalid: token audience not allowed", func(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](Config{
 			SigningKeyURL:    server.URL,
-			AllowedAudiences: []string{"aud-1"},
+			AllowedAudiences: []string{"stack:2"},
 		})
 		claims, err := verifier.Verify(context.Background(), signPrimary(t, CustomClaims{}))
 		assert.ErrorIs(t, err, ErrInvalidAudience)
 		assert.Nil(t, claims)
+	})
+
+	t.Run("valid: token audience allowed", func(t *testing.T) {
+		verifier := NewVerifier[CustomClaims](Config{
+			SigningKeyURL:    server.URL,
+			AllowedAudiences: []string{"stack:1"},
+		})
+		claims, err := verifier.Verify(context.Background(), signPrimary(t, CustomClaims{}))
+		assert.NoError(t, err)
+		assert.NotNil(t, claims)
 	})
 
 	t.Run("valid: token", func(t *testing.T) {
@@ -162,7 +172,7 @@ func signToken(t *testing.T, keyID string, key *ecdsa.PrivateKey, claims any) st
 	})
 	require.NoError(t, err)
 
-	token, err := jwt.Signed(signer).Claims(claims).CompactSerialize()
+	token, err := jwt.Signed(signer).Claims(claims).Claims(jwt.Claims{Audience: jwt.Audience{"stack:1"}}).CompactSerialize()
 	require.NoError(t, err)
 
 	return token
