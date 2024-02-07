@@ -42,7 +42,7 @@ func TestKeyService_Get(t *testing.T) {
 		assert.Equal(t, calls, 1)
 	})
 
-	t.Run("should return caced key", func(t *testing.T) {
+	t.Run("should return cached key", func(t *testing.T) {
 		key, err := service.Get(context.Background(), secondKeyId)
 		require.NoError(t, err)
 		require.NotNil(t, key)
