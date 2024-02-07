@@ -19,8 +19,8 @@ import (
 	goquery "github.com/google/go-querystring/query"
 	"golang.org/x/sync/singleflight"
 
-	"github.com/grafana/rbac-client-poc/pkg/ac/cache"
 	"github.com/grafana/rbac-client-poc/pkg/ac/models"
+	"github.com/grafana/rbac-client-poc/pkg/cache"
 )
 
 var _ RBACClient = &RBACClientImpl{}
@@ -97,7 +97,10 @@ func NewRBACClient(cfg ClientCfg, opts ...ClientOption) (*RBACClientImpl, error)
 	}
 
 	if client.cache == nil {
-		client.cache = cache.NewLocalCache()
+		client.cache = cache.NewLocalCache(cache.Config{
+			Expiry:          5 * time.Minute,
+			CleanupInterval: 1 * time.Minute,
+		})
 	}
 
 	// create httpClient, if not already present
@@ -156,14 +159,14 @@ func (c *RBACClientImpl) SearchUserPermissions(ctx context.Context, query Search
 
 	key := searchCacheKey(query)
 
-	r, ok, err := c.cache.Get(ctx, key)
-	if err != nil {
+	item, err := c.cache.Get(ctx, key)
+	if err != nil && !errors.Is(err, cache.ErrNotFound) {
 		level.Warn(c.logger).Log("could not retrieve from cache", "error", err)
 	}
 
-	if ok {
+	if err == nil {
 		perms := models.UsersPermissions{}
-		err := gob.NewDecoder(r).Decode(&perms)
+		err := gob.NewDecoder(bytes.NewReader(item)).Decode(&perms)
 		if err != nil {
 			level.Warn(c.logger).Log("could not decode data from cache", "error", err)
 		} else {
@@ -225,7 +228,7 @@ func (c *RBACClientImpl) cacheNoFail(ctx context.Context, perms models.UsersPerm
 		return
 	}
 
-	if err = c.cache.Set(ctx, key, CacheExp, bytes.NewReader(buf.Bytes())); err != nil {
+	if err = c.cache.Set(ctx, key, buf.Bytes(), CacheExp); err != nil {
 		level.Warn(c.logger).Log("msg", "error caching result", "key", key, "err", err)
 	}
 }
