@@ -1,16 +1,16 @@
-package idtoken
+package authn
 
 import (
 	"flag"
 	"strings"
 )
 
-type Config struct {
+type IDVerifierConfig struct {
 	SigningKeyURL    string   `yaml:"signingKeysUrl"`
 	AllowedAudiences []string `yaml:"allowedAudiences"`
 }
 
-func (c *Config) RegisterFlags(prefix string, fs flag.FlagSet) {
+func (c *IDVerifierConfig) RegisterFlags(prefix string, fs flag.FlagSet) {
 	fs.StringVar(&c.SigningKeyURL, prefix+".signing-keys-url", "", "URL to jwks endpoint")
 
 	var allowedAudiences string

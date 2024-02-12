@@ -1,4 +1,4 @@
-package idtoken
+package authn
 
 import (
 	"bytes"

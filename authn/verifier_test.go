@@ -1,4 +1,4 @@
-package idtoken
+package authn
 
 import (
 	"context"
@@ -67,7 +67,7 @@ func TestVerifier_Verify(t *testing.T) {
 
 	type CustomClaims struct{}
 
-	verifier := NewVerifier[CustomClaims](Config{
+	verifier := NewVerifier[CustomClaims](IDVerifierConfig{
 		SigningKeyURL: server.URL,
 	})
 
