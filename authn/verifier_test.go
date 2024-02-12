@@ -84,7 +84,7 @@ func TestVerifier_Verify(t *testing.T) {
 	})
 
 	t.Run("invalid: transient http error", func(t *testing.T) {
-		verifier := NewVerifier[CustomClaims](Config{
+		verifier := NewVerifier[CustomClaims](IDVerifierConfig{
 			SigningKeyURL: "http://localhost:8000/v1/unknown",
 		})
 		claims, err := verifier.Verify(context.Background(), signFist(t, CustomClaims{}))
@@ -96,7 +96,7 @@ func TestVerifier_Verify(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 		}))
-		verifier := NewVerifier[CustomClaims](Config{
+		verifier := NewVerifier[CustomClaims](IDVerifierConfig{
 			SigningKeyURL: server.URL,
 		})
 		claims, err := verifier.Verify(context.Background(), signFist(t, CustomClaims{}))
@@ -116,7 +116,7 @@ func TestVerifier_Verify(t *testing.T) {
 			w.Write([]byte(response))
 		}))
 
-		verifier := NewVerifier[CustomClaims](Config{
+		verifier := NewVerifier[CustomClaims](IDVerifierConfig{
 			SigningKeyURL: server.URL,
 		})
 		claims, err := verifier.Verify(context.Background(), signSecond(t, CustomClaims{}))
@@ -125,7 +125,7 @@ func TestVerifier_Verify(t *testing.T) {
 	})
 
 	t.Run("invalid: token audience not allowed", func(t *testing.T) {
-		verifier := NewVerifier[CustomClaims](Config{
+		verifier := NewVerifier[CustomClaims](IDVerifierConfig{
 			SigningKeyURL:    server.URL,
 			AllowedAudiences: []string{"stack:2"},
 		})
@@ -135,7 +135,7 @@ func TestVerifier_Verify(t *testing.T) {
 	})
 
 	t.Run("valid: token audience allowed", func(t *testing.T) {
-		verifier := NewVerifier[CustomClaims](Config{
+		verifier := NewVerifier[CustomClaims](IDVerifierConfig{
 			SigningKeyURL:    server.URL,
 			AllowedAudiences: []string{"stack:1"},
 		})
