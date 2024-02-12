@@ -11,7 +11,7 @@ import (
 	"github.com/go-jose/go-jose/v3"
 	"golang.org/x/sync/singleflight"
 
-	"github.com/grafana/rbac-client-poc/pkg/cache"
+	"github.com/grafana/authlib/internal/cache"
 )
 
 const (

@@ -1,4 +1,4 @@
-module github.com/grafana/rbac-client-poc
+module github.com/grafana/authlib
 
 go 1.21.3
 
