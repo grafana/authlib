@@ -1,4 +1,4 @@
-package idtoken
+package authn
 
 import (
 	"context"
@@ -16,12 +16,12 @@ type Claims[T any] struct {
 	Rest T
 }
 
-func NewVerifier[T any](cfg Config) *VerifierBase[T] {
+func NewVerifier[T any](cfg IDVerifierConfig) *VerifierBase[T] {
 	return &VerifierBase[T]{cfg, newKeyService(cfg.SigningKeyURL)}
 }
 
 type VerifierBase[T any] struct {
-	cfg  Config
+	cfg  IDVerifierConfig
 	keys *keyService
 }
 
