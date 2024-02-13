@@ -65,6 +65,12 @@ func Test_WildcardsDetector(t *testing.T) {
 			want:  true,
 		},
 		{
+			name:  "edge case detect invalid wildcard",
+			kinds: []string{"datasources"},
+			scope: "datasources:uid:1:*",
+			want:  false,
+		},
+		{
 			name:  "two kinds",
 			kinds: []string{"datasources", "folders"},
 			scope: "datasources:uid:*",
@@ -100,63 +106,63 @@ func TestGenerateChecker(t *testing.T) {
 		name        string
 		permissions authz.Permissions
 		action      string
-		prefixes    []string
+		kinds       []string
 		want        match
 	}{
 		{
 			name:        "no match user has no permission",
 			permissions: authz.Permissions{},
 			action:      "dashboards:read",
-			prefixes:    []string{"dashboards:uid"},
+			kinds:       []string{"dashboards"},
 			want:        match{resources: []authz.Resource{{Kind: "dashboards", Attr: "uid", ID: "1"}}, hasAccess: false},
 		},
 		{
 			name:        "no match user does not have the permission",
 			permissions: userPermissions,
 			action:      "folders:read",
-			prefixes:    []string{"folders:uid"},
+			kinds:       []string{"folders"},
 			want:        match{resources: []authz.Resource{{Kind: "folders", Attr: "uid", ID: "2"}}, hasAccess: false},
 		},
 		{
 			name:        "match on action only",
 			permissions: userPermissions,
 			action:      "dashboards:create",
-			prefixes:    []string{},
+			kinds:       []string{},
 			want:        match{resources: []authz.Resource{}, hasAccess: true},
 		},
 		{
 			name:        "no match on action only",
 			permissions: userPermissions,
 			action:      "dashboards:print",
-			prefixes:    []string{},
+			kinds:       []string{},
 			want:        match{resources: []authz.Resource{}, hasAccess: false},
 		},
 		{
 			name:        "match on action only even with scope",
 			permissions: userPermissions,
 			action:      "dashboards:delete",
-			prefixes:    []string{},
+			kinds:       []string{},
 			want:        match{resources: []authz.Resource{}, hasAccess: true},
 		},
 		{
 			name:        "match user has specific permission",
 			permissions: userPermissions,
 			action:      "dashboards:write",
-			prefixes:    []string{"dashboards:uid"},
+			kinds:       []string{"dashboards"},
 			want:        match{resources: []authz.Resource{{Kind: "dashboards", Attr: "uid", ID: "2"}}, hasAccess: true},
 		},
 		{
 			name:        "match user has wildcard permission",
 			permissions: userPermissions,
 			action:      "dashboards:read",
-			prefixes:    []string{"dashboards:uid"},
+			kinds:       []string{"dashboards"},
 			want:        match{resources: []authz.Resource{{Kind: "dashboards", Attr: "uid", ID: "1"}}, hasAccess: true},
 		},
 		{
 			name:        "no match user has action but on none of the desired",
 			permissions: userPermissions,
 			action:      "dashboards:write",
-			prefixes:    []string{"dashboards:uid"},
+			kinds:       []string{"dashboards"},
 			want: match{resources: []authz.Resource{
 				{Kind: "dashboards", Attr: "uid", ID: "55"},
 				{Kind: "dashboards", Attr: "uid", ID: "56"},
@@ -166,7 +172,7 @@ func TestGenerateChecker(t *testing.T) {
 			name:        "match checker built with multiple prefixes",
 			permissions: userPermissions,
 			action:      "dashboards:write",
-			prefixes:    []string{"dashboards:uid", "folders:uid"},
+			kinds:       []string{"dashboards", "folders"},
 			want: match{resources: []authz.Resource{
 				{Kind: "dashboards", Attr: "uid", ID: "55"},
 				{Kind: "folders", Attr: "uid", ID: "3"},
@@ -176,7 +182,7 @@ func TestGenerateChecker(t *testing.T) {
 			name:        "match when at least one scope is found",
 			permissions: userPermissions,
 			action:      "dashboards:write",
-			prefixes:    []string{"dashboards:uid"},
+			kinds:       []string{"dashboards"},
 			want: match{resources: []authz.Resource{
 				{Kind: "dashboards", Attr: "uid", ID: "55"},
 				{Kind: "dashboards", Attr: "uid", ID: "2"},
@@ -185,7 +191,7 @@ func TestGenerateChecker(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			checker := CompileChecker(tt.permissions, tt.action, tt.prefixes...)
+			checker := CompileChecker(tt.permissions, tt.action, tt.kinds...)
 			got := checker(tt.want.resources...)
 			require.Equal(t, tt.want.hasAccess, got)
 		})
@@ -218,7 +224,7 @@ func TestCheckerExamples(t *testing.T) {
 	require.False(t, canDeleteDashboards())
 
 	// Check on either dashboard or folder
-	canReadDashboards := CompileChecker(userPermissions, "dashboards:read", "dashboards:uid", "folders:uid")
+	canReadDashboards := CompileChecker(userPermissions, "dashboards:read", "dashboards", "folders")
 	dash2 := authz.Resource{Kind: "dashboards", Attr: "uid", ID: "dash2"}
 	require.True(t, canReadDashboards(dash2), "should be allowed to read dashboard")
 	fold2 := authz.Resource{Kind: "folders", Attr: "uid", ID: "fold2"}
@@ -228,7 +234,7 @@ func TestCheckerExamples(t *testing.T) {
 	require.True(t, canReadDashboards(dash4, fold3), "should be allowed to read dashboards in the folder")
 
 	// Filter resources
-	canWriteDashboards := CompileChecker(userPermissions, "dashboards:write", "dashboards:uid", "folders:uid")
+	canWriteDashboards := CompileChecker(userPermissions, "dashboards:write", "dashboards", "folders")
 	writeOK := []string{}
 	for _, dash := range dashboards {
 		res := authz.Resource{Kind: "dashboards", Attr: "uid", ID: dash.UID}

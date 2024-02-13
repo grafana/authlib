@@ -63,8 +63,12 @@ func WildcardDetector(kinds ...string) func(scope string) bool {
 		if scope == "*" {
 			return true
 		}
+		split := strings.Split(scope, ":")
+		if len(split) != 3 {
+			split[2] = strings.Join(split[2:], ":")
+		}
 		for i := range kinds {
-			if scope[len(scope)-1] == '*' && strings.HasPrefix(scope, kinds[i]+":") {
+			if split[0] == kinds[i] && split[2] == "*" {
 				return true
 			}
 		}
