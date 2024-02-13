@@ -1,4 +1,4 @@
-package client
+package api
 
 import (
 	"context"
@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/grafana/authlib/internal/cache"
-	"github.com/grafana/authlib/pkg/ac/models"
+	"github.com/grafana/rbac-client-poc/pkg/cache"
 )
 
 type CacheWrap struct {
@@ -56,13 +56,15 @@ func TestRBACClientImpl_SearchUserPermissions(t *testing.T) {
 	tests := []struct {
 		name    string
 		query   SearchQuery
-		want    models.UsersPermissions
+		want    SearchResponse
 		wantErr bool
 	}{
 		{
-			name:  "userID 1 no error",
-			query: SearchQuery{Action: "users:read", UserID: 1},
-			want:  models.UsersPermissions{1: {"users:read": {"org.users:*"}}},
+			name:  "NamespaceID user:1 no error",
+			query: SearchQuery{Action: "users:read", NamespaceID: "user:1"},
+			want: SearchResponse{
+				Data: &PermissionsByID{1: {"users:read": {"org.users:*"}}},
+			},
 		},
 	}
 	for _, tt := range tests {
@@ -71,7 +73,7 @@ func TestRBACClientImpl_SearchUserPermissions(t *testing.T) {
 			d := []byte{}
 			if tt.query.Action != "" {
 				// Using a string instead of an int on purpose as this is what is returned by the API.
-				d, _ = json.Marshal(map[string]map[string][]string{fmt.Sprintf("%v", tt.query.UserID): {tt.query.Action: perms[tt.query.Action]}})
+				d, _ = json.Marshal(map[string]map[string][]string{fmt.Sprintf("%v", strings.Split(tt.query.NamespaceID, ":")[1]): {tt.query.Action: perms[tt.query.Action]}})
 			}
 			require.Equal(t, r.Header.Get("Authorization"), "Bearer aabbcc")
 			require.Equal(t, r.URL.Path, searchPath)
@@ -80,7 +82,7 @@ func TestRBACClientImpl_SearchUserPermissions(t *testing.T) {
 		}))
 		defer server.Close()
 		t.Run(tt.name, func(t *testing.T) {
-			c, err := NewRBACClient(ClientCfg{
+			c, err := NewClient(ClientCfg{
 				GrafanaURL: server.URL,
 				Token:      "aabbcc",
 			}, WithCache(testCache))
@@ -88,16 +90,18 @@ func TestRBACClientImpl_SearchUserPermissions(t *testing.T) {
 
 			c.client = server.Client()
 
-			got, err := c.SearchUserPermissions(context.Background(), tt.query)
+			got, err := c.Search(context.Background(), tt.query)
 			require.NoError(t, err)
-			require.Equal(t, tt.want, got)
+			require.NotNil(t, got)
+			require.Equal(t, tt.want, *got)
 
 			require.Equal(t, 1, testCache.successWriteCnt)
 
 			// Should read from cache
-			got2, err := c.SearchUserPermissions(context.Background(), tt.query)
+			got2, err := c.Search(context.Background(), tt.query)
 			require.NoError(t, err)
-			require.Equal(t, tt.want, got2)
+			require.NotNil(t, got2)
+			require.Equal(t, tt.want, *got2)
 
 			require.Equal(t, 1, testCache.successReadCnt)
 		})
