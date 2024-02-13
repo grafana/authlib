@@ -12,7 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/grafana/rbac-client-poc/pkg/cache"
+	"github.com/grafana/authlib/internal/cache"
 )
 
 type CacheWrap struct {
