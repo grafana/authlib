@@ -3,7 +3,6 @@ package authz
 import (
 	"context"
 	"errors"
-	"strings"
 )
 
 const maxPrefixParts = 3
@@ -53,18 +52,6 @@ func NewEnforcementClient(cfg Config, opt ...ServiceOption) (*EnforcementClientI
 		}
 	}
 	return s, nil
-}
-
-// ScopePrefix returns the prefix associated to a given scope
-// we assume prefixes are all in the form <resource>:<attribute>:<value>
-// ex: "datasources:name:test" returns "datasources:name:"
-func ScopePrefix(scope string) string {
-	parts := strings.Split(scope, ":")
-	// We assume prefixes don't have more than maxPrefixParts parts
-	if len(parts) > maxPrefixParts {
-		parts = append(parts[:maxPrefixParts], "")
-	}
-	return strings.Join(parts, ":")
 }
 
 func (s *EnforcementClientImpl) fetchPermissions(ctx context.Context, idToken string, action string, resource *Resource) (Permissions, error) {
