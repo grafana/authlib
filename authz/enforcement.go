@@ -30,7 +30,7 @@ func WithPreloadPermissions() ServiceOption {
 	}
 }
 
-func WithPreloadPrefixedPermissions(prefix string) ServiceOption {
+func WithPreloadPermissionsByPrefix(prefix string) ServiceOption {
 	return func(s *EnforcementClientImpl) error {
 		s.preload = &SearchQuery{
 			ActionPrefix: prefix,
