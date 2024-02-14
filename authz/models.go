@@ -33,14 +33,28 @@ type Checker func(resources ...Resource) bool
 // ServiceOption allows setting custom parameters during construction.
 type ServiceOption func(*EnforcementClientImpl) error
 
+// ClientOption allows setting custom parameters during construction.
+type ClientOption func(*ClientImpl) error
 type Response[T any] struct {
 	Data  *T     `json:"data"`
 	Error string `json:"error"`
 }
 
+type SearchResponse Response[PermissionsByID]
+
+// PermissionsByID groups permissions (with scopes grouped by action) by user/service-account ID.
+// ex: { 1: { "teams:read": ["teams:id:2", "teams:id:3"] }, 3: { "teams:read": ["teams:id:1", "teams:id:3"] } }
+type PermissionsByID map[int64]Permissions
+
 // Permissions maps actions to the scopes they can be applied to.
 // ex: { "pluginID.users:read": ["pluginID.users:uid:xHuuebS", "pluginID.users:uid:znbGGd"] }
 type Permissions map[string][]string
+
+type ClientCfg struct {
+	GrafanaURL string
+	Token      string
+	JWKsURL    string
+}
 
 // Resource represents a resource in Grafana.
 type Resource struct {
@@ -56,16 +70,6 @@ func (r *Resource) Scope() string {
 	return r.Kind + ":" + r.Attr + ":" + r.ID
 }
 
-func (r *Resource) ScopePrefix() string {
-	return r.Kind + ":" + r.Attr + ":"
-}
-
-type ClientCfg struct {
-	GrafanaURL string
-	Token      string
-	JWKsURL    string
-}
-
 // SearchQuery is the query to search for permissions.
 type SearchQuery struct {
 	ActionPrefix string    `json:"actionPrefix,omitempty" url:"actionPrefix,omitempty"`
@@ -75,15 +79,6 @@ type SearchQuery struct {
 	IdToken      string    `json:"-" url:"-"`
 	Resource     *Resource `json:"-" url:"-"`
 }
-
-type SearchResponse Response[PermissionsByID]
-
-// PermissionsByID groups permissions (with scopes grouped by action) by user/service-account ID.
-// ex: { 1: { "teams:read": ["teams:id:2", "teams:id:3"] }, 3: { "teams:read": ["teams:id:1", "teams:id:3"] } }
-type PermissionsByID map[int64]Permissions
-
-// ClientOption allows setting custom parameters during construction.
-type ClientOption func(*ClientImpl) error
 
 // CustomClaims is a placeholder for any potential additional claims in the id token.
 type CustomClaims struct{}
