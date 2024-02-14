@@ -1,12 +1,9 @@
-package permissions
+package authz
 
 import (
 	"context"
 	"errors"
 	"strings"
-
-	"github.com/grafana/authlib/authz"
-	"github.com/grafana/authlib/authz/api"
 )
 
 const maxPrefixParts = 3
@@ -16,11 +13,11 @@ var (
 )
 
 type EnforcementClientImpl struct {
-	client  api.Client
-	preload *api.SearchQuery
+	client  Client
+	preload *SearchQuery
 }
 
-func WithPreloadSearch(query api.SearchQuery) ServiceOption {
+func WithPreloadSearch(query SearchQuery) ServiceOption {
 	return func(s *EnforcementClientImpl) error {
 		s.preload = &query
 		return nil
@@ -29,21 +26,21 @@ func WithPreloadSearch(query api.SearchQuery) ServiceOption {
 
 func WithPreloadPermissions() ServiceOption {
 	return func(s *EnforcementClientImpl) error {
-		s.preload = &api.SearchQuery{}
+		s.preload = &SearchQuery{}
 		return nil
 	}
 }
 
 func WithPreloadPrefixedPermissions(prefix string) ServiceOption {
 	return func(s *EnforcementClientImpl) error {
-		s.preload = &api.SearchQuery{
+		s.preload = &SearchQuery{
 			ActionPrefix: prefix,
 		}
 		return nil
 	}
 }
 
-func NewEnforcementClient(client api.Client, opt ...ServiceOption) *EnforcementClientImpl {
+func NewEnforcementClient(client Client, opt ...ServiceOption) *EnforcementClientImpl {
 	s := &EnforcementClientImpl{
 		client: client,
 	}
@@ -65,11 +62,11 @@ func ScopePrefix(scope string) string {
 	return strings.Join(parts, ":")
 }
 
-func (s *EnforcementClientImpl) fetchPermissions(ctx context.Context, idToken string, action string, resource *authz.Resource) (authz.Permissions, error) {
+func (s *EnforcementClientImpl) fetchPermissions(ctx context.Context, idToken string, action string, resource *Resource) (Permissions, error) {
 	searchQuery := s.preload
 	// No preload, create a new search query
 	if searchQuery == nil {
-		searchQuery = &api.SearchQuery{
+		searchQuery = &SearchQuery{
 			Action:   action,
 			Resource: resource,
 		}
@@ -100,7 +97,7 @@ func (s *EnforcementClientImpl) Compile(ctx context.Context, idToken string, act
 	return CompileChecker(permissions, action, kinds...), nil
 }
 
-func (s *EnforcementClientImpl) HasAccess(ctx context.Context, idToken string, action string, resource *authz.Resource) (bool, error) {
+func (s *EnforcementClientImpl) HasAccess(ctx context.Context, idToken string, action string, resource *Resource) (bool, error) {
 	permissions, err := s.fetchPermissions(ctx, idToken, action, resource)
 	if err != nil {
 		return false, err

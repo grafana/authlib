@@ -1,20 +1,18 @@
-package permissions
+package authz
 
 // NOTE: this package is temporary, the aim is actually to make this a module
 
 import (
 	"strings"
-
-	"github.com/grafana/authlib/authz"
 )
 
 var (
-	NoAccessChecker   Checker = func(resources ...authz.Resource) bool { return false }
-	FullAccessChecker Checker = func(resources ...authz.Resource) bool { return true }
+	NoAccessChecker   Checker = func(resources ...Resource) bool { return false }
+	FullAccessChecker Checker = func(resources ...Resource) bool { return true }
 )
 
 // CompileChecker generates a function to check whether the user has access to any scope of a given list of scopes.
-func CompileChecker(permissions authz.Permissions, action string, kinds ...string) Checker {
+func CompileChecker(permissions Permissions, action string, kinds ...string) Checker {
 	// no permissions => no access to any resource of this type
 	if len(permissions) == 0 {
 		return NoAccessChecker
@@ -41,7 +39,7 @@ func CompileChecker(permissions authz.Permissions, action string, kinds ...strin
 		lookup[s] = true
 	}
 
-	return func(resources ...authz.Resource) bool {
+	return func(resources ...Resource) bool {
 		// search for any direct match
 		for i := range resources {
 			if lookup[resources[i].Scope()] {

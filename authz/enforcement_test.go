@@ -1,4 +1,4 @@
-package permissions
+package authz
 
 import (
 	"context"
@@ -6,10 +6,6 @@ import (
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
-
-	"github.com/grafana/authlib/authz"
-	"github.com/grafana/authlib/authz/api"
-	"github.com/grafana/authlib/authz/testutils"
 )
 
 func TestEnforcementClientImpl_fetchPermissions_queryPreload(t *testing.T) {
@@ -17,30 +13,30 @@ func TestEnforcementClientImpl_fetchPermissions_queryPreload(t *testing.T) {
 		name         string
 		idToken      string
 		action       string
-		resource     *authz.Resource
-		preloadQuery *api.SearchQuery
-		wantQuery    api.SearchQuery
+		resource     *Resource
+		preloadQuery *SearchQuery
+		wantQuery    SearchQuery
 	}{
 		{
 			name:     "without preload query",
 			idToken:  "jwt_id_token",
 			action:   "teams:read",
-			resource: &authz.Resource{Kind: "teams", Attr: "id", ID: "1"},
-			wantQuery: api.SearchQuery{
+			resource: &Resource{Kind: "teams", Attr: "id", ID: "1"},
+			wantQuery: SearchQuery{
 				IdToken:  "jwt_id_token",
 				Action:   "teams:read",
-				Resource: &authz.Resource{Kind: "teams", Attr: "id", ID: "1"},
+				Resource: &Resource{Kind: "teams", Attr: "id", ID: "1"},
 			},
 		},
 		{
 			name:     "with preload query",
 			idToken:  "jwt_id_token",
 			action:   "teams:read",
-			resource: &authz.Resource{Kind: "teams", Attr: "id", ID: "1"},
-			preloadQuery: &api.SearchQuery{
+			resource: &Resource{Kind: "teams", Attr: "id", ID: "1"},
+			preloadQuery: &SearchQuery{
 				ActionPrefix: "teams",
 			},
-			wantQuery: api.SearchQuery{
+			wantQuery: SearchQuery{
 				ActionPrefix: "teams",
 				IdToken:      "jwt_id_token",
 			},
@@ -48,12 +44,12 @@ func TestEnforcementClientImpl_fetchPermissions_queryPreload(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockClient := &testutils.MockClient{}
+			mockClient := &MockClient{}
 			s := NewEnforcementClient(mockClient)
 			if tt.preloadQuery != nil {
 				s.preload = tt.preloadQuery
 			}
-			mockClient.On("Search", mock.Anything, tt.wantQuery).Return(&api.SearchResponse{Data: &api.PermissionsByID{}}, nil)
+			mockClient.On("Search", mock.Anything, tt.wantQuery).Return(&SearchResponse{Data: &PermissionsByID{}}, nil)
 
 			_, err := s.fetchPermissions(context.Background(), tt.idToken, tt.action, tt.resource)
 			require.NoError(t, err)
@@ -67,15 +63,15 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 		permissions map[string][]string
 		idToken     string
 		action      string
-		resource    *authz.Resource
-		wantQuery   api.SearchQuery
+		resource    *Resource
+		wantQuery   SearchQuery
 		want        bool
 	}{
 		{
 			name:    "no permission",
 			idToken: "jwt_id_token",
 			action:  "teams:read",
-			wantQuery: api.SearchQuery{
+			wantQuery: SearchQuery{
 				IdToken: "jwt_id_token",
 				Action:  "teams:read",
 			},
@@ -86,7 +82,7 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 			permissions: map[string][]string{"teams:read": {"teams:id:1", "teams:id:2"}},
 			idToken:     "jwt_id_token",
 			action:      "teams:read",
-			wantQuery: api.SearchQuery{
+			wantQuery: SearchQuery{
 				IdToken: "jwt_id_token",
 				Action:  "teams:read",
 			},
@@ -97,7 +93,7 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 			permissions: map[string][]string{"teams:read": {"teams:id:1", "teams:id:2"}}, // only likely with query preload
 			idToken:     "jwt_id_token",
 			action:      "teams:write",
-			wantQuery: api.SearchQuery{
+			wantQuery: SearchQuery{
 				IdToken: "jwt_id_token",
 				Action:  "teams:write",
 			},
@@ -108,11 +104,11 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 			permissions: map[string][]string{"teams:read": {"teams:id:1", "teams:id:2"}},
 			idToken:     "jwt_id_token",
 			action:      "teams:read",
-			resource:    &authz.Resource{Kind: "teams", Attr: "id", ID: "1"},
-			wantQuery: api.SearchQuery{
+			resource:    &Resource{Kind: "teams", Attr: "id", ID: "1"},
+			wantQuery: SearchQuery{
 				IdToken:  "jwt_id_token",
 				Action:   "teams:read",
-				Resource: &authz.Resource{Kind: "teams", Attr: "id", ID: "1"},
+				Resource: &Resource{Kind: "teams", Attr: "id", ID: "1"},
 			},
 			want: true,
 		},
@@ -121,19 +117,19 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 			permissions: map[string][]string{"teams:read": {"teams:id:1", "teams:id:2"}}, // only likely with query preload
 			idToken:     "jwt_id_token",
 			action:      "teams:read",
-			resource:    &authz.Resource{Kind: "teams", Attr: "id", ID: "3"},
-			wantQuery: api.SearchQuery{
+			resource:    &Resource{Kind: "teams", Attr: "id", ID: "3"},
+			wantQuery: SearchQuery{
 				IdToken:  "jwt_id_token",
 				Action:   "teams:read",
-				Resource: &authz.Resource{Kind: "teams", Attr: "id", ID: "3"},
+				Resource: &Resource{Kind: "teams", Attr: "id", ID: "3"},
 			},
 			want: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockClient := &testutils.MockClient{}
-			mockClient.On("Search", mock.Anything, tt.wantQuery).Return(&api.SearchResponse{Data: &api.PermissionsByID{1: tt.permissions}}, nil)
+			mockClient := &MockClient{}
+			mockClient.On("Search", mock.Anything, tt.wantQuery).Return(&SearchResponse{Data: &PermissionsByID{1: tt.permissions}}, nil)
 			s := NewEnforcementClient(mockClient)
 			got, err := s.HasAccess(context.Background(), tt.idToken, tt.action, tt.resource)
 			require.NoError(t, err)

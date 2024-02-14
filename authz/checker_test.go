@@ -1,12 +1,10 @@
-package permissions
+package authz
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/grafana/authlib/authz"
 )
 
 func Test_WildcardsDetector(t *testing.T) {
@@ -91,7 +89,7 @@ func Test_WildcardsDetector(t *testing.T) {
 }
 
 func TestGenerateChecker(t *testing.T) {
-	userPermissions := authz.Permissions{
+	userPermissions := Permissions{
 		"dashboards:create": []string{},                                                                         // no scope
 		"dashboards:read":   []string{"dashboards:uid:*", "folders:uid:*"},                                      // wildcards
 		"dashboards:write":  []string{"dashboards:uid:1", "dashboards:uid:2", "folders:uid:3", "folders:uid:4"}, // folders or dashboards
@@ -99,71 +97,71 @@ func TestGenerateChecker(t *testing.T) {
 	}
 
 	type match struct {
-		resources []authz.Resource
+		resources []Resource
 		hasAccess bool
 	}
 	tests := []struct {
 		name        string
-		permissions authz.Permissions
+		permissions Permissions
 		action      string
 		kinds       []string
 		want        match
 	}{
 		{
 			name:        "no match user has no permission",
-			permissions: authz.Permissions{},
+			permissions: Permissions{},
 			action:      "dashboards:read",
 			kinds:       []string{"dashboards"},
-			want:        match{resources: []authz.Resource{{Kind: "dashboards", Attr: "uid", ID: "1"}}, hasAccess: false},
+			want:        match{resources: []Resource{{Kind: "dashboards", Attr: "uid", ID: "1"}}, hasAccess: false},
 		},
 		{
 			name:        "no match user does not have the permission",
 			permissions: userPermissions,
 			action:      "folders:read",
 			kinds:       []string{"folders"},
-			want:        match{resources: []authz.Resource{{Kind: "folders", Attr: "uid", ID: "2"}}, hasAccess: false},
+			want:        match{resources: []Resource{{Kind: "folders", Attr: "uid", ID: "2"}}, hasAccess: false},
 		},
 		{
 			name:        "match on action only",
 			permissions: userPermissions,
 			action:      "dashboards:create",
 			kinds:       []string{},
-			want:        match{resources: []authz.Resource{}, hasAccess: true},
+			want:        match{resources: []Resource{}, hasAccess: true},
 		},
 		{
 			name:        "no match on action only",
 			permissions: userPermissions,
 			action:      "dashboards:print",
 			kinds:       []string{},
-			want:        match{resources: []authz.Resource{}, hasAccess: false},
+			want:        match{resources: []Resource{}, hasAccess: false},
 		},
 		{
 			name:        "match on action only even with scope",
 			permissions: userPermissions,
 			action:      "dashboards:delete",
 			kinds:       []string{},
-			want:        match{resources: []authz.Resource{}, hasAccess: true},
+			want:        match{resources: []Resource{}, hasAccess: true},
 		},
 		{
 			name:        "match user has specific permission",
 			permissions: userPermissions,
 			action:      "dashboards:write",
 			kinds:       []string{"dashboards"},
-			want:        match{resources: []authz.Resource{{Kind: "dashboards", Attr: "uid", ID: "2"}}, hasAccess: true},
+			want:        match{resources: []Resource{{Kind: "dashboards", Attr: "uid", ID: "2"}}, hasAccess: true},
 		},
 		{
 			name:        "match user has wildcard permission",
 			permissions: userPermissions,
 			action:      "dashboards:read",
 			kinds:       []string{"dashboards"},
-			want:        match{resources: []authz.Resource{{Kind: "dashboards", Attr: "uid", ID: "1"}}, hasAccess: true},
+			want:        match{resources: []Resource{{Kind: "dashboards", Attr: "uid", ID: "1"}}, hasAccess: true},
 		},
 		{
 			name:        "no match user has action but on none of the desired",
 			permissions: userPermissions,
 			action:      "dashboards:write",
 			kinds:       []string{"dashboards"},
-			want: match{resources: []authz.Resource{
+			want: match{resources: []Resource{
 				{Kind: "dashboards", Attr: "uid", ID: "55"},
 				{Kind: "dashboards", Attr: "uid", ID: "56"},
 			}, hasAccess: false},
@@ -173,7 +171,7 @@ func TestGenerateChecker(t *testing.T) {
 			permissions: userPermissions,
 			action:      "dashboards:write",
 			kinds:       []string{"dashboards", "folders"},
-			want: match{resources: []authz.Resource{
+			want: match{resources: []Resource{
 				{Kind: "dashboards", Attr: "uid", ID: "55"},
 				{Kind: "folders", Attr: "uid", ID: "3"},
 			}, hasAccess: true},
@@ -183,7 +181,7 @@ func TestGenerateChecker(t *testing.T) {
 			permissions: userPermissions,
 			action:      "dashboards:write",
 			kinds:       []string{"dashboards"},
-			want: match{resources: []authz.Resource{
+			want: match{resources: []Resource{
 				{Kind: "dashboards", Attr: "uid", ID: "55"},
 				{Kind: "dashboards", Attr: "uid", ID: "2"},
 			}, hasAccess: true},
@@ -204,7 +202,7 @@ func TestCheckerExamples(t *testing.T) {
 		parentUID string
 	}
 
-	userPermissions := authz.Permissions{
+	userPermissions := Permissions{
 		"dashboards:create": []string{},
 		"dashboards:read":   []string{"dashboards:uid:*", "folders:uid:*"},
 		"dashboards:write":  []string{"dashboards:uid:dash1", "dashboards:uid:dash2", "folders:uid:fold1", "folders:uid:fold2"},
@@ -225,20 +223,20 @@ func TestCheckerExamples(t *testing.T) {
 
 	// Check on either dashboard or folder
 	canReadDashboards := CompileChecker(userPermissions, "dashboards:read", "dashboards", "folders")
-	dash2 := authz.Resource{Kind: "dashboards", Attr: "uid", ID: "dash2"}
+	dash2 := Resource{Kind: "dashboards", Attr: "uid", ID: "dash2"}
 	require.True(t, canReadDashboards(dash2), "should be allowed to read dashboard")
-	fold2 := authz.Resource{Kind: "folders", Attr: "uid", ID: "fold2"}
+	fold2 := Resource{Kind: "folders", Attr: "uid", ID: "fold2"}
 	require.True(t, canReadDashboards(fold2), "should be allowed to read dashboard in the folder")
-	dash4 := authz.Resource{Kind: "dashboards", Attr: "uid", ID: "dash4"}
-	fold3 := authz.Resource{Kind: "folders", Attr: "uid", ID: "fold3"}
+	dash4 := Resource{Kind: "dashboards", Attr: "uid", ID: "dash4"}
+	fold3 := Resource{Kind: "folders", Attr: "uid", ID: "fold3"}
 	require.True(t, canReadDashboards(dash4, fold3), "should be allowed to read dashboards in the folder")
 
 	// Filter resources
 	canWriteDashboards := CompileChecker(userPermissions, "dashboards:write", "dashboards", "folders")
 	writeOK := []string{}
 	for _, dash := range dashboards {
-		res := authz.Resource{Kind: "dashboards", Attr: "uid", ID: dash.UID}
-		parent := authz.Resource{Kind: "folders", Attr: "uid", ID: dash.parentUID}
+		res := Resource{Kind: "dashboards", Attr: "uid", ID: dash.UID}
+		parent := Resource{Kind: "folders", Attr: "uid", ID: dash.parentUID}
 		if canWriteDashboards(res, parent) {
 			writeOK = append(writeOK, dash.UID)
 		}
