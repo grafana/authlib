@@ -22,9 +22,9 @@ type EnforcementClient interface {
 	// This is particularly useful when you want to verify access to a list of resources.
 	Compile(ctx context.Context, idToken string, action string, kinds ...string) (Checker, error)
 
-	// HasAccess checks whether the user can perform the given action on the given scope.
+	// HasAccess checks whether the user can perform the given action on any of the given resources.
 	// If the scope is empty, it checks whether the user can perform the action.
-	HasAccess(ctx context.Context, idToken string, action string, resource *Resource) (bool, error)
+	HasAccess(ctx context.Context, idToken string, action string, resources ...Resource) (bool, error)
 }
 
 // Checker checks whether a user has access to any of the provided resources.

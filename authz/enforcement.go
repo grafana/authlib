@@ -54,13 +54,16 @@ func NewEnforcementClient(cfg Config, opt ...ServiceOption) (*EnforcementClientI
 	return s, nil
 }
 
-func (s *EnforcementClientImpl) fetchPermissions(ctx context.Context, idToken string, action string, resource *Resource) (Permissions, error) {
+func (s *EnforcementClientImpl) fetchPermissions(ctx context.Context, idToken string, action string, resources ...Resource) (Permissions, error) {
 	searchQuery := s.preload
 	// No preload, create a new search query
 	if searchQuery == nil {
 		searchQuery = &SearchQuery{
-			Action:   action,
-			Resource: resource,
+			Action: action,
+		}
+		if len(resources) == 1 {
+			res := resources[0]
+			searchQuery.Resource = &res
 		}
 	}
 	searchQuery.IdToken = idToken
@@ -81,7 +84,7 @@ func (s *EnforcementClientImpl) fetchPermissions(ctx context.Context, idToken st
 }
 
 func (s *EnforcementClientImpl) Compile(ctx context.Context, idToken string, action string, kinds ...string) (Checker, error) {
-	permissions, err := s.fetchPermissions(ctx, idToken, action, nil)
+	permissions, err := s.fetchPermissions(ctx, idToken, action)
 	if err != nil {
 		return NoAccessChecker, err
 	}
@@ -89,13 +92,23 @@ func (s *EnforcementClientImpl) Compile(ctx context.Context, idToken string, act
 	return CompileChecker(permissions, action, kinds...), nil
 }
 
-func (s *EnforcementClientImpl) HasAccess(ctx context.Context, idToken string, action string, resource *Resource) (bool, error) {
-	permissions, err := s.fetchPermissions(ctx, idToken, action, resource)
+func resourcesKind(resources ...Resource) []string {
+	mK := make(map[string]bool, len(resources))
+	kinds := make([]string, 0, len(resources))
+	for _, r := range resources {
+		if !mK[r.Kind] {
+			mK[r.Kind] = true
+			kinds = append(kinds, r.Kind)
+		}
+	}
+	return kinds
+}
+
+func (s *EnforcementClientImpl) HasAccess(ctx context.Context, idToken string, action string, resources ...Resource) (bool, error) {
+	permissions, err := s.fetchPermissions(ctx, idToken, action, resources...)
 	if err != nil {
 		return false, err
 	}
-	if resource == nil {
-		return CompileChecker(permissions, action)(), nil
-	}
-	return CompileChecker(permissions, action, resource.Kind)(*resource), nil
+	kinds := resourcesKind(resources...)
+	return CompileChecker(permissions, action, kinds...)(resources...), nil
 }

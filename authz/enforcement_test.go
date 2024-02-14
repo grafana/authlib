@@ -13,15 +13,15 @@ func TestEnforcementClientImpl_fetchPermissions_queryPreload(t *testing.T) {
 		name         string
 		idToken      string
 		action       string
-		resource     *Resource
+		resources    []Resource
 		preloadQuery *SearchQuery
 		wantQuery    SearchQuery
 	}{
 		{
-			name:     "without preload query",
-			idToken:  "jwt_id_token",
-			action:   "teams:read",
-			resource: &Resource{Kind: "teams", Attr: "id", ID: "1"},
+			name:      "without preload query",
+			idToken:   "jwt_id_token",
+			action:    "teams:read",
+			resources: []Resource{{Kind: "teams", Attr: "id", ID: "1"}},
 			wantQuery: SearchQuery{
 				IdToken:  "jwt_id_token",
 				Action:   "teams:read",
@@ -29,10 +29,10 @@ func TestEnforcementClientImpl_fetchPermissions_queryPreload(t *testing.T) {
 			},
 		},
 		{
-			name:     "with preload query",
-			idToken:  "jwt_id_token",
-			action:   "teams:read",
-			resource: &Resource{Kind: "teams", Attr: "id", ID: "1"},
+			name:      "with preload query",
+			idToken:   "jwt_id_token",
+			action:    "teams:read",
+			resources: []Resource{{Kind: "teams", Attr: "id", ID: "1"}},
 			preloadQuery: &SearchQuery{
 				ActionPrefix: "teams",
 			},
@@ -52,7 +52,7 @@ func TestEnforcementClientImpl_fetchPermissions_queryPreload(t *testing.T) {
 			}
 			mockClient.On("Search", mock.Anything, tt.wantQuery).Return(&SearchResponse{Data: &PermissionsByID{}}, nil)
 
-			_, err := s.fetchPermissions(context.Background(), tt.idToken, tt.action, tt.resource)
+			_, err := s.fetchPermissions(context.Background(), tt.idToken, tt.action, tt.resources...)
 			require.NoError(t, err)
 		})
 	}
@@ -64,7 +64,7 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 		permissions map[string][]string
 		idToken     string
 		action      string
-		resource    *Resource
+		resources   []Resource
 		wantQuery   SearchQuery
 		want        bool
 	}{
@@ -105,7 +105,7 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 			permissions: map[string][]string{"teams:read": {"teams:id:1", "teams:id:2"}},
 			idToken:     "jwt_id_token",
 			action:      "teams:read",
-			resource:    &Resource{Kind: "teams", Attr: "id", ID: "1"},
+			resources:   []Resource{{Kind: "teams", Attr: "id", ID: "1"}},
 			wantQuery: SearchQuery{
 				IdToken:  "jwt_id_token",
 				Action:   "teams:read",
@@ -118,11 +118,35 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 			permissions: map[string][]string{"teams:read": {"teams:id:1", "teams:id:2"}}, // only likely with query preload
 			idToken:     "jwt_id_token",
 			action:      "teams:read",
-			resource:    &Resource{Kind: "teams", Attr: "id", ID: "3"},
+			resources:   []Resource{{Kind: "teams", Attr: "id", ID: "3"}},
 			wantQuery: SearchQuery{
 				IdToken:  "jwt_id_token",
 				Action:   "teams:read",
 				Resource: &Resource{Kind: "teams", Attr: "id", ID: "3"},
+			},
+			want: false,
+		},
+		{
+			name:        "has action on any of the scopes",
+			permissions: map[string][]string{"dashboards:read": {"dashboards:uid:1", "folders:uid:2"}},
+			idToken:     "jwt_id_token",
+			action:      "dashboards:read",
+			resources:   []Resource{{Kind: "dashboards", Attr: "uid", ID: "3"}, {Kind: "folders", Attr: "uid", ID: "2"}},
+			wantQuery: SearchQuery{
+				IdToken: "jwt_id_token",
+				Action:  "dashboards:read",
+			},
+			want: true,
+		},
+		{
+			name:        "does not have action on any of the scopes",
+			permissions: map[string][]string{"dashboards:read": {"dashboards:uid:1", "folders:uid:2"}},
+			idToken:     "jwt_id_token",
+			action:      "dashboards:read",
+			resources:   []Resource{{Kind: "dashboards", Attr: "uid", ID: "3"}, {Kind: "folders", Attr: "uid", ID: "4"}},
+			wantQuery: SearchQuery{
+				IdToken: "jwt_id_token",
+				Action:  "dashboards:read",
 			},
 			want: false,
 		},
@@ -133,7 +157,7 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 			mockClient.On("Search", mock.Anything, tt.wantQuery).Return(&SearchResponse{Data: &PermissionsByID{1: tt.permissions}}, nil)
 			s := EnforcementClientImpl{client: mockClient}
 
-			got, err := s.HasAccess(context.Background(), tt.idToken, tt.action, tt.resource)
+			got, err := s.HasAccess(context.Background(), tt.idToken, tt.action, tt.resources...)
 			require.NoError(t, err)
 			require.Equal(t, got, tt.want)
 		})
