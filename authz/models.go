@@ -50,7 +50,7 @@ type PermissionsByID map[int64]Permissions
 // ex: { "pluginID.users:read": ["pluginID.users:uid:xHuuebS", "pluginID.users:uid:znbGGd"] }
 type Permissions map[string][]string
 
-type ClientCfg struct {
+type Config struct {
 	GrafanaURL string
 	Token      string
 	JWKsURL    string

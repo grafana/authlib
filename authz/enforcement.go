@@ -40,14 +40,19 @@ func WithPreloadPrefixedPermissions(prefix string) ServiceOption {
 	}
 }
 
-func NewEnforcementClient(client Client, opt ...ServiceOption) *EnforcementClientImpl {
-	s := &EnforcementClientImpl{
-		client: client,
-	}
+func NewEnforcementClient(cfg Config, opt ...ServiceOption) (*EnforcementClientImpl, error) {
+	s := &EnforcementClientImpl{}
 	for _, o := range opt {
 		_ = o(s)
 	}
-	return s
+
+	if s.client == nil {
+		var err error
+		if s.client, err = NewClient(cfg); err != nil {
+			return nil, err
+		}
+	}
+	return s, nil
 }
 
 // ScopePrefix returns the prefix associated to a given scope

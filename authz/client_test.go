@@ -82,7 +82,7 @@ func TestRBACClientImpl_SearchUserPermissions(t *testing.T) {
 		}))
 		defer server.Close()
 		t.Run(tt.name, func(t *testing.T) {
-			c, err := NewClient(ClientCfg{
+			c, err := NewClient(Config{
 				GrafanaURL: server.URL,
 				Token:      "aabbcc",
 			}, WithCache(testCache))

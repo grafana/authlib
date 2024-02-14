@@ -45,7 +45,8 @@ func TestEnforcementClientImpl_fetchPermissions_queryPreload(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := &MockClient{}
-			s := NewEnforcementClient(mockClient)
+			s := EnforcementClientImpl{client: mockClient}
+
 			if tt.preloadQuery != nil {
 				s.preload = tt.preloadQuery
 			}
@@ -130,7 +131,8 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := &MockClient{}
 			mockClient.On("Search", mock.Anything, tt.wantQuery).Return(&SearchResponse{Data: &PermissionsByID{1: tt.permissions}}, nil)
-			s := NewEnforcementClient(mockClient)
+			s := EnforcementClientImpl{client: mockClient}
+
 			got, err := s.HasAccess(context.Background(), tt.idToken, tt.action, tt.resource)
 			require.NoError(t, err)
 			require.Equal(t, got, tt.want)

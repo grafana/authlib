@@ -57,7 +57,7 @@ func WithCache(cache cache.Cache) ClientOption {
 	}
 }
 
-func NewClient(cfg ClientCfg, opts ...ClientOption) (*ClientImpl, error) {
+func NewClient(cfg Config, opts ...ClientOption) (*ClientImpl, error) {
 	client := &ClientImpl{
 		singlef: singleflight.Group{},
 		client:  nil,
@@ -107,7 +107,7 @@ func NewClient(cfg ClientCfg, opts ...ClientOption) (*ClientImpl, error) {
 
 type ClientImpl struct {
 	cache    cache.Cache
-	cfg      ClientCfg
+	cfg      Config
 	client   HTTPRequestDoer
 	logger   log.Logger
 	verifier authn.Verifier[CustomClaims]
