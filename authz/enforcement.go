@@ -63,21 +63,21 @@ func NewEnforcementClient(cfg Config, opt ...ClientOption) (*EnforcementClientIm
 
 func (s *EnforcementClientImpl) fetchPermissions(ctx context.Context,
 	idToken string, action string, resources ...Resource) (permissions, error) {
-	query := s.queryTemplate
-	// No preload, create a new search query
-	if query == nil || (query.ActionPrefix != "" && !strings.HasPrefix(action,
-		query.ActionPrefix)) {
-		query = &searchQuery{
-			Action: action,
-		}
+	var query searchQuery
+
+	if s.queryTemplate != nil && s.queryTemplate.ActionPrefix != "" &&
+		strings.HasPrefix(action, s.queryTemplate.ActionPrefix) {
+		query = *s.queryTemplate
+	} else {
+		query = searchQuery{Action: action}
 		if len(resources) == 1 {
 			res := resources[0]
 			query.Resource = &res
 		}
 	}
-	query.IdToken = idToken
 
-	searchRes, err := s.client.Search(ctx, *query)
+	query.IdToken = idToken
+	searchRes, err := s.client.Search(ctx, query)
 	if err != nil || searchRes.Data == nil || len(*searchRes.Data) == 0 {
 		return nil, err
 	}
