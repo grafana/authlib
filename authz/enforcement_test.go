@@ -50,7 +50,7 @@ func TestEnforcementClientImpl_fetchPermissions_queryPreload(t *testing.T) {
 			if tt.preloadQuery != nil {
 				s.preload = tt.preloadQuery
 			}
-			mockClient.On("Search", mock.Anything, tt.wantQuery).Return(&SearchResponse{Data: &PermissionsByID{}}, nil)
+			mockClient.On("Search", mock.Anything, tt.wantQuery).Return(&searchResponse{Data: &permissionsByID{}}, nil)
 
 			_, err := s.fetchPermissions(context.Background(), tt.idToken, tt.action, tt.resources...)
 			require.NoError(t, err)
@@ -154,7 +154,7 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockClient := &MockClient{}
-			mockClient.On("Search", mock.Anything, tt.wantQuery).Return(&SearchResponse{Data: &PermissionsByID{1: tt.permissions}}, nil)
+			mockClient.On("Search", mock.Anything, tt.wantQuery).Return(&searchResponse{Data: &permissionsByID{1: tt.permissions}}, nil)
 			s := EnforcementClientImpl{client: mockClient}
 
 			got, err := s.HasAccess(context.Background(), tt.idToken, tt.action, tt.resources...)

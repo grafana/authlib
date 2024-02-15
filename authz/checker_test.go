@@ -89,7 +89,7 @@ func Test_WildcardsDetector(t *testing.T) {
 }
 
 func TestGenerateChecker(t *testing.T) {
-	userPermissions := Permissions{
+	userPermissions := permissions{
 		"dashboards:create": []string{},                                                                         // no scope
 		"dashboards:read":   []string{"dashboards:uid:*", "folders:uid:*"},                                      // wildcards
 		"dashboards:write":  []string{"dashboards:uid:1", "dashboards:uid:2", "folders:uid:3", "folders:uid:4"}, // folders or dashboards
@@ -102,14 +102,14 @@ func TestGenerateChecker(t *testing.T) {
 	}
 	tests := []struct {
 		name        string
-		permissions Permissions
+		permissions permissions
 		action      string
 		kinds       []string
 		want        match
 	}{
 		{
 			name:        "no match user has no permission",
-			permissions: Permissions{},
+			permissions: permissions{},
 			action:      "dashboards:read",
 			kinds:       []string{"dashboards"},
 			want:        match{resources: []Resource{{Kind: "dashboards", Attr: "uid", ID: "1"}}, hasAccess: false},
@@ -202,7 +202,7 @@ func TestCheckerExamples(t *testing.T) {
 		parentUID string
 	}
 
-	userPermissions := Permissions{
+	userPermissions := permissions{
 		"dashboards:create": []string{},
 		"dashboards:read":   []string{"dashboards:uid:*", "folders:uid:*"},
 		"dashboards:write":  []string{"dashboards:uid:dash1", "dashboards:uid:dash2", "folders:uid:fold1", "folders:uid:fold2"},

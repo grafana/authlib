@@ -20,7 +20,7 @@ import (
 	"github.com/grafana/authlib/internal/cache"
 )
 
-var _ Client = &clientImpl{}
+var _ client = &clientImpl{}
 
 var (
 	ErrInvalidQuery     = errors.New("invalid query")
@@ -75,7 +75,7 @@ func newClient(cfg Config, opts ...clientOption) (*clientImpl, error) {
 		})
 	}
 
-	client.verifier = authn.NewVerifier[CustomClaims](authn.IDVerifierConfig{SigningKeyURL: cfg.JWKsURL})
+	client.verifier = authn.NewVerifier[customClaims](authn.IDVerifierConfig{SigningKeyURL: cfg.JWKsURL})
 
 	// create httpClient, if not already present
 	if client.client == nil {
@@ -105,7 +105,7 @@ type clientImpl struct {
 	cache    cache.Cache
 	cfg      Config
 	client   HTTPRequestDoer
-	verifier authn.Verifier[CustomClaims]
+	verifier authn.Verifier[customClaims]
 	singlef  singleflight.Group
 }
 
@@ -149,7 +149,7 @@ func (query *SearchQuery) validateQuery() error {
 }
 
 // Search returns the permissions for the given query.
-func (c *clientImpl) Search(ctx context.Context, query SearchQuery) (*SearchResponse, error) {
+func (c *clientImpl) Search(ctx context.Context, query SearchQuery) (*searchResponse, error) {
 	// set scope if resource is provided
 	query.processResource()
 
@@ -171,12 +171,12 @@ func (c *clientImpl) Search(ctx context.Context, query SearchQuery) (*SearchResp
 	}
 
 	if err == nil {
-		perms := PermissionsByID{}
+		perms := permissionsByID{}
 		err := gob.NewDecoder(bytes.NewReader(item)).Decode(&perms)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode cache entry: %w", err)
 		} else {
-			return &SearchResponse{Data: &perms}, nil
+			return &searchResponse{Data: &perms}, nil
 		}
 	}
 
@@ -207,7 +207,7 @@ func (c *clientImpl) Search(ctx context.Context, query SearchQuery) (*SearchResp
 			return nil, fmt.Errorf("%w: %s", ErrUnexpectedStatus, res.Status)
 		}
 
-		response := PermissionsByID{}
+		response := permissionsByID{}
 		if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
 			return nil, fmt.Errorf("%w: %s", ErrInvalidResponse, err)
 		}
@@ -218,15 +218,15 @@ func (c *clientImpl) Search(ctx context.Context, query SearchQuery) (*SearchResp
 		return nil, err
 	}
 
-	perms := res.(PermissionsByID)
+	perms := res.(permissionsByID)
 	if err := c.cacheValue(ctx, perms, key); err != nil {
 		return nil, fmt.Errorf("failed to cache response: %w", err)
 	}
 
-	return &SearchResponse{Data: &perms}, nil
+	return &searchResponse{Data: &perms}, nil
 }
 
-func (c *clientImpl) cacheValue(ctx context.Context, perms PermissionsByID, key string) error {
+func (c *clientImpl) cacheValue(ctx context.Context, perms permissionsByID, key string) error {
 	buf := bytes.Buffer{}
 	err := gob.NewEncoder(&buf).Encode(perms)
 	if err != nil {

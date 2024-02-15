@@ -12,7 +12,7 @@ var (
 )
 
 type EnforcementClientImpl struct {
-	client     Client
+	client     client
 	preload    *SearchQuery
 	clientOpts []clientOption
 }
@@ -72,7 +72,7 @@ func NewEnforcementClient(cfg Config, opt ...ClientOption) (*EnforcementClientIm
 	return s, nil
 }
 
-func (s *EnforcementClientImpl) fetchPermissions(ctx context.Context, idToken string, action string, resources ...Resource) (Permissions, error) {
+func (s *EnforcementClientImpl) fetchPermissions(ctx context.Context, idToken string, action string, resources ...Resource) (permissions, error) {
 	searchQuery := s.preload
 	// No preload, create a new search query
 	if searchQuery == nil {

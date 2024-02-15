@@ -11,10 +11,10 @@ type HTTPRequestDoer interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-// Client performs requests to the authorization server.
-type Client interface {
+// client performs requests to the authorization server.
+type client interface {
 	// Search returns the permissions for the given query.
-	Search(ctx context.Context, query SearchQuery) (*SearchResponse, error)
+	Search(ctx context.Context, query SearchQuery) (*searchResponse, error)
 }
 
 type EnforcementClient interface {
@@ -35,20 +35,20 @@ type ClientOption func(*EnforcementClientImpl) error
 
 // ClientOption allows setting custom parameters during construction.
 type clientOption func(*clientImpl) error
-type Response[T any] struct {
+type response[T any] struct {
 	Data  *T     `json:"data"`
 	Error string `json:"error"`
 }
 
-type SearchResponse Response[PermissionsByID]
+type searchResponse response[permissionsByID]
 
-// PermissionsByID groups permissions (with scopes grouped by action) by user/service-account ID.
+// permissionsByID groups permissions (with scopes grouped by action) by user/service-account ID.
 // ex: { 1: { "teams:read": ["teams:id:2", "teams:id:3"] }, 3: { "teams:read": ["teams:id:1", "teams:id:3"] } }
-type PermissionsByID map[int64]Permissions
+type permissionsByID map[int64]permissions
 
-// Permissions maps actions to the scopes they can be applied to.
+// permissions maps actions to the scopes they can be applied to.
 // ex: { "pluginID.users:read": ["pluginID.users:uid:xHuuebS", "pluginID.users:uid:znbGGd"] }
-type Permissions map[string][]string
+type permissions map[string][]string
 
 type Config struct {
 	APIURL  string
@@ -80,5 +80,5 @@ type SearchQuery struct {
 	Resource     *Resource `json:"-" url:"-"`
 }
 
-// CustomClaims is a placeholder for any potential additional claims in the id token.
-type CustomClaims struct{}
+// customClaims is a placeholder for any potential additional claims in the id token.
+type customClaims struct{}
