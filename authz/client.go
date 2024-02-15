@@ -140,10 +140,12 @@ func (query *searchQuery) processIDToken(c *clientImpl) error {
 func (query *searchQuery) validateQuery() error {
 	// Validate inputs
 	if (query.ActionPrefix != "") && (query.Action != "") {
-		return fmt.Errorf("%w: %v", ErrInvalidQuery, "'action' and 'actionPrefix' are mutually exclusive")
+		return fmt.Errorf("%w: %v", ErrInvalidQuery,
+			"'action' and 'actionPrefix' are mutually exclusive")
 	}
 	if query.NamespaceID == "" && query.ActionPrefix == "" && query.Action == "" {
-		return fmt.Errorf("%w: %v", ErrInvalidQuery, "at least one search option must be provided")
+		return fmt.Errorf("%w: %v", ErrInvalidQuery,
+			"at least one search option must be provided")
 	}
 	return nil
 }

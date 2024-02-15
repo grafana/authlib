@@ -65,7 +65,8 @@ func (s *EnforcementClientImpl) fetchPermissions(ctx context.Context,
 	idToken string, action string, resources ...Resource) (permissions, error) {
 	query := s.queryTemplate
 	// No preload, create a new search query
-	if query == nil || (query.ActionPrefix != "" && !strings.HasPrefix(action, query.ActionPrefix)) {
+	if query == nil || (query.ActionPrefix != "" && !strings.HasPrefix(action,
+		query.ActionPrefix)) {
 		query = &searchQuery{
 			Action: action,
 		}
@@ -91,7 +92,8 @@ func (s *EnforcementClientImpl) fetchPermissions(ctx context.Context,
 	return nil, nil
 }
 
-func (s *EnforcementClientImpl) Compile(ctx context.Context, idToken string, action string, kinds ...string) (checker, error) {
+func (s *EnforcementClientImpl) Compile(ctx context.Context, idToken string,
+	action string, kinds ...string) (checker, error) {
 	permissions, err := s.fetchPermissions(ctx, idToken, action)
 	if err != nil {
 		return noAccessChecker, err
@@ -112,7 +114,8 @@ func resourcesKind(resources ...Resource) []string {
 	return kinds
 }
 
-func (s *EnforcementClientImpl) HasAccess(ctx context.Context, idToken string, action string, resources ...Resource) (bool, error) {
+func (s *EnforcementClientImpl) HasAccess(ctx context.Context, idToken string,
+	action string, resources ...Resource) (bool, error) {
 	permissions, err := s.fetchPermissions(ctx, idToken, action, resources...)
 	if err != nil {
 		return false, err
