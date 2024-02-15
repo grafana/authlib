@@ -10,12 +10,9 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
-	"github.com/go-kit/log"
-	"github.com/go-kit/log/level"
 	goquery "github.com/google/go-querystring/query"
 	"golang.org/x/sync/singleflight"
 
@@ -23,7 +20,7 @@ import (
 	"github.com/grafana/authlib/internal/cache"
 )
 
-var _ Client = &ClientImpl{}
+var _ Client = &clientImpl{}
 
 var (
 	ErrInvalidQuery     = errors.New("invalid query")
@@ -31,50 +28,49 @@ var (
 	ErrInvalidToken     = errors.New("invalid token: cannot query server")
 	ErrInvalidResponse  = errors.New("invalid response from server")
 	ErrUnexpectedStatus = errors.New("unexpected response status")
+)
 
-	TimeNow  = time.Now
-	CacheExp = 5 * time.Minute
-
+const (
+	cacheExp   = 5 * time.Minute
 	searchPath = "/api/access-control/users/permissions/search"
 )
 
-// WithHTTPClient allows overriding the default Doer, which is
+// withHTTPClient allows overriding the default Doer, which is
 // automatically created using http.Client. This is useful for tests.
-func WithHTTPClient(doer HTTPRequestDoer) ClientOption {
-	return func(c *ClientImpl) error {
+func withHTTPClient(doer HTTPRequestDoer) clientOption {
+	return func(c *clientImpl) error {
 		c.client = doer
 
 		return nil
 	}
 }
 
-// WithCache allows overriding the default cache, which is a local cache.
-func WithCache(cache cache.Cache) ClientOption {
-	return func(c *ClientImpl) error {
+// withCache allows overriding the default cache, which is a local cache.
+func withCache(cache cache.Cache) clientOption {
+	return func(c *clientImpl) error {
 		c.cache = cache
 
 		return nil
 	}
 }
 
-func NewClient(cfg Config, opts ...ClientOption) (*ClientImpl, error) {
-	client := &ClientImpl{
+func newClient(cfg Config, opts ...clientOption) (*clientImpl, error) {
+	client := &clientImpl{
 		singlef: singleflight.Group{},
 		client:  nil,
 		cache:   nil,
 		cfg:     cfg,
-		logger:  log.NewJSONLogger(log.NewSyncWriter(os.Stdout)),
 	}
 
 	for _, opt := range opts {
 		if err := opt(client); err != nil {
-			_ = level.Error(client.logger).Log("msg", "error applying option", "err", err)
+			return nil, err
 		}
 	}
 
 	if client.cache == nil {
 		client.cache = cache.NewLocalCache(cache.Config{
-			Expiry:          5 * time.Minute,
+			Expiry:          cacheExp,
 			CleanupInterval: 1 * time.Minute,
 		})
 	}
@@ -105,11 +101,10 @@ func NewClient(cfg Config, opts ...ClientOption) (*ClientImpl, error) {
 	return client, nil
 }
 
-type ClientImpl struct {
+type clientImpl struct {
 	cache    cache.Cache
 	cfg      Config
 	client   HTTPRequestDoer
-	logger   log.Logger
 	verifier authn.Verifier[CustomClaims]
 	singlef  singleflight.Group
 }
@@ -127,7 +122,7 @@ func (query *SearchQuery) processResource() {
 }
 
 // processIDToken verifies the id token is legit and extracts its subject in the query.NamespaceID.
-func (query *SearchQuery) processIDToken(c *ClientImpl) error {
+func (query *SearchQuery) processIDToken(c *clientImpl) error {
 	if query.IdToken != "" {
 		claims, err := c.verifier.Verify(context.Background(), query.IdToken)
 		if err != nil {
@@ -154,19 +149,17 @@ func (query *SearchQuery) validateQuery() error {
 }
 
 // Search returns the permissions for the given query.
-func (c *ClientImpl) Search(ctx context.Context, query SearchQuery) (*SearchResponse, error) {
+func (c *clientImpl) Search(ctx context.Context, query SearchQuery) (*SearchResponse, error) {
 	// set scope if resource is provided
 	query.processResource()
 
 	// set namespaceID if id token is provided
 	if err := query.processIDToken(c); err != nil {
-		level.Error(c.logger).Log("msg", "error processing id token", "err", err)
 		return nil, err
 	}
 
 	// validate query
 	if err := query.validateQuery(); err != nil {
-		level.Error(c.logger).Log("invalid query", "error", err)
 		return nil, err
 	}
 
@@ -174,23 +167,22 @@ func (c *ClientImpl) Search(ctx context.Context, query SearchQuery) (*SearchResp
 
 	item, err := c.cache.Get(ctx, key)
 	if err != nil && !errors.Is(err, cache.ErrNotFound) {
-		level.Warn(c.logger).Log("could not retrieve from cache", "error", err)
+		return nil, err
 	}
 
 	if err == nil {
 		perms := PermissionsByID{}
 		err := gob.NewDecoder(bytes.NewReader(item)).Decode(&perms)
 		if err != nil {
-			level.Warn(c.logger).Log("could not decode data from cache", "error", err)
+			return nil, fmt.Errorf("failed to decode cache entry: %w", err)
 		} else {
-			level.Debug(c.logger).Log("retrieved permissions from cache", "key", key)
 			return &SearchResponse{Data: &perms}, nil
 		}
 	}
 
 	res, err, _ := c.singlef.Do(key, func() (interface{}, error) {
 		v, _ := goquery.Values(query)
-		url := strings.TrimRight(c.cfg.GrafanaURL, "/") + searchPath + "?" + v.Encode()
+		url := strings.TrimRight(c.cfg.APIURL, "/") + searchPath + "?" + v.Encode()
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, strings.NewReader(key))
 		if err != nil {
 			return nil, err
@@ -223,25 +215,23 @@ func (c *ClientImpl) Search(ctx context.Context, query SearchQuery) (*SearchResp
 	})
 
 	if err != nil {
-		level.Error(c.logger).Log("msg", "error sending request to Grafana API", "err", err)
 		return nil, err
 	}
 
 	perms := res.(PermissionsByID)
-	c.cacheNoFail(ctx, perms, key)
+	if err := c.cacheValue(ctx, perms, key); err != nil {
+		return nil, fmt.Errorf("failed to cache response: %w", err)
+	}
 
 	return &SearchResponse{Data: &perms}, nil
 }
 
-func (c *ClientImpl) cacheNoFail(ctx context.Context, perms PermissionsByID, key string) {
+func (c *clientImpl) cacheValue(ctx context.Context, perms PermissionsByID, key string) error {
 	buf := bytes.Buffer{}
 	err := gob.NewEncoder(&buf).Encode(perms)
 	if err != nil {
-		level.Warn(c.logger).Log("msg", "error encoding result for cache", "err", err)
-		return
+		return err
 	}
 
-	if err = c.cache.Set(ctx, key, buf.Bytes(), CacheExp); err != nil {
-		level.Warn(c.logger).Log("msg", "error caching result", "key", key, "err", err)
-	}
+	return c.cache.Set(ctx, key, buf.Bytes(), cacheExp)
 }

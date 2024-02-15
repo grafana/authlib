@@ -20,21 +20,21 @@ type Client interface {
 type EnforcementClient interface {
 	// Compile generates a function to check whether the user has access to any scope of a given list of scopes.
 	// This is particularly useful when you want to verify access to a list of resources.
-	Compile(ctx context.Context, idToken string, action string, kinds ...string) (Checker, error)
+	Compile(ctx context.Context, idToken string, action string, kinds ...string) (checker, error)
 
 	// HasAccess checks whether the user can perform the given action on any of the given resources.
 	// If the scope is empty, it checks whether the user can perform the action.
 	HasAccess(ctx context.Context, idToken string, action string, resources ...Resource) (bool, error)
 }
 
-// Checker checks whether a user has access to any of the provided resources.
-type Checker func(resources ...Resource) bool
-
-// ServiceOption allows setting custom parameters during construction.
-type ServiceOption func(*EnforcementClientImpl) error
+// checker checks whether a user has access to any of the provided resources.
+type checker func(resources ...Resource) bool
 
 // ClientOption allows setting custom parameters during construction.
-type ClientOption func(*ClientImpl) error
+type ClientOption func(*EnforcementClientImpl) error
+
+// ClientOption allows setting custom parameters during construction.
+type clientOption func(*clientImpl) error
 type Response[T any] struct {
 	Data  *T     `json:"data"`
 	Error string `json:"error"`
@@ -51,9 +51,9 @@ type PermissionsByID map[int64]Permissions
 type Permissions map[string][]string
 
 type Config struct {
-	GrafanaURL string
-	Token      string
-	JWKsURL    string
+	APIURL  string
+	Token   string
+	JWKsURL string
 }
 
 // Resource represents a resource in Grafana.

@@ -3,34 +3,49 @@ package authz
 import (
 	"context"
 	"errors"
-)
 
-const maxPrefixParts = 3
+	"github.com/grafana/authlib/internal/cache"
+)
 
 var (
 	ErrTooManyPermissions = errors.New("unexpected number of permissions returned by the server")
 )
 
 type EnforcementClientImpl struct {
-	client  Client
-	preload *SearchQuery
+	client     Client
+	preload    *SearchQuery
+	clientOpts []clientOption
 }
 
-func WithPreloadSearch(query SearchQuery) ServiceOption {
+func WithHTTPClient(doer HTTPRequestDoer) ClientOption {
+	return func(s *EnforcementClientImpl) error {
+		s.clientOpts = append(s.clientOpts, withHTTPClient(doer))
+		return nil
+	}
+}
+
+func WithCache(cache cache.Cache) ClientOption {
+	return func(s *EnforcementClientImpl) error {
+		s.clientOpts = append(s.clientOpts, withCache(cache))
+		return nil
+	}
+}
+
+func WithPreloadSearch(query SearchQuery) ClientOption {
 	return func(s *EnforcementClientImpl) error {
 		s.preload = &query
 		return nil
 	}
 }
 
-func WithPreloadPermissions() ServiceOption {
+func WithPreloadPermissions() ClientOption {
 	return func(s *EnforcementClientImpl) error {
 		s.preload = &SearchQuery{}
 		return nil
 	}
 }
 
-func WithPreloadPermissionsByPrefix(prefix string) ServiceOption {
+func WithPreloadPermissionsByPrefix(prefix string) ClientOption {
 	return func(s *EnforcementClientImpl) error {
 		s.preload = &SearchQuery{
 			ActionPrefix: prefix,
@@ -39,18 +54,21 @@ func WithPreloadPermissionsByPrefix(prefix string) ServiceOption {
 	}
 }
 
-func NewEnforcementClient(cfg Config, opt ...ServiceOption) (*EnforcementClientImpl, error) {
-	s := &EnforcementClientImpl{}
+func NewEnforcementClient(cfg Config, opt ...ClientOption) (*EnforcementClientImpl, error) {
+	s := &EnforcementClientImpl{
+		client:  nil,
+		preload: nil,
+	}
+
 	for _, o := range opt {
 		_ = o(s)
 	}
 
-	if s.client == nil {
-		var err error
-		if s.client, err = NewClient(cfg); err != nil {
-			return nil, err
-		}
+	var err error
+	if s.client, err = newClient(cfg, s.clientOpts...); err != nil {
+		return nil, err
 	}
+
 	return s, nil
 }
 
@@ -83,13 +101,13 @@ func (s *EnforcementClientImpl) fetchPermissions(ctx context.Context, idToken st
 	return nil, nil
 }
 
-func (s *EnforcementClientImpl) Compile(ctx context.Context, idToken string, action string, kinds ...string) (Checker, error) {
+func (s *EnforcementClientImpl) Compile(ctx context.Context, idToken string, action string, kinds ...string) (checker, error) {
 	permissions, err := s.fetchPermissions(ctx, idToken, action)
 	if err != nil {
-		return NoAccessChecker, err
+		return noAccessChecker, err
 	}
 
-	return CompileChecker(permissions, action, kinds...), nil
+	return compileChecker(permissions, action, kinds...), nil
 }
 
 func resourcesKind(resources ...Resource) []string {
@@ -110,5 +128,5 @@ func (s *EnforcementClientImpl) HasAccess(ctx context.Context, idToken string, a
 		return false, err
 	}
 	kinds := resourcesKind(resources...)
-	return CompileChecker(permissions, action, kinds...)(resources...), nil
+	return compileChecker(permissions, action, kinds...)(resources...), nil
 }

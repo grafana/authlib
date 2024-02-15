@@ -189,7 +189,7 @@ func TestGenerateChecker(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			checker := CompileChecker(tt.permissions, tt.action, tt.kinds...)
+			checker := compileChecker(tt.permissions, tt.action, tt.kinds...)
 			got := checker(tt.want.resources...)
 			require.Equal(t, tt.want.hasAccess, got)
 		})
@@ -216,13 +216,13 @@ func TestCheckerExamples(t *testing.T) {
 	}
 
 	// Check on action only
-	canCreateDashboards := CompileChecker(userPermissions, "dashboards:create")
+	canCreateDashboards := compileChecker(userPermissions, "dashboards:create")
 	require.True(t, canCreateDashboards())
-	canDeleteDashboards := CompileChecker(userPermissions, "dashboards:delete")
+	canDeleteDashboards := compileChecker(userPermissions, "dashboards:delete")
 	require.False(t, canDeleteDashboards())
 
 	// Check on either dashboard or folder
-	canReadDashboards := CompileChecker(userPermissions, "dashboards:read", "dashboards", "folders")
+	canReadDashboards := compileChecker(userPermissions, "dashboards:read", "dashboards", "folders")
 	dash2 := Resource{Kind: "dashboards", Attr: "uid", ID: "dash2"}
 	require.True(t, canReadDashboards(dash2), "should be allowed to read dashboard")
 	fold2 := Resource{Kind: "folders", Attr: "uid", ID: "fold2"}
@@ -232,7 +232,7 @@ func TestCheckerExamples(t *testing.T) {
 	require.True(t, canReadDashboards(dash4, fold3), "should be allowed to read dashboards in the folder")
 
 	// Filter resources
-	canWriteDashboards := CompileChecker(userPermissions, "dashboards:write", "dashboards", "folders")
+	canWriteDashboards := compileChecker(userPermissions, "dashboards:write", "dashboards", "folders")
 	writeOK := []string{}
 	for _, dash := range dashboards {
 		res := Resource{Kind: "dashboards", Attr: "uid", ID: dash.UID}

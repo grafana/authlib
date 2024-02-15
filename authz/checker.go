@@ -7,26 +7,26 @@ import (
 )
 
 var (
-	NoAccessChecker   Checker = func(resources ...Resource) bool { return false }
-	FullAccessChecker Checker = func(resources ...Resource) bool { return true }
+	noAccessChecker   checker = func(resources ...Resource) bool { return false }
+	fullAccessChecker checker = func(resources ...Resource) bool { return true }
 )
 
-// CompileChecker generates a function to check whether the user has access to any scope of a given list of scopes.
-func CompileChecker(permissions Permissions, action string, kinds ...string) Checker {
+// compileChecker generates a function to check whether the user has access to any scope of a given list of scopes.
+func compileChecker(permissions Permissions, action string, kinds ...string) checker {
 	// no permissions => no access to any resource of this type
 	if len(permissions) == 0 {
-		return NoAccessChecker
+		return noAccessChecker
 	}
 
 	// no permissions for this action => no access to any resource of this type
 	pScopes, ok := permissions[action]
 	if !ok {
-		return NoAccessChecker
+		return noAccessChecker
 	}
 
 	// no prefix expected => only check for the action
 	if len(kinds) == 0 {
-		return FullAccessChecker
+		return fullAccessChecker
 	}
 
 	isWildcard := WildcardDetector(kinds...)
@@ -34,7 +34,7 @@ func CompileChecker(permissions Permissions, action string, kinds ...string) Che
 	for _, s := range pScopes {
 		// one scope is a wildcard => access to all resources of this type
 		if isWildcard(s) {
-			return FullAccessChecker
+			return fullAccessChecker
 		}
 		lookup[s] = true
 	}

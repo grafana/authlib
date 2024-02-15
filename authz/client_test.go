@@ -15,39 +15,6 @@ import (
 	"github.com/grafana/authlib/internal/cache"
 )
 
-type CacheWrap struct {
-	successReadCnt   int
-	successWriteCnt  int
-	successDeleteCnt int
-	cache            cache.Cache
-}
-
-// Get implements cache.Cache.
-func (c *CacheWrap) Get(ctx context.Context, key string) ([]byte, error) {
-	get, err := c.cache.Get(ctx, key)
-	if err == nil {
-		c.successReadCnt++
-	}
-	return get, err
-}
-
-// Set implements cache.Cache.
-func (c *CacheWrap) Set(ctx context.Context, key string, data []byte, exp time.Duration) error {
-	err := c.cache.Set(ctx, key, data, exp)
-	if err == nil {
-		c.successWriteCnt++
-	}
-	return err
-}
-
-func (c *CacheWrap) Delete(ctx context.Context, key string) error {
-	err := c.cache.Delete(ctx, key)
-	if err == nil {
-		c.successDeleteCnt++
-	}
-	return err
-}
-
 func TestRBACClientImpl_SearchUserPermissions(t *testing.T) {
 	perms := map[string][]string{
 		"users:read": {"org.users:*"},
@@ -68,7 +35,7 @@ func TestRBACClientImpl_SearchUserPermissions(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		testCache := &CacheWrap{cache: cache.NewLocalCache(cache.Config{Expiry: 10 * time.Minute, CleanupInterval: 10 * time.Minute})}
+		testCache := &cacheWrap{cache: cache.NewLocalCache(cache.Config{Expiry: 10 * time.Minute, CleanupInterval: 10 * time.Minute})}
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			d := []byte{}
 			if tt.query.Action != "" {
@@ -82,10 +49,10 @@ func TestRBACClientImpl_SearchUserPermissions(t *testing.T) {
 		}))
 		defer server.Close()
 		t.Run(tt.name, func(t *testing.T) {
-			c, err := NewClient(Config{
-				GrafanaURL: server.URL,
-				Token:      "aabbcc",
-			}, WithCache(testCache))
+			c, err := newClient(Config{
+				APIURL: server.URL,
+				Token:  "aabbcc",
+			}, withCache(testCache))
 			require.NoError(t, err)
 
 			c.client = server.Client()
