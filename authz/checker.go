@@ -29,7 +29,7 @@ func compileChecker(permissions permissions, action string, kinds ...string) che
 		return fullAccessChecker
 	}
 
-	isWildcard := WildcardDetector(kinds...)
+	isWildcard := wildcardDetector(kinds...)
 	lookup := make(map[string]bool, len(pScopes))
 	for _, s := range pScopes {
 		// one scope is a wildcard => access to all resources of this type
@@ -50,9 +50,9 @@ func compileChecker(permissions permissions, action string, kinds ...string) che
 	}
 }
 
-// WildcardDetector is an helper to quickly assess if a scope is a wildcard of a given set of kinds.
-// ex: WildcardDetector("datasources", "folders")("datasources:uid:*") => true
-func WildcardDetector(kinds ...string) func(scope string) bool {
+// wildcardDetector is an helper to quickly assess if a scope is a wildcard of a given set of kinds.
+// ex: wildcardDetector("datasources", "folders")("datasources:uid:*") => true
+func wildcardDetector(kinds ...string) func(scope string) bool {
 	// no kinds => no wildcard
 	if len(kinds) == 0 {
 		return func(scope string) bool { return false }
