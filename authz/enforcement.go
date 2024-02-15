@@ -3,6 +3,7 @@ package authz
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/grafana/authlib/internal/cache"
 )
@@ -12,9 +13,9 @@ var (
 )
 
 type EnforcementClientImpl struct {
-	client     client
-	preload    *SearchQuery
-	clientOpts []clientOption
+	client        client
+	queryTemplate *searchQuery
+	clientOpts    []clientOption
 }
 
 func WithHTTPClient(doer HTTPRequestDoer) ClientOption {
@@ -31,23 +32,11 @@ func WithCache(cache cache.Cache) ClientOption {
 	}
 }
 
-func WithPreloadSearch(query SearchQuery) ClientOption {
+// WithSearchByPrefix makes the client search for permissions always using the given prefix.
+// This can improve performance when the client is used to check permissions for a single action prefix.
+func WithSearchByPrefix(prefix string) ClientOption {
 	return func(s *EnforcementClientImpl) error {
-		s.preload = &query
-		return nil
-	}
-}
-
-func WithPreloadPermissions() ClientOption {
-	return func(s *EnforcementClientImpl) error {
-		s.preload = &SearchQuery{}
-		return nil
-	}
-}
-
-func WithPreloadPermissionsByPrefix(prefix string) ClientOption {
-	return func(s *EnforcementClientImpl) error {
-		s.preload = &SearchQuery{
+		s.queryTemplate = &searchQuery{
 			ActionPrefix: prefix,
 		}
 		return nil
@@ -56,8 +45,8 @@ func WithPreloadPermissionsByPrefix(prefix string) ClientOption {
 
 func NewEnforcementClient(cfg Config, opt ...ClientOption) (*EnforcementClientImpl, error) {
 	s := &EnforcementClientImpl{
-		client:  nil,
-		preload: nil,
+		client:        nil,
+		queryTemplate: nil,
 	}
 
 	for _, o := range opt {
@@ -74,20 +63,20 @@ func NewEnforcementClient(cfg Config, opt ...ClientOption) (*EnforcementClientIm
 
 func (s *EnforcementClientImpl) fetchPermissions(ctx context.Context,
 	idToken string, action string, resources ...Resource) (permissions, error) {
-	searchQuery := s.preload
+	query := s.queryTemplate
 	// No preload, create a new search query
-	if searchQuery == nil {
-		searchQuery = &SearchQuery{
+	if query == nil || (query.ActionPrefix != "" && !strings.HasPrefix(action, query.ActionPrefix)) {
+		query = &searchQuery{
 			Action: action,
 		}
 		if len(resources) == 1 {
 			res := resources[0]
-			searchQuery.Resource = &res
+			query.Resource = &res
 		}
 	}
-	searchQuery.IdToken = idToken
+	query.IdToken = idToken
 
-	searchRes, err := s.client.Search(ctx, *searchQuery)
+	searchRes, err := s.client.Search(ctx, *query)
 	if err != nil || searchRes.Data == nil || len(*searchRes.Data) == 0 {
 		return nil, err
 	}

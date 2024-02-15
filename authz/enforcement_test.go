@@ -14,15 +14,15 @@ func TestEnforcementClientImpl_fetchPermissions_queryPreload(t *testing.T) {
 		idToken      string
 		action       string
 		resources    []Resource
-		preloadQuery *SearchQuery
-		wantQuery    SearchQuery
+		preloadQuery *searchQuery
+		wantQuery    searchQuery
 	}{
 		{
 			name:      "without preload query",
 			idToken:   "jwt_id_token",
 			action:    "teams:read",
 			resources: []Resource{{Kind: "teams", Attr: "id", ID: "1"}},
-			wantQuery: SearchQuery{
+			wantQuery: searchQuery{
 				IdToken:  "jwt_id_token",
 				Action:   "teams:read",
 				Resource: &Resource{Kind: "teams", Attr: "id", ID: "1"},
@@ -33,10 +33,10 @@ func TestEnforcementClientImpl_fetchPermissions_queryPreload(t *testing.T) {
 			idToken:   "jwt_id_token",
 			action:    "teams:read",
 			resources: []Resource{{Kind: "teams", Attr: "id", ID: "1"}},
-			preloadQuery: &SearchQuery{
+			preloadQuery: &searchQuery{
 				ActionPrefix: "teams",
 			},
-			wantQuery: SearchQuery{
+			wantQuery: searchQuery{
 				ActionPrefix: "teams",
 				IdToken:      "jwt_id_token",
 			},
@@ -48,7 +48,7 @@ func TestEnforcementClientImpl_fetchPermissions_queryPreload(t *testing.T) {
 			s := EnforcementClientImpl{client: mockClient}
 
 			if tt.preloadQuery != nil {
-				s.preload = tt.preloadQuery
+				s.queryTemplate = tt.preloadQuery
 			}
 			mockClient.On("Search", mock.Anything, tt.wantQuery).Return(&searchResponse{Data: &permissionsByID{}}, nil)
 
@@ -65,14 +65,14 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 		idToken     string
 		action      string
 		resources   []Resource
-		wantQuery   SearchQuery
+		wantQuery   searchQuery
 		want        bool
 	}{
 		{
 			name:    "no permission",
 			idToken: "jwt_id_token",
 			action:  "teams:read",
-			wantQuery: SearchQuery{
+			wantQuery: searchQuery{
 				IdToken: "jwt_id_token",
 				Action:  "teams:read",
 			},
@@ -83,7 +83,7 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 			permissions: map[string][]string{"teams:read": {"teams:id:1", "teams:id:2"}},
 			idToken:     "jwt_id_token",
 			action:      "teams:read",
-			wantQuery: SearchQuery{
+			wantQuery: searchQuery{
 				IdToken: "jwt_id_token",
 				Action:  "teams:read",
 			},
@@ -94,7 +94,7 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 			permissions: map[string][]string{"teams:read": {"teams:id:1", "teams:id:2"}}, // only likely with query preload
 			idToken:     "jwt_id_token",
 			action:      "teams:write",
-			wantQuery: SearchQuery{
+			wantQuery: searchQuery{
 				IdToken: "jwt_id_token",
 				Action:  "teams:write",
 			},
@@ -106,7 +106,7 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 			idToken:     "jwt_id_token",
 			action:      "teams:read",
 			resources:   []Resource{{Kind: "teams", Attr: "id", ID: "1"}},
-			wantQuery: SearchQuery{
+			wantQuery: searchQuery{
 				IdToken:  "jwt_id_token",
 				Action:   "teams:read",
 				Resource: &Resource{Kind: "teams", Attr: "id", ID: "1"},
@@ -119,7 +119,7 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 			idToken:     "jwt_id_token",
 			action:      "teams:read",
 			resources:   []Resource{{Kind: "teams", Attr: "id", ID: "3"}},
-			wantQuery: SearchQuery{
+			wantQuery: searchQuery{
 				IdToken:  "jwt_id_token",
 				Action:   "teams:read",
 				Resource: &Resource{Kind: "teams", Attr: "id", ID: "3"},
@@ -132,7 +132,7 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 			idToken:     "jwt_id_token",
 			action:      "dashboards:read",
 			resources:   []Resource{{Kind: "dashboards", Attr: "uid", ID: "3"}, {Kind: "folders", Attr: "uid", ID: "2"}},
-			wantQuery: SearchQuery{
+			wantQuery: searchQuery{
 				IdToken: "jwt_id_token",
 				Action:  "dashboards:read",
 			},
@@ -144,7 +144,7 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 			idToken:     "jwt_id_token",
 			action:      "dashboards:read",
 			resources:   []Resource{{Kind: "dashboards", Attr: "uid", ID: "3"}, {Kind: "folders", Attr: "uid", ID: "4"}},
-			wantQuery: SearchQuery{
+			wantQuery: searchQuery{
 				IdToken: "jwt_id_token",
 				Action:  "dashboards:read",
 			},

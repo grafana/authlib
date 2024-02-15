@@ -109,20 +109,20 @@ type clientImpl struct {
 	singlef  singleflight.Group
 }
 
-func searchCacheKey(query SearchQuery) string {
+func searchCacheKey(query searchQuery) string {
 	// TODO : safe to ignore the error completely?
 	data, _ := json.Marshal(query)
 	return string(data)
 }
 
-func (query *SearchQuery) processResource() {
+func (query *searchQuery) processResource() {
 	if query.Resource != nil {
 		query.Scope = query.Resource.Scope()
 	}
 }
 
 // processIDToken verifies the id token is legit and extracts its subject in the query.NamespaceID.
-func (query *SearchQuery) processIDToken(c *clientImpl) error {
+func (query *searchQuery) processIDToken(c *clientImpl) error {
 	if query.IdToken != "" {
 		claims, err := c.verifier.Verify(context.Background(), query.IdToken)
 		if err != nil {
@@ -137,7 +137,7 @@ func (query *SearchQuery) processIDToken(c *clientImpl) error {
 }
 
 // validateQuery checks if the query is valid.
-func (query *SearchQuery) validateQuery() error {
+func (query *searchQuery) validateQuery() error {
 	// Validate inputs
 	if (query.ActionPrefix != "") && (query.Action != "") {
 		return fmt.Errorf("%w: %v", ErrInvalidQuery, "'action' and 'actionPrefix' are mutually exclusive")
@@ -149,7 +149,7 @@ func (query *SearchQuery) validateQuery() error {
 }
 
 // Search returns the permissions for the given query.
-func (c *clientImpl) Search(ctx context.Context, query SearchQuery) (*searchResponse, error) {
+func (c *clientImpl) Search(ctx context.Context, query searchQuery) (*searchResponse, error) {
 	// set scope if resource is provided
 	query.processResource()
 

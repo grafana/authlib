@@ -12,15 +12,15 @@ type MockClient struct {
 	mock.Mock
 }
 
-func (_m *MockClient) Search(ctx context.Context, query SearchQuery) (*searchResponse, error) {
+func (_m *MockClient) Search(ctx context.Context, query searchQuery) (*searchResponse, error) {
 	ret := _m.Called(ctx, query)
 
 	var r0 *searchResponse
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, SearchQuery) (*searchResponse, error)); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, searchQuery) (*searchResponse, error)); ok {
 		return rf(ctx, query)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, SearchQuery) *searchResponse); ok {
+	if rf, ok := ret.Get(0).(func(context.Context, searchQuery) *searchResponse); ok {
 		r0 = rf(ctx, query)
 	} else {
 		if ret.Get(0) != nil {
@@ -28,7 +28,7 @@ func (_m *MockClient) Search(ctx context.Context, query SearchQuery) (*searchRes
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, SearchQuery) error); ok {
+	if rf, ok := ret.Get(1).(func(context.Context, searchQuery) error); ok {
 		r1 = rf(ctx, query)
 	} else {
 		r1 = ret.Error(1)

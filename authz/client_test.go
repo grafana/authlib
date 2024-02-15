@@ -22,13 +22,13 @@ func TestRBACClientImpl_SearchUserPermissions(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		query   SearchQuery
+		query   searchQuery
 		want    searchResponse
 		wantErr bool
 	}{
 		{
 			name:  "NamespaceID user:1 no error",
-			query: SearchQuery{Action: "users:read", NamespaceID: "user:1"},
+			query: searchQuery{Action: "users:read", NamespaceID: "user:1"},
 			want: searchResponse{
 				Data: &permissionsByID{1: {"users:read": {"org.users:*"}}},
 			},

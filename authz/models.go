@@ -14,7 +14,7 @@ type HTTPRequestDoer interface {
 // client performs requests to the authorization server.
 type client interface {
 	// Search returns the permissions for the given query.
-	Search(ctx context.Context, query SearchQuery) (*searchResponse, error)
+	Search(ctx context.Context, query searchQuery) (*searchResponse, error)
 }
 
 type EnforcementClient interface {
@@ -70,8 +70,8 @@ func (r *Resource) Scope() string {
 	return r.Kind + ":" + r.Attr + ":" + r.ID
 }
 
-// SearchQuery is the query to search for permissions.
-type SearchQuery struct {
+// searchQuery is the query to search for permissions.
+type searchQuery struct {
 	ActionPrefix string    `json:"actionPrefix,omitempty" url:"actionPrefix,omitempty"`
 	Action       string    `json:"action,omitempty" url:"action,omitempty"`
 	Scope        string    `json:"scope,omitempty" url:"scope,omitempty"`
