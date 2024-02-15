@@ -7,12 +7,12 @@ import (
 )
 
 var (
-	noAccessChecker   checker = func(resources ...Resource) bool { return false }
-	fullAccessChecker checker = func(resources ...Resource) bool { return true }
+	noAccessChecker   Checker = func(resources ...Resource) bool { return false }
+	fullAccessChecker Checker = func(resources ...Resource) bool { return true }
 )
 
 // compileChecker generates a function to check whether the user has access to any scope of a given list of scopes.
-func compileChecker(permissions permissions, action string, kinds ...string) checker {
+func compileChecker(permissions permissions, action string, kinds ...string) Checker {
 	// no permissions => no access to any resource of this type
 	if len(permissions) == 0 {
 		return noAccessChecker

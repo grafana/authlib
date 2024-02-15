@@ -93,7 +93,7 @@ func (s *EnforcementClientImpl) fetchPermissions(ctx context.Context,
 }
 
 func (s *EnforcementClientImpl) Compile(ctx context.Context, idToken string,
-	action string, kinds ...string) (checker, error) {
+	action string, kinds ...string) (Checker, error) {
 	permissions, err := s.fetchPermissions(ctx, idToken, action)
 	if err != nil {
 		return noAccessChecker, err
