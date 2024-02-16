@@ -15,7 +15,7 @@ import (
 	"github.com/grafana/authlib/internal/cache"
 )
 
-func TestRBACClientImpl_SearchUserPermissions(t *testing.T) {
+func TestClientImpl_Search(t *testing.T) {
 	perms := map[string][]string{
 		"users:read": {"org.users:*"},
 		"teams:read": {"teams:id:1", "teams:id:2"},
