@@ -24,7 +24,7 @@ var _ client = &clientImpl{}
 
 var (
 	ErrInvalidQuery     = errors.New("invalid query")
-	ErrInvalidIDToken   = errors.New("invalid id token: cannot extract namespaceID")
+	ErrInvalidIDToken   = errors.New("invalid id token: cannot extract namespaced ID")
 	ErrInvalidToken     = errors.New("invalid token: cannot query server")
 	ErrInvalidResponse  = errors.New("invalid response from server")
 	ErrUnexpectedStatus = errors.New("unexpected response status")
@@ -121,7 +121,7 @@ func (query *searchQuery) processResource() {
 	}
 }
 
-// processIDToken verifies the id token is legit and extracts its subject in the query.NamespaceID.
+// processIDToken verifies the id token is legit and extracts its subject in the query.NamespacedID.
 func (query *searchQuery) processIDToken(c *clientImpl) error {
 	if query.IdToken != "" {
 		claims, err := c.verifier.Verify(context.Background(), query.IdToken)
@@ -129,9 +129,9 @@ func (query *searchQuery) processIDToken(c *clientImpl) error {
 			return fmt.Errorf("%v: %w", ErrInvalidIDToken, err)
 		}
 		if claims.Subject == "" {
-			return fmt.Errorf("%v: %w", ErrInvalidIDToken, errors.New("missing subject (namespaceID) in id token"))
+			return fmt.Errorf("%v: %w", ErrInvalidIDToken, errors.New("missing subject (namespacedID) in id token"))
 		}
-		query.NamespaceID = claims.Subject
+		query.NamespacedID = claims.Subject
 	}
 	return nil
 }
@@ -143,7 +143,7 @@ func (query *searchQuery) validateQuery() error {
 		return fmt.Errorf("%w: %v", ErrInvalidQuery,
 			"'action' and 'actionPrefix' are mutually exclusive")
 	}
-	if query.NamespaceID == "" && query.ActionPrefix == "" && query.Action == "" {
+	if query.NamespacedID == "" && query.ActionPrefix == "" && query.Action == "" {
 		return fmt.Errorf("%w: %v", ErrInvalidQuery,
 			"at least one search option must be provided")
 	}
@@ -155,7 +155,7 @@ func (c *clientImpl) Search(ctx context.Context, query searchQuery) (*searchResp
 	// set scope if resource is provided
 	query.processResource()
 
-	// set namespaceID if id token is provided
+	// set namespaced ID if id token is provided
 	if err := query.processIDToken(c); err != nil {
 		return nil, err
 	}

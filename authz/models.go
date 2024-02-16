@@ -75,7 +75,7 @@ type searchQuery struct {
 	ActionPrefix string    `json:"actionPrefix,omitempty" url:"actionPrefix,omitempty"`
 	Action       string    `json:"action,omitempty" url:"action,omitempty"`
 	Scope        string    `json:"scope,omitempty" url:"scope,omitempty"`
-	NamespaceID  string    `json:"namespaceId" url:"namespaceId,omitempty"`
+	NamespacedID string    `json:"namespacedId" url:"namespacedId,omitempty"`
 	IdToken      string    `json:"-" url:"-"`
 	Resource     *Resource `json:"-" url:"-"`
 }
