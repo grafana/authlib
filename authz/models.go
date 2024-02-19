@@ -14,7 +14,7 @@ type HTTPRequestDoer interface {
 // client performs requests to the authorization server.
 type client interface {
 	// Search returns the permissions for the given query.
-	Search(ctx context.Context, query searchQuery) (*searchResponse, error)
+	Search(ctx context.Context, query SearchQuery) (*searchResponse, error)
 }
 
 type EnforcementClient interface {
@@ -44,11 +44,11 @@ type searchResponse response[permissionsByID]
 
 // permissionsByID groups permissions (with scopes grouped by action) by user/service-account ID.
 // ex: { 1: { "teams:read": ["teams:id:2", "teams:id:3"] }, 3: { "teams:read": ["teams:id:1", "teams:id:3"] } }
-type permissionsByID map[int64]permissions
+type permissionsByID map[int64]Permissions
 
 // permissions maps actions to the scopes they can be applied to.
 // ex: { "pluginID.users:read": ["pluginID.users:uid:xHuuebS", "pluginID.users:uid:znbGGd"] }
-type permissions map[string][]string
+type Permissions map[string][]string
 
 type Config struct {
 	APIURL  string
@@ -71,7 +71,7 @@ func (r *Resource) Scope() string {
 }
 
 // searchQuery is the query to search for permissions.
-type searchQuery struct {
+type SearchQuery struct {
 	ActionPrefix string    `json:"actionPrefix,omitempty" url:"actionPrefix,omitempty"`
 	Action       string    `json:"action,omitempty" url:"action,omitempty"`
 	Scope        string    `json:"scope,omitempty" url:"scope,omitempty"`

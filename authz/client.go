@@ -54,7 +54,7 @@ func withCache(cache cache.Cache) clientOption {
 	}
 }
 
-func newClient(cfg Config, opts ...clientOption) (*clientImpl, error) {
+func NewClient(cfg Config, opts ...clientOption) (*clientImpl, error) {
 	client := &clientImpl{
 		singlef: singleflight.Group{},
 		client:  nil,
@@ -109,20 +109,20 @@ type clientImpl struct {
 	singlef  singleflight.Group
 }
 
-func searchCacheKey(query searchQuery) string {
+func searchCacheKey(query SearchQuery) string {
 	// TODO : safe to ignore the error completely?
 	data, _ := json.Marshal(query)
 	return string(data)
 }
 
-func (query *searchQuery) processResource() {
+func (query *SearchQuery) processResource() {
 	if query.Resource != nil {
 		query.Scope = query.Resource.Scope()
 	}
 }
 
 // processIDToken verifies the id token is legit and extracts its subject in the query.NamespacedID.
-func (query *searchQuery) processIDToken(c *clientImpl) error {
+func (query *SearchQuery) processIDToken(c *clientImpl) error {
 	if query.IdToken != "" {
 		claims, err := c.verifier.Verify(context.Background(), query.IdToken)
 		if err != nil {
@@ -137,7 +137,7 @@ func (query *searchQuery) processIDToken(c *clientImpl) error {
 }
 
 // validateQuery checks if the query is valid.
-func (query *searchQuery) validateQuery() error {
+func (query *SearchQuery) validateQuery() error {
 	// Validate inputs
 	if (query.ActionPrefix != "") && (query.Action != "") {
 		return fmt.Errorf("%w: %v", ErrInvalidQuery,
@@ -151,7 +151,7 @@ func (query *searchQuery) validateQuery() error {
 }
 
 // Search returns the permissions for the given query.
-func (c *clientImpl) Search(ctx context.Context, query searchQuery) (*searchResponse, error) {
+func (c *clientImpl) Search(ctx context.Context, query SearchQuery) (*searchResponse, error) {
 	// set scope if resource is provided
 	query.processResource()
 

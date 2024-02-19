@@ -22,13 +22,13 @@ func TestClientImpl_Search(t *testing.T) {
 	}
 	tests := []struct {
 		name    string
-		query   searchQuery
+		query   SearchQuery
 		want    searchResponse
 		wantErr bool
 	}{
 		{
 			name:  "NamespacedID user:1 no error",
-			query: searchQuery{Action: "users:read", NamespacedID: "user:1"},
+			query: SearchQuery{Action: "users:read", NamespacedID: "user:1"},
 			want: searchResponse{
 				Data: &permissionsByID{1: {"users:read": {"org.users:*"}}},
 			},
@@ -49,7 +49,7 @@ func TestClientImpl_Search(t *testing.T) {
 		}))
 		defer server.Close()
 		t.Run(tt.name, func(t *testing.T) {
-			c, err := newClient(Config{
+			c, err := NewClient(Config{
 				APIURL: server.URL,
 				Token:  "aabbcc",
 			}, withCache(testCache))

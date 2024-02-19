@@ -14,7 +14,7 @@ var (
 
 type EnforcementClientImpl struct {
 	client        client
-	queryTemplate *searchQuery
+	queryTemplate *SearchQuery
 	clientOpts    []clientOption
 }
 
@@ -36,7 +36,7 @@ func WithCache(cache cache.Cache) ClientOption {
 // This can improve performance when the client is used to check permissions for a single action prefix.
 func WithSearchByPrefix(prefix string) ClientOption {
 	return func(s *EnforcementClientImpl) error {
-		s.queryTemplate = &searchQuery{
+		s.queryTemplate = &SearchQuery{
 			ActionPrefix: prefix,
 		}
 		return nil
@@ -54,7 +54,7 @@ func NewEnforcementClient(cfg Config, opt ...ClientOption) (*EnforcementClientIm
 	}
 
 	var err error
-	if s.client, err = newClient(cfg, s.clientOpts...); err != nil {
+	if s.client, err = NewClient(cfg, s.clientOpts...); err != nil {
 		return nil, err
 	}
 
@@ -62,14 +62,14 @@ func NewEnforcementClient(cfg Config, opt ...ClientOption) (*EnforcementClientIm
 }
 
 func (s *EnforcementClientImpl) fetchPermissions(ctx context.Context,
-	idToken string, action string, resources ...Resource) (permissions, error) {
-	var query searchQuery
+	idToken string, action string, resources ...Resource) (Permissions, error) {
+	var query SearchQuery
 
 	if s.queryTemplate != nil && s.queryTemplate.ActionPrefix != "" &&
 		strings.HasPrefix(action, s.queryTemplate.ActionPrefix) {
 		query = *s.queryTemplate
 	} else {
-		query = searchQuery{Action: action}
+		query = SearchQuery{Action: action}
 		if len(resources) == 1 {
 			res := resources[0]
 			query.Resource = &res
