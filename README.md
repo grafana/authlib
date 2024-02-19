@@ -17,7 +17,7 @@ enable = accessControlOnCall
 
 This repository is private for now, to use the library:
 ```bash
-GOPRIVATE=github.com/grafana/rbac-client-poc
+GOPRIVATE=github.com/grafana/authlib
 ```
 
 Here is an example on how to fetch a user's permission filtering on a specific action `users:read`.
@@ -109,4 +109,33 @@ The program here would output:
 OK: dashAABBCC
 KO: dashBBCCDD
 OK: dashCCDDEE
+```
+
+Here is an example on how to fetch a user's permission by `idToken`, presuming the `idForwarding` feature toggle is enabled.
+```go
+func main() {
+	grafanaURL := "localhost:3000"
+
+	ac, err := authz.NewClient(authz.Config{
+		APIURL:  grafanaURL,
+		Token:   "Your Grafana Token",
+		JWKsURL: strings.TrimRight(grafanaURL, "/") + "/api/signing-keys/keys",
+	})
+	if err != nil {
+		fmt.Printf("Error creating client %v\n", err)
+	}
+
+	idToken := req.Headers.Get("X-Grafana-Id")
+
+	permResp, err := ac.Search(context, authz.SearchQuery{
+		IdToken: idToken,
+	})
+
+	userPermissions := authz.Permissions{}
+	
+	for _, permissions := range *permResp.Data {
+		userPermissions = permissions
+	}
+
+}
 ```
