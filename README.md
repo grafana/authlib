@@ -1,6 +1,10 @@
-# rbac-client
+# Authlib
 
-This is an RBAC client library that contains a set of utilities to fetch and check users permissions from Grafana.
+A collection of common authn/authz utilities.
+
+## Authz
+
+This package exports an RBAC client library that contains a set of utilities to check users permissions from Grafana.
 
 ## Grafana Configuration
 
@@ -13,100 +17,81 @@ enable = accessControlOnCall
 
 ## Examples
 
-### client usage
-
 This repository is private for now, to use the library:
 ```bash
-GOPRIVATE=github.com/grafana/rbac-client-poc
+GOPRIVATE=github.com/grafana/authlib
 ```
 
-Here is an example on how to fetch a user's permission filtering on a specific action `users:read`.
+Here is an example on how to check access on a resouce for a user.
 
 ```go
 package main
 
 import (
 	"context"
-	"fmt"
-	"time"
+	"log"
 
-	"github.com/grafana/rbac-client-poc/pkg/ac/cache"
-	"github.com/grafana/rbac-client-poc/pkg/ac/client"
+	"github.com/grafana/authlib/authz"
 )
 
 func main() {
-	c, err := client.NewRBACClient(client.ClientCfg{
-		GrafanaURL: "http://localhost:3000",
-		Token:      "Your Service Account Token",
+	client, err := authz.NewEnforcementClient(authz.Config{
+		APIURL:  "http://localhost:3000",
+		Token:   "<service account token>",
+		JWKsURL: "<jwks url>",
 	})
+
 	if err != nil {
-		fmt.Printf("Error creating client %v\n", err)
+		log.Fatal("failed to construct authz client", err)
 	}
 
-	perms, err := c.SearchUserPermissions(context.Background(), client.SearchQuery{
-		Action: "users:read",
-		UserLogin: "admin",
+	ok, err := client.HasAccess(context.Background(), "<id token>", "users:read", authz.Resource{
+		Kind: "users",
+		Attr: "id",
+		ID:   "1",
 	})
+
 	if err != nil {
-		fmt.Printf("Error fetching permissions %v\n", err)
+		log.Fatal("failed to perform access check", err)
 	}
 
-	fmt.Println("Got permissions from Grafana", perms)
+	log.Println("has access: ", ok)
 }
 ```
 
-The program here would output:
-```
-Got permissions from Grafana map[1:map[users:read:[global.users:*]]]
-```
+## Authn
 
-More filters are available to search `userLogin`, `userId`, `action`, `actionPrefix`, `scope`.
+This package exports an token verifier that can be used to verify signed jwt tokens. A common usecase for this component is to verify grafana id tokens.
 
-### checker usage (to search and filter)
+This package will handle retrival and caching of jwks. It was desing to be generic over "Custom claims" so that we are not only restricted to the current structure of id tokens. This means that the parsed claims will contain standard jwts claims such as `aud`, `exp` etc plus specified custom claims.
 
+## Example
 
 ```go
 package main
 
 import (
 	"context"
-	"fmt"
+	"log"
 
-	"github.com/grafana/rbac-client-poc/pkg/ac/checker"
-	"github.com/grafana/rbac-client-poc/pkg/ac/models"
+	"github.com/grafana/authlib/authn"
 )
 
-type dash struct {
-	uid       string
-	parentUid string
-}
+type CustomClaims struct{}
 
 func main() {
-	userPermissions := models.Permissions{
-		"dashboards:read": {"dashboards:uid:dashAABBCC", "folders:uid:foldCCDDEE"},
+	verifier := authn.NewVerifier[CustomClaims](authn.IDVerifierConfig{
+		SigningKeysURL:   "<jwks url>",
+		AllowedAudiences: []string{},
+	})
+
+	claims, err := verifier.Verify(context.Background(), "<token>")
+
+	if err != nil {
+		log.Fatal("failed to verify id token: ", err)
 	}
 
-	canRead := checker.GenerateChecker(context.Background(), userPermissions, "dashboards:read", "dashboards:uid:", "folders:uid:")
-
-	dashboards := []dash{
-		{uid: "dashAABBCC", parentUid: "foldAABBCC"},
-		{uid: "dashBBCCDD", parentUid: "foldBBCCDD"},
-		{uid: "dashCCDDEE", parentUid: "foldCCDDEE"},
-	}
-
-	for i := range dashboards {
-		if canRead("dashboards:uid:"+dashboards[i].uid) || canRead("folders:uid:"+dashboards[i].parentUid) {
-			fmt.Printf("OK: %v\n", dashboards[i].uid)
-			continue
-		}
-		fmt.Printf("KO: %v\n", dashboards[i].uid)
-	}
+	log.Println("Claims: ", claims)
 }
-```
 
-The program here would output:
-```
-OK: dashAABBCC
-KO: dashBBCCDD
-OK: dashCCDDEE
 ```
