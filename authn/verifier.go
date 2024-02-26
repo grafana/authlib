@@ -17,7 +17,7 @@ type Claims[T any] struct {
 }
 
 func NewVerifier[T any](cfg IDVerifierConfig) *VerifierBase[T] {
-	return &VerifierBase[T]{cfg, newKeyService(cfg.SigningKeyURL)}
+	return &VerifierBase[T]{cfg, newKeyService(cfg.SigningKeysURL)}
 }
 
 type VerifierBase[T any] struct {
