@@ -2,6 +2,8 @@ package authn
 
 import (
 	"context"
+	"errors"
+	"time"
 
 	"github.com/go-jose/go-jose/v3"
 	"github.com/go-jose/go-jose/v3/jwt"
@@ -46,16 +48,26 @@ func (v *VerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T],
 		return nil, err
 	}
 
-	if len(v.cfg.AllowedAudiences) > 0 {
-		for _, allowed := range v.cfg.AllowedAudiences {
-			if claims.Audience.Contains(allowed) {
-				return &claims, nil
-			}
-		}
-		return nil, ErrInvalidAudience
+	if err := claims.Validate(jwt.Expected{
+		Audience: v.cfg.AllowedAudiences,
+		Time:     time.Now(),
+	}); err != nil {
+		return nil, mapErr(err)
 	}
 
 	return &claims, nil
+}
+
+func mapErr(err error) error {
+	if errors.Is(err, jwt.ErrExpired) {
+		return ErrExpiredToken
+	}
+
+	if errors.Is(err, jwt.ErrInvalidAudience) {
+		return ErrInvalidAudience
+	}
+
+	return err
 }
 
 func getKeyID(headers []jose.Header) (string, error) {

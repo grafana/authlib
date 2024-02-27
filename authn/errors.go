@@ -8,11 +8,13 @@ import (
 var (
 	ErrFetchingSigningKey = errors.New("unable to fetch signing keys")
 
-	// Privite error we wrap all other exported errors with
+	// Private error we wrap all other exported errors with
 	errInvalidToken      = errors.New("invalid token")
 	ErrPraseToken        = fmt.Errorf("%w: failed to parse as jwt token", errInvalidToken)
 	ErrInvalidSigningKey = fmt.Errorf("%w: unrecognized signing key", errInvalidToken)
-	ErrInvalidAudience   = fmt.Errorf("%w: invalid audience", errInvalidToken)
+
+	ErrExpiredToken    = fmt.Errorf("%w: expired token", errInvalidToken)
+	ErrInvalidAudience = fmt.Errorf("%w: invalid audience", errInvalidToken)
 )
 
 func IsInvalidTokenErr(err error) bool {
