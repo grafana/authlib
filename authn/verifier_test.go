@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/go-jose/go-jose/v3"
 	"github.com/go-jose/go-jose/v3/jwt"
@@ -78,7 +79,7 @@ func TestVerifier_Verify(t *testing.T) {
 	})
 
 	t.Run("invalid: unknown signing key", func(t *testing.T) {
-		claims, err := verifier.Verify(context.Background(), signSecond(t, CustomClaims{}))
+		claims, err := verifier.Verify(context.Background(), signSecond(t))
 		assert.ErrorIs(t, err, ErrInvalidSigningKey)
 		assert.Nil(t, claims)
 	})
@@ -87,7 +88,7 @@ func TestVerifier_Verify(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](IDVerifierConfig{
 			SigningKeysURL: "http://localhost:8000/v1/unknown",
 		})
-		claims, err := verifier.Verify(context.Background(), signFist(t, CustomClaims{}))
+		claims, err := verifier.Verify(context.Background(), signFist(t))
 		assert.ErrorIs(t, err, ErrFetchingSigningKey)
 		assert.Nil(t, claims)
 	})
@@ -99,7 +100,7 @@ func TestVerifier_Verify(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](IDVerifierConfig{
 			SigningKeysURL: server.URL,
 		})
-		claims, err := verifier.Verify(context.Background(), signFist(t, CustomClaims{}))
+		claims, err := verifier.Verify(context.Background(), signFist(t))
 		assert.ErrorIs(t, err, ErrFetchingSigningKey)
 		assert.Nil(t, claims)
 	})
@@ -119,7 +120,7 @@ func TestVerifier_Verify(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](IDVerifierConfig{
 			SigningKeysURL: server.URL,
 		})
-		claims, err := verifier.Verify(context.Background(), signSecond(t, CustomClaims{}))
+		claims, err := verifier.Verify(context.Background(), signSecond(t))
 		assert.ErrorIs(t, err, ErrInvalidSigningKey)
 		assert.Nil(t, claims)
 	})
@@ -129,8 +130,17 @@ func TestVerifier_Verify(t *testing.T) {
 			SigningKeysURL:   server.URL,
 			AllowedAudiences: []string{"stack:2"},
 		})
-		claims, err := verifier.Verify(context.Background(), signFist(t, CustomClaims{}))
+		claims, err := verifier.Verify(context.Background(), signFist(t))
 		assert.ErrorIs(t, err, ErrInvalidAudience)
+		assert.Nil(t, claims)
+	})
+
+	t.Run("invalid: token expired", func(t *testing.T) {
+		verifier := NewVerifier[CustomClaims](IDVerifierConfig{
+			SigningKeysURL: server.URL,
+		})
+		claims, err := verifier.Verify(context.Background(), signExpired(t))
+		assert.ErrorIs(t, err, ErrExpiredToken)
 		assert.Nil(t, claims)
 	})
 
@@ -139,27 +149,32 @@ func TestVerifier_Verify(t *testing.T) {
 			SigningKeysURL:   server.URL,
 			AllowedAudiences: []string{"stack:1"},
 		})
-		claims, err := verifier.Verify(context.Background(), signFist(t, CustomClaims{}))
+		claims, err := verifier.Verify(context.Background(), signFist(t))
 		assert.NoError(t, err)
 		assert.NotNil(t, claims)
 	})
 
 	t.Run("valid: token", func(t *testing.T) {
-		claims, err := verifier.Verify(context.Background(), signFist(t, CustomClaims{}))
+		claims, err := verifier.Verify(context.Background(), signFist(t))
+		fmt.Println(claims.Claims)
 		assert.NoError(t, err)
 		assert.NotNil(t, claims)
 	})
 }
 
-func signFist(t *testing.T, claims any) string {
-	return signToken(t, firstKeyID, fistKey, claims)
+func signExpired(t *testing.T) string {
+	return signToken(t, firstKeyID, fistKey, time.Now().Add(-2*time.Minute))
 }
 
-func signSecond(t *testing.T, claims any) string {
-	return signToken(t, secondKeyId, secondKey, claims)
+func signFist(t *testing.T) string {
+	return signToken(t, firstKeyID, fistKey, time.Now().Add(1*time.Minute))
 }
 
-func signToken(t *testing.T, keyID string, key *ecdsa.PrivateKey, claims any) string {
+func signSecond(t *testing.T) string {
+	return signToken(t, secondKeyId, secondKey, time.Now().Add(1*time.Minute))
+}
+
+func signToken(t *testing.T, keyID string, key *ecdsa.PrivateKey, exp time.Time) string {
 	t.Helper()
 
 	signer, err := jose.NewSigner(jose.SigningKey{
@@ -172,7 +187,7 @@ func signToken(t *testing.T, keyID string, key *ecdsa.PrivateKey, claims any) st
 	})
 	require.NoError(t, err)
 
-	token, err := jwt.Signed(signer).Claims(claims).Claims(jwt.Claims{Audience: jwt.Audience{"stack:1"}}).CompactSerialize()
+	token, err := jwt.Signed(signer).Claims(jwt.Claims{Audience: jwt.Audience{"stack:1"}, Expiry: jwt.NewNumericDate(exp)}).CompactSerialize()
 	require.NoError(t, err)
 
 	return token
