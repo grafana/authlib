@@ -235,5 +235,6 @@ func (c *clientImpl) cacheValue(ctx context.Context, perms permissionsByID, key 
 		return err
 	}
 
-	return c.cache.Set(ctx, key, buf.Bytes(), cacheExp)
+	// Cache with default expiry
+	return c.cache.Set(ctx, key, buf.Bytes(), cache.DefaultExpiration)
 }
