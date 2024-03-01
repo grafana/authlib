@@ -21,7 +21,7 @@ type Cache interface {
 	// Get gets the cache value as an byte array
 	Get(ctx context.Context, key string) ([]byte, error)
 
-	// Set saves the value as an byte array. if `expire` is set to zero it will default to 24h
+	// Set saves the value as an byte array. if `expire` is set to zero it will use the cache default expiration time.
 	Set(ctx context.Context, key string, value []byte, expire time.Duration) error
 
 	// Delete object from cache

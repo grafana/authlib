@@ -31,6 +31,7 @@ var (
 )
 
 const (
+	defaultExp = 0
 	cacheExp   = 5 * time.Minute
 	searchPath = "/api/access-control/users/permissions/search"
 )
@@ -156,9 +157,9 @@ func (c *clientImpl) Search(ctx context.Context, query searchQuery) (*searchResp
 	query.processResource()
 
 	// set namespaced ID if id token is provided
-	if err := query.processIDToken(c); err != nil {
-		return nil, err
-	}
+	// if err := query.processIDToken(c); err != nil {
+	// 	return nil, err
+	// }
 
 	// validate query
 	if err := query.validateQuery(); err != nil {
@@ -235,5 +236,6 @@ func (c *clientImpl) cacheValue(ctx context.Context, perms permissionsByID, key 
 		return err
 	}
 
-	return c.cache.Set(ctx, key, buf.Bytes(), cacheExp)
+	// Cache with default expiry
+	return c.cache.Set(ctx, key, buf.Bytes(), defaultExp)
 }
