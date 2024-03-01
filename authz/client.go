@@ -31,7 +31,6 @@ var (
 )
 
 const (
-	defaultExp = 0
 	cacheExp   = 5 * time.Minute
 	searchPath = "/api/access-control/users/permissions/search"
 )
@@ -237,5 +236,5 @@ func (c *clientImpl) cacheValue(ctx context.Context, perms permissionsByID, key 
 	}
 
 	// Cache with default expiry
-	return c.cache.Set(ctx, key, buf.Bytes(), defaultExp)
+	return c.cache.Set(ctx, key, buf.Bytes(), cache.DefaultExpiration)
 }

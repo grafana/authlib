@@ -9,7 +9,10 @@ import (
 	gocache "github.com/patrickmn/go-cache"
 )
 
-const NoExpiration = cache.NoExpiration
+const (
+	NoExpiration      = cache.NoExpiration
+	DefaultExpiration = cache.DefaultExpiration
+)
 
 var (
 	ErrNotFound = errors.New("not found")
