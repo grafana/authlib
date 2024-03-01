@@ -157,9 +157,9 @@ func (c *clientImpl) Search(ctx context.Context, query searchQuery) (*searchResp
 	query.processResource()
 
 	// set namespaced ID if id token is provided
-	// if err := query.processIDToken(c); err != nil {
-	// 	return nil, err
-	// }
+	if err := query.processIDToken(c); err != nil {
+		return nil, err
+	}
 
 	// validate query
 	if err := query.validateQuery(); err != nil {
