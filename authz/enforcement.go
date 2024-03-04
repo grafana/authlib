@@ -12,6 +12,8 @@ var (
 	ErrTooManyPermissions = errors.New("unexpected number of permissions returned by the server")
 )
 
+var _ EnforcementClient = &EnforcementClientImpl{}
+
 type EnforcementClientImpl struct {
 	client        client
 	queryTemplate *searchQuery
@@ -122,4 +124,30 @@ func (s *EnforcementClientImpl) HasAccess(ctx context.Context, idToken string,
 	}
 	kinds := resourcesKind(resources...)
 	return compileChecker(permissions, action, kinds...)(resources...), nil
+}
+
+func (s *EnforcementClientImpl) LookupResources(ctx context.Context, idToken string, action string) ([]Resource, error) {
+	permissions, err := s.fetchPermissions(ctx, idToken, action)
+	if err != nil {
+		return nil, err
+	}
+
+	resources := make([]Resource, 0, len(permissions))
+	for gotAction, scopes := range permissions {
+		if gotAction != action {
+			continue
+		}
+		for _, scope := range scopes {
+			parts := strings.Split(scope, ":")
+			if len(parts) != 3 {
+				continue
+			}
+			resources = append(resources, Resource{
+				Kind: parts[0],
+				Attr: parts[1],
+				ID:   parts[2],
+			})
+		}
+	}
+	return resources, nil
 }
