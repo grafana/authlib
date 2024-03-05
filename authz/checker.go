@@ -1,7 +1,5 @@
 package authz
 
-// NOTE: this package is temporary, the aim is actually to make this a module
-
 var (
 	noAccessChecker   Checker = func(resources ...Resource) bool { return false }
 	fullAccessChecker Checker = func(resources ...Resource) bool { return true }
