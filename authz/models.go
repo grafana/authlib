@@ -25,6 +25,9 @@ type EnforcementClient interface {
 	// HasAccess checks whether the user can perform the given action on any of the given resources.
 	// If the scope is empty, it checks whether the user can perform the action.
 	HasAccess(ctx context.Context, idToken string, action string, resources ...Resource) (bool, error)
+
+	// Experimental: LookupResources returns the resources that the user has access to for the given action.
+	LookupResources(ctx context.Context, idToken string, action string) ([]Resource, error)
 }
 
 // Checker checks whether a user has access to any of the provided resources.

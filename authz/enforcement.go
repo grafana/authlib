@@ -12,6 +12,8 @@ var (
 	ErrTooManyPermissions = errors.New("unexpected number of permissions returned by the server")
 )
 
+var _ EnforcementClient = &EnforcementClientImpl{}
+
 type EnforcementClientImpl struct {
 	client        client
 	queryTemplate *searchQuery
@@ -122,4 +124,45 @@ func (s *EnforcementClientImpl) HasAccess(ctx context.Context, idToken string,
 	}
 	kinds := resourcesKind(resources...)
 	return compileChecker(permissions, action, kinds...)(resources...), nil
+}
+
+// Experimental: LookupResources returns the resources that the user has access to for the given action.
+// Resource expansion is still not supported in this method.
+func (s *EnforcementClientImpl) LookupResources(ctx context.Context, idToken string, action string) ([]Resource, error) {
+	permissions, err := s.fetchPermissions(ctx, idToken, action)
+	if err != nil {
+		return nil, err
+	}
+
+	resources := make([]Resource, 0, len(permissions))
+	for gotAction, scopes := range permissions {
+		if gotAction != action {
+			continue
+		}
+		for _, scope := range scopes {
+			if scope == "" {
+				continue
+			}
+			kind, attribute, id := splitScope(scope)
+			resources = append(resources, Resource{
+				Kind: kind,
+				Attr: attribute,
+				ID:   id,
+			})
+		}
+	}
+	return resources, nil
+}
+
+// splitScope returns kind, attribute and Identifier
+func splitScope(scope string) (kind string, attribute string, id string) {
+	fragments := strings.Split(scope, ":")
+	switch l := len(fragments); l {
+	case 1: // Splitting a wildcard scope "*" -> kind: "*"; attribute: "*"; identifier: "*"
+		return fragments[0], fragments[0], fragments[0]
+	case 2: // Splitting a wildcard scope with specified kind "dashboards:*" -> kind: "dashboards"; attribute: "*"; identifier: "*"
+		return fragments[0], fragments[1], fragments[1]
+	default: // Splitting a scope with all fields specified "dashboards:uid:my_dash" -> kind: "dashboards"; attribute: "uid"; identifier: "my_dash"
+		return fragments[0], fragments[1], strings.Join(fragments[2:], ":")
+	}
 }
