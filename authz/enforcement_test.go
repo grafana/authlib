@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -160,6 +161,137 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 			got, err := s.HasAccess(context.Background(), tt.idToken, tt.action, tt.resources...)
 			require.NoError(t, err)
 			require.Equal(t, got, tt.want)
+		})
+	}
+}
+
+func TestEnforcementClientImpl_LookupResources(t *testing.T) {
+	tests := []struct {
+		name        string
+		idToken     string
+		action      string
+		permissions permissionsByID
+		want        []Resource
+		mockErr     error
+		wantErr     bool
+	}{
+		{
+			name:    "no permissions",
+			idToken: "jwt_id_token",
+			action:  "teams:read",
+			permissions: permissionsByID{
+				1: map[string][]string{},
+			},
+			want:    []Resource{},
+			wantErr: false,
+		},
+		{
+			name:    "permission filtering works",
+			idToken: "jwt_id_token",
+			action:  "teams:write",
+			permissions: permissionsByID{
+				1: map[string][]string{
+					"teams:read": {"teams:id:1", "teams:id:2"},
+				},
+			},
+			want:    []Resource{},
+			wantErr: false,
+		},
+		{
+			name:    "has permissions",
+			idToken: "jwt_id_token",
+			action:  "teams:read",
+			permissions: permissionsByID{
+				1: map[string][]string{
+					"teams:read": {"teams:id:1", "teams:id:2"},
+				},
+			},
+			want: []Resource{
+				{Kind: "teams", Attr: "id", ID: "1"},
+				{Kind: "teams", Attr: "id", ID: "2"},
+			},
+			wantErr: false,
+		},
+		{
+			name:    "has permissions wildcard",
+			idToken: "jwt_id_token",
+			action:  "folders:read",
+			permissions: permissionsByID{
+				1: map[string][]string{
+					"folders:read": {"folders:*"},
+				},
+			},
+			want: []Resource{
+				{Kind: "folders", Attr: "*", ID: "*"},
+			},
+			wantErr: false,
+		},
+		{
+			name:        "error fetching permissions",
+			idToken:     "jwt_id_token",
+			action:      "teams:read",
+			permissions: permissionsByID{},
+			mockErr:     ErrTooManyPermissions,
+			want:        nil,
+			wantErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockClient := &MockClient{}
+			s := EnforcementClientImpl{client: mockClient}
+
+			mockClient.On("Search", mock.Anything, mock.Anything).Return(&searchResponse{Data: &tt.permissions}, tt.mockErr)
+
+			got, err := s.LookupResources(context.Background(), tt.idToken, tt.action)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestSplitScope(t *testing.T) {
+	tests := []struct {
+		name          string
+		scope         string
+		wantKind      string
+		wantAttribute string
+		wantID        string
+	}{
+		{
+			name:          "wildcard scope",
+			scope:         "*",
+			wantKind:      "*",
+			wantAttribute: "*",
+			wantID:        "*",
+		},
+		{
+			name:          "wildcard scope with specified kind",
+			scope:         "dashboards:*",
+			wantKind:      "dashboards",
+			wantAttribute: "*",
+			wantID:        "*",
+		},
+		{
+			name:          "scope with all fields specified",
+			scope:         "dashboards:uid:my_dash",
+			wantKind:      "dashboards",
+			wantAttribute: "uid",
+			wantID:        "my_dash",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotKind, gotAttribute, gotID := splitScope(tt.scope)
+			assert.Equal(t, tt.wantKind, gotKind, "they should be equal")
+			assert.Equal(t, tt.wantAttribute, gotAttribute, "they should be equal")
+			assert.Equal(t, tt.wantID, gotID, "they should be equal")
 		})
 	}
 }

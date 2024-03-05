@@ -2,10 +2,6 @@ package authz
 
 // NOTE: this package is temporary, the aim is actually to make this a module
 
-import (
-	"strings"
-)
-
 var (
 	noAccessChecker   Checker = func(resources ...Resource) bool { return false }
 	fullAccessChecker Checker = func(resources ...Resource) bool { return true }
@@ -58,16 +54,10 @@ func wildcardDetector(kinds ...string) func(scope string) bool {
 		return func(scope string) bool { return false }
 	}
 	return func(scope string) bool {
-		if scope == "*" {
-			return true
-		}
-		split := strings.Split(scope, ":")
-		if len(split) > 3 {
-			// the last part of the scope is definitely not a wildcard
-			return false
-		}
+		// split the scope into its parts
+		kind, _, id := splitScope(scope)
 		for i := range kinds {
-			if split[0] == kinds[i] && split[2] == "*" {
+			if (kind == kinds[i] || kind == "*") && id == "*" {
 				return true
 			}
 		}
