@@ -27,7 +27,6 @@ type EnforcementClient interface {
 	HasAccess(ctx context.Context, idToken string, action string, resources ...Resource) (bool, error)
 
 	// Experimental: LookupResources returns the resources that the user has access to for the given action.
-	// Resource expansion is still not supported in this method.
 	LookupResources(ctx context.Context, idToken string, action string) ([]Resource, error)
 }
 
