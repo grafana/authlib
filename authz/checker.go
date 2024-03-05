@@ -54,6 +54,10 @@ func wildcardDetector(kinds ...string) func(scope string) bool {
 		return func(scope string) bool { return false }
 	}
 	return func(scope string) bool {
+		if scope == "*" {
+			return true
+		}
+
 		// split the scope into its parts
 		kind, _, id := splitScope(scope)
 		for i := range kinds {
