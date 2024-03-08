@@ -63,7 +63,7 @@ func main() {
 
 This package exports an token verifier that can be used to verify signed jwt tokens. A common usecase for this component is to verify grafana id tokens.
 
-This package will handle retrival and caching of jwks. It was desing to be generic over "Custom claims" so that we are not only restricted to the current structure of id tokens. This means that the parsed claims will contain standard jwts claims such as `aud`, `exp` etc plus specified custom claims.
+This package will handle retrival and caching of jwks. It was designed to be generic over "Custom claims" so that we are not restricted to the current structure of id tokens. This means that the parsed claims will contain standard jwts claims such as `aud`, `exp` etc plus specified custom claims.
 
 ## Example
 
