@@ -17,11 +17,6 @@ enable = accessControlOnCall
 
 ## Examples
 
-This repository is private for now, to use the library:
-```bash
-GOPRIVATE=github.com/grafana/authlib
-```
-
 Here is an example on how to check access on a resouce for a user.
 
 ```go
