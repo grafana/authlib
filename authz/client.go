@@ -28,6 +28,7 @@ var (
 	ErrInvalidToken     = errors.New("invalid token: cannot query server")
 	ErrInvalidResponse  = errors.New("invalid response from server")
 	ErrUnexpectedStatus = errors.New("unexpected response status")
+	ErrIsAPIKey         = errors.New("invalid token: cannot query server with an api-key token")
 )
 
 const (
@@ -132,6 +133,10 @@ func (query *searchQuery) processIDToken(c *clientImpl) error {
 			return fmt.Errorf("%v: %w", ErrInvalidIDToken, errors.New("missing subject (namespacedID) in id token"))
 		}
 		query.NamespacedID = claims.Subject
+		if strings.Contains(query.NamespacedID, "api-key") {
+			// return an error if we attempt to query an `api-key` - currently not supported by the /search endpoint
+			return ErrIsAPIKey
+		}
 	}
 	return nil
 }
