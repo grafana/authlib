@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/grafana/authlib/internal/cache"
+	"github.com/grafana/authlib/cache"
 	"github.com/stretchr/testify/mock"
 )
 

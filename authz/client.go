@@ -17,7 +17,7 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/grafana/authlib/authn"
-	"github.com/grafana/authlib/internal/cache"
+	"github.com/grafana/authlib/cache"
 )
 
 var _ client = &clientImpl{}
