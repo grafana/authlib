@@ -12,7 +12,7 @@ import (
 
 	"golang.org/x/sync/singleflight"
 
-	"github.com/grafana/authlib/internal/cache"
+	"github.com/grafana/authlib/cache"
 )
 
 // Set cache TTL one minute shorter than Token expiry
