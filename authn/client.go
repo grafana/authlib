@@ -113,8 +113,6 @@ func (c *tokenExchangeClientImpl) GetAccessToken(ctx context.Context, req Access
 	return response.Data.Token, nil
 }
 
-// TODO check what unique info for APs can be used for caching
-// TODO not enough to just cache the request probs - need to make sure that the caller should be able to get the Token
 func tokenExchangeCacheKey(query AccessTokenRequest) (string, error) {
 	data, err := json.Marshal(query)
 	return string(data), err
