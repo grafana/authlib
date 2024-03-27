@@ -5,13 +5,12 @@ import (
 	"errors"
 	"time"
 
-	"github.com/patrickmn/go-cache"
 	gocache "github.com/patrickmn/go-cache"
 )
 
 const (
-	NoExpiration      = cache.NoExpiration
-	DefaultExpiration = cache.DefaultExpiration
+	NoExpiration      = gocache.NoExpiration
+	DefaultExpiration = gocache.DefaultExpiration
 )
 
 var (
