@@ -73,7 +73,7 @@ func (s *keyService) Get(ctx context.Context, keyID string) (*jose.JSONWebKey, e
 }
 
 func (s *keyService) fetchJWKS(ctx context.Context) (*jose.JSONWebKeySet, error) {
-	req, err := http.NewRequest("GET", s.url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", s.url, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -10,7 +10,12 @@ import (
 )
 
 type Verifier[T any] interface {
+	// Verify will parse and verify provided token using public key from `IDVerifierConfig.SigningKeysURL`.
+	// If `AllowedAutiences` was configured those will be validated as well.
 	Verify(ctx context.Context, token string) (*Claims[T], error)
+	// ClaimsWithoutVerification will parse provided token and extract claims without performing any verification.
+	// Can be used to inspect claims when we have no need to perform verification.
+	ClaimsWithoutVerification(ctx context.Context, token string) (*Claims[T], error)
 }
 
 type Claims[T any] struct {
@@ -27,6 +32,8 @@ type VerifierBase[T any] struct {
 	keys *keyService
 }
 
+// Verify will parse and verify provided token using public key from `SigningKeysURL`.
+// If `AllowedAutiences` was configured those will be validated as well.
 func (v *VerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T], error) {
 	parsed, err := jwt.ParseSigned(token)
 	if err != nil {
@@ -53,6 +60,22 @@ func (v *VerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T],
 		Time:     time.Now(),
 	}); err != nil {
 		return nil, mapErr(err)
+	}
+
+	return &claims, nil
+}
+
+// ClaimsWithoutVerification will parse provided token and extract claims without performing any verification.
+// Can be used to inspect claims when we have no need to perform verification.
+func (v *VerifierBase[T]) ClaimsWithoutVerification(ctx context.Context, token string) (*Claims[T], error) {
+	parsed, err := jwt.ParseSigned(token)
+	if err != nil {
+		return nil, ErrParseToken
+	}
+
+	claims := Claims[T]{}
+	if err := parsed.UnsafeClaimsWithoutVerification(&claims.Claims, &claims.Rest); err != nil {
+		return nil, err
 	}
 
 	return &claims, nil
