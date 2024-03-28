@@ -30,7 +30,7 @@ type VerifierBase[T any] struct {
 func (v *VerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T], error) {
 	parsed, err := jwt.ParseSigned(token)
 	if err != nil {
-		return nil, ErrPraseToken
+		return nil, ErrParseToken
 	}
 
 	keyID, err := getKeyID(parsed.Headers)
