@@ -124,7 +124,7 @@ func (query *searchQuery) processResource() {
 // processIDToken verifies the id token is legit and extracts its subject in the query.NamespacedID.
 func (query *searchQuery) processIDToken(c *clientImpl) error {
 	if query.IdToken != "" {
-		claims, err := c.verifier.Verify(context.Background(), query.IdToken)
+		claims, err := c.verifier.Verify(context.Background(), query.IdToken, authn.TypeIDToken)
 		if err != nil {
 			return fmt.Errorf("%v: %w", ErrInvalidIDToken, err)
 		}
