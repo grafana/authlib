@@ -2,16 +2,9 @@ package authn
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/go-jose/go-jose/v3/jwt"
 )
-
-// HTTPRequestDoer performs HTTP requests.
-// The standard http.Client implements this interface.
-type HTTPRequestDoer interface {
-	Do(req *http.Request) (*http.Response, error)
-}
 
 // client performs requests to auth server
 type client interface {

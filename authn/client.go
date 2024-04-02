@@ -24,7 +24,7 @@ var _ TokenExchangeClient = &TokenExchangeClientImpl{}
 type tokenExchangeClientImpl struct {
 	cache   cache.Cache
 	cfg     Config
-	client  HTTPRequestDoer
+	client  *http.Client
 	singlef singleflight.Group
 }
 
