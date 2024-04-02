@@ -9,13 +9,16 @@ import (
 	"github.com/go-jose/go-jose/v3/jwt"
 )
 
+const (
+	TypeIDToken     = "jwt"
+	TypeAccessToken = "at+jwt"
+)
+
 type Verifier[T any] interface {
 	// Verify will parse and verify provided token using public key from `IDVerifierConfig.SigningKeysURL`.
+	// typ will either be `TypeIDToken` or `TypeAccessToken` depending on expected token to verify.
 	// If `AllowedAutiences` was configured those will be validated as well.
-	Verify(ctx context.Context, token string) (*Claims[T], error)
-	// ClaimsWithoutVerification will parse provided token and extract claims without performing any verification.
-	// Can be used to inspect claims when we have no need to perform verification.
-	ClaimsWithoutVerification(ctx context.Context, token string) (*Claims[T], error)
+	Verify(ctx context.Context, token, typ string) (*Claims[T], error)
 }
 
 type Claims[T any] struct {
@@ -24,7 +27,11 @@ type Claims[T any] struct {
 }
 
 func NewVerifier[T any](cfg IDVerifierConfig) *VerifierBase[T] {
-	return &VerifierBase[T]{cfg, newKeyService(cfg.SigningKeysURL)}
+	return newVerifierWithKeyService[T](cfg, newKeyService(cfg.SigningKeysURL))
+}
+
+func newVerifierWithKeyService[T any](cfg IDVerifierConfig, keys *keyService) *VerifierBase[T] {
+	return &VerifierBase[T]{cfg, keys}
 }
 
 type VerifierBase[T any] struct {
@@ -34,10 +41,14 @@ type VerifierBase[T any] struct {
 
 // Verify will parse and verify provided token using public key from `SigningKeysURL`.
 // If `AllowedAutiences` was configured those will be validated as well.
-func (v *VerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T], error) {
+func (v *VerifierBase[T]) Verify(ctx context.Context, token, typ string) (*Claims[T], error) {
 	parsed, err := jwt.ParseSigned(token)
 	if err != nil {
 		return nil, ErrParseToken
+	}
+
+	if !validType(parsed, typ) {
+		return nil, ErrInvalidTokenType
 	}
 
 	keyID, err := getKeyID(parsed.Headers)
@@ -65,20 +76,13 @@ func (v *VerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T],
 	return &claims, nil
 }
 
-// ClaimsWithoutVerification will parse provided token and extract claims without performing any verification.
-// Can be used to inspect claims when we have no need to perform verification.
-func (v *VerifierBase[T]) ClaimsWithoutVerification(ctx context.Context, token string) (*Claims[T], error) {
-	parsed, err := jwt.ParseSigned(token)
-	if err != nil {
-		return nil, ErrParseToken
+func validType(token *jwt.JSONWebToken, typ string) bool {
+	for _, h := range token.Headers {
+		if t, ok := h.ExtraHeaders["typ"].(string); ok && t == typ {
+			return true
+		}
 	}
-
-	claims := Claims[T]{}
-	if err := parsed.UnsafeClaimsWithoutVerification(&claims.Claims, &claims.Rest); err != nil {
-		return nil, err
-	}
-
-	return &claims, nil
+	return false
 }
 
 func mapErr(err error) error {

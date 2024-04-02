@@ -20,13 +20,18 @@ const (
 )
 
 func newKeyService(jwksURL string) *keyService {
+	return newKeyServiceWithCache(jwksURL, cache.NewLocalCache(cache.Config{
+		Expiry:          cacheTTL,
+		CleanupInterval: cacheCleanupInterval,
+	}))
+
+}
+
+func newKeyServiceWithCache(jwksURL string, cache cache.Cache) *keyService {
 	return &keyService{
 		url: jwksURL,
-		c: cache.NewLocalCache(cache.Config{
-			Expiry:          cacheTTL,
-			CleanupInterval: cacheCleanupInterval,
-		}),
-		s: &singleflight.Group{},
+		c:   cache,
+		s:   &singleflight.Group{},
 	}
 }
 
