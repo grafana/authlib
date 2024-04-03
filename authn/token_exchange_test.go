@@ -40,7 +40,7 @@ func TestClientImpl_Search(t *testing.T) {
 		}))
 		defer server.Close()
 		t.Run(tt.name, func(t *testing.T) {
-			c, err := newClient(Config{
+			c, err := NewTokenExchangeClient(Config{
 				AuthAPIURL: server.URL,
 				CAP:        capToken,
 			})
