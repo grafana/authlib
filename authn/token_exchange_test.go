@@ -13,20 +13,20 @@ import (
 func Test_TokenExchangeClient(t *testing.T) {
 	tests := []struct {
 		name     string
-		request  AccessTokenRequest
+		request  TokenExchangeRequest
 		response string
 		want     string
 		wantErr  bool
 	}{
 		{
 			name:    "Error if realm and org ID are not provided for a system wide CAP",
-			request: AccessTokenRequest{},
+			request: TokenExchangeRequest{},
 			want:    "",
 			wantErr: true,
 		},
 		{
 			name: "Can parse a successful response",
-			request: AccessTokenRequest{
+			request: TokenExchangeRequest{
 				Realms: []Realm{
 					{
 						Type:       "org",
@@ -41,7 +41,7 @@ func Test_TokenExchangeClient(t *testing.T) {
 		},
 		{
 			name: "Can parse an error response",
-			request: AccessTokenRequest{
+			request: TokenExchangeRequest{
 				Realms: []Realm{
 					{
 						Type:       "org",
@@ -65,7 +65,7 @@ func Test_TokenExchangeClient(t *testing.T) {
 		}))
 		defer server.Close()
 		t.Run(tt.name, func(t *testing.T) {
-			c, err := NewTokenExchangeClient(Config{
+			c, err := NewTokenExchangeClient(TokenExchangeConfig{
 				AuthAPIURL: server.URL,
 				CAP:        capToken,
 			})

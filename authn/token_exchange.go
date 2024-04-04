@@ -23,16 +23,16 @@ const tokenExchangePath = "/v1/sign-access-token"
 
 type TokenExchangeClient interface {
 	// GetAccessToken returns a short-lived access Token for the given claims.
-	GetAccessToken(ctx context.Context, req AccessTokenRequest) (string, error)
+	GetAccessToken(ctx context.Context, req TokenExchangeRequest) (string, error)
 }
 
-type Config struct {
+type TokenExchangeConfig struct {
 	CAP           string // cloud access policy token used for authorising the request
 	usesSystemCAP bool
 	AuthAPIURL    string // URL of the auth server
 }
 
-func NewTokenExchangeClient(cfg Config) (*tokenExchangeClientImpl, error) {
+func NewTokenExchangeClient(cfg TokenExchangeConfig) (*tokenExchangeClientImpl, error) {
 	if cfg.CAP == "" {
 		return nil, fmt.Errorf("cloud access policy (CAP) is required")
 	}
@@ -94,7 +94,7 @@ func isSystemWideCAP(cap string) (bool, error) {
 
 type tokenExchangeClientImpl struct {
 	cache   cache.Cache
-	cfg     Config
+	cfg     TokenExchangeConfig
 	client  *http.Client
 	singlef singleflight.Group
 }
@@ -104,22 +104,22 @@ type Realm struct {
 	Identifier string `json:"identifier"` // org id or stack id
 }
 
-type AccessTokenRequest struct {
+type TokenExchangeRequest struct {
 	Realms []Realm // A JSON-encoded array of objects containing the realms the request should be restricted to.
 	OrgID  int64   // ID of the org the request should be restricted to.
 }
 
-type Data struct {
+type TokenExchangeData struct {
 	Token string `json:"token"`
 }
 
 type tokenExchangeResponse struct {
-	Data   Data   `json:"data"`
-	Status string `json:"status"`
-	Error  string `json:"error"`
+	Data   TokenExchangeData `json:"data"`
+	Status string            `json:"status"`
+	Error  string            `json:"error"`
 }
 
-func (c *tokenExchangeClientImpl) GetAccessToken(ctx context.Context, tokenReq AccessTokenRequest) (string, error) {
+func (c *tokenExchangeClientImpl) GetAccessToken(ctx context.Context, tokenReq TokenExchangeRequest) (string, error) {
 	if c.cfg.usesSystemCAP && (tokenReq.OrgID == 0 || len(tokenReq.Realms) == 0) {
 		return "", fmt.Errorf("org ID and realms must be specified when using system-wide CAP")
 	}
@@ -189,7 +189,7 @@ func (c *tokenExchangeClientImpl) GetAccessToken(ctx context.Context, tokenReq A
 	return response.Data.Token, nil
 }
 
-func tokenExchangeCacheKey(query AccessTokenRequest) (string, error) {
+func tokenExchangeCacheKey(query TokenExchangeRequest) (string, error) {
 	data, err := json.Marshal(query)
 	return string(data), err
 }
