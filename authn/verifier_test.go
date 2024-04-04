@@ -74,7 +74,7 @@ func TestVerifier_Verify(t *testing.T) {
 
 	t.Run("invalid: wrong token format", func(t *testing.T) {
 		claims, err := verifier.Verify(context.Background(), "not a jwt token")
-		assert.ErrorIs(t, err, ErrPraseToken)
+		assert.ErrorIs(t, err, ErrParseToken)
 		assert.Nil(t, claims)
 	})
 
