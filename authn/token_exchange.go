@@ -2,6 +2,7 @@ package authn
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/go-jose/go-jose/v3/jwt"
@@ -17,8 +18,7 @@ import (
 	"github.com/grafana/authlib/cache"
 )
 
-// Set cache TTL one minute shorter than token expiry
-const tokenCacheTTL = 9 * time.Minute
+const cacheBuffer = 15 * time.Second
 const tokenExchangePath = "/v1/sign-access-token"
 
 type TokenExchangeClient interface {
@@ -27,16 +27,29 @@ type TokenExchangeClient interface {
 }
 
 type Config struct {
-	CAP        string `json:"cloudAccessPolicy"` // cloud access policy token used for authorising the request
-	AuthAPIURL string `json:"authAPIURL"`        // URL of the auth server
+	CAP           string // cloud access policy token used for authorising the request
+	usesSystemCAP bool
+	AuthAPIURL    string // URL of the auth server
 }
 
 func NewTokenExchangeClient(cfg Config) (*tokenExchangeClientImpl, error) {
+	if cfg.CAP == "" {
+		return nil, fmt.Errorf("cloud access policy (CAP) is required")
+	}
+	usesSystemCAP, err := isSystemWideCAP(cfg.CAP)
+	if err != nil {
+		return nil, fmt.Errorf("invalid CAP: %v", err)
+	}
+	cfg.usesSystemCAP = usesSystemCAP
+
+	if cfg.AuthAPIURL == "" {
+		return nil, fmt.Errorf("auth API URL is required")
+	}
+
 	client := &tokenExchangeClientImpl{
 		client: nil,
 		cache: cache.NewLocalCache(cache.Config{
-			Expiry:          tokenCacheTTL,
-			CleanupInterval: 1 * time.Minute,
+			CleanupInterval: 5 * time.Minute,
 		}),
 		cfg:     cfg,
 		singlef: singleflight.Group{},
@@ -60,6 +73,25 @@ func NewTokenExchangeClient(cfg Config) (*tokenExchangeClientImpl, error) {
 	return client, nil
 }
 
+// isSystemWideCAP checks if the given CAP is a system-wide CAP by looking at the org ID in the CAP.
+func isSystemWideCAP(cap string) (bool, error) {
+	capParts := strings.Split(cap, "_")
+	// strip CAP prefix
+	strippedCAP := capParts[len(capParts)-1]
+	decodedCAP, err := base64.StdEncoding.DecodeString(strippedCAP)
+	if err != nil {
+		return false, fmt.Errorf("failed to decode CAP: %v", err)
+	}
+	type capToken struct {
+		OrgID string `json:"o"`
+	}
+	var capData capToken
+	if err := json.Unmarshal(decodedCAP, &capData); err != nil {
+		return false, fmt.Errorf("failed to unmarshal CAP: %v", err)
+	}
+	return capData.OrgID == "0", nil
+}
+
 type tokenExchangeClientImpl struct {
 	cache   cache.Cache
 	cfg     Config
@@ -67,18 +99,14 @@ type tokenExchangeClientImpl struct {
 	singlef singleflight.Group
 }
 
-type RealmList []Realm
-
 type Realm struct {
 	Type       string `json:"type"`       // org or stack
 	Identifier string `json:"identifier"` // org id or stack id
 }
 
 type AccessTokenRequest struct {
-	Claims jwt.Claims // claims to be included in the access token
-	Extra  map[string]any
-	Realms RealmList // A JSON-encoded array of objects containing the realms the request should be restricted to.
-	OrgID  int64     // ID of the org the request should be restricted to.
+	Realms []Realm // A JSON-encoded array of objects containing the realms the request should be restricted to.
+	OrgID  int64   // ID of the org the request should be restricted to.
 }
 
 type Data struct {
@@ -92,6 +120,10 @@ type tokenExchangeResponse struct {
 }
 
 func (c *tokenExchangeClientImpl) GetAccessToken(ctx context.Context, tokenReq AccessTokenRequest) (string, error) {
+	if c.cfg.usesSystemCAP && (tokenReq.OrgID == 0 || len(tokenReq.Realms) == 0) {
+		return "", fmt.Errorf("org ID and realms must be specified when using system-wide CAP")
+	}
+
 	key, err := tokenExchangeCacheKey(tokenReq)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate cache key: %v", err)
@@ -107,7 +139,7 @@ func (c *tokenExchangeClientImpl) GetAccessToken(ctx context.Context, tokenReq A
 			return nil, err
 		}
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, strings.NewReader(key))
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, strings.NewReader("{}"))
 		if err != nil {
 			return nil, err
 		}
@@ -163,5 +195,17 @@ func tokenExchangeCacheKey(query AccessTokenRequest) (string, error) {
 }
 
 func (c *tokenExchangeClientImpl) cacheValue(ctx context.Context, token string, key string) error {
-	return c.cache.Set(ctx, key, []byte(token), cache.DefaultExpiration)
+	// decode JWT token without verifying the signature to extract the expiry time
+	var claims jwt.Claims
+	parsedToken, err := jwt.ParseSigned(token)
+	if err != nil {
+		return fmt.Errorf("failed to parse token: %v", err)
+	}
+	err = parsedToken.UnsafeClaimsWithoutVerification(&claims)
+	if err != nil {
+		return fmt.Errorf("failed to extract claims from the token: %v", err)
+	}
+	ttl := time.Until(claims.Expiry.Time()) - cacheBuffer
+
+	return c.cache.Set(ctx, key, []byte(token), ttl)
 }
