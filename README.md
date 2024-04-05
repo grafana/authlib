@@ -76,7 +76,7 @@ func main() {
 	verifier := authn.NewVerifier[CustomClaims](authn.IDVerifierConfig{
 		SigningKeysURL:   "<jwks url>",
 		AllowedAudiences: []string{},
-	})
+	}, authn.TokenTypeID)
 
 	claims, err := verifier.Verify(context.Background(), "<token>")
 
@@ -90,5 +90,4 @@ func main() {
 ```
 
 The verifier is generic over jwt.Claims. Most common use cases will be to either verify Grafana issued ID-Token or Access token.
-For those we have `AccessTokenVerifier` and `IDTokenVerifier`. Those are just simple wrappers around `Verifier` with expected claims.
-
+For those we have `AccessTokenVerifier` and `IDTokenVerifier`. These two structures are just simple wrappers around `Verifier` with expected claims.
