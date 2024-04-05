@@ -17,7 +17,7 @@ const (
 type Verifier[T any] interface {
 	// Verify will parse and verify provided token using public key from `IDVerifierConfig.SigningKeysURL`.
 	// typ will either be `TypeIDToken` or `TypeAccessToken` depending on expected token to verify.
-	// If `AllowedAutiences` was configured those will be validated as well.
+	// If `AllowedAudiences` was configured those will be validated as well.
 	Verify(ctx context.Context, token, typ string) (*Claims[T], error)
 }
 
