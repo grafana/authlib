@@ -40,7 +40,7 @@ type VerifierBase[T any] struct {
 }
 
 // Verify will parse and verify provided token using public key from `SigningKeysURL`.
-// If `AllowedAutiences` was configured those will be validated as well.
+// If `AllowedAudiences` was configured those will be validated as well.
 func (v *VerifierBase[T]) Verify(ctx context.Context, token, typ string) (*Claims[T], error) {
 	parsed, err := jwt.ParseSigned(token)
 	if err != nil {
