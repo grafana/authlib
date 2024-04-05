@@ -70,7 +70,7 @@ func TestVerifier_Verify(t *testing.T) {
 
 	verifier := NewVerifier[CustomClaims](VerifierConfig{
 		SigningKeysURL: server.URL,
-	}, TypeIDToken)
+	}, TokenTypeID)
 
 	t.Run("invalid: wrong token format", func(t *testing.T) {
 		claims, err := verifier.Verify(context.Background(), "not a jwt token")
@@ -87,7 +87,7 @@ func TestVerifier_Verify(t *testing.T) {
 	t.Run("invalid: transient http error", func(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](VerifierConfig{
 			SigningKeysURL: "http://localhost:8000/v1/unknown",
-		}, TypeIDToken)
+		}, TokenTypeID)
 		claims, err := verifier.Verify(context.Background(), signFist(t))
 		assert.ErrorIs(t, err, ErrFetchingSigningKey)
 		assert.Nil(t, claims)
@@ -99,7 +99,7 @@ func TestVerifier_Verify(t *testing.T) {
 		}))
 		verifier := NewVerifier[CustomClaims](VerifierConfig{
 			SigningKeysURL: server.URL,
-		}, TypeIDToken)
+		}, TokenTypeID)
 		claims, err := verifier.Verify(context.Background(), signFist(t))
 		assert.ErrorIs(t, err, ErrFetchingSigningKey)
 		assert.Nil(t, claims)
@@ -119,7 +119,7 @@ func TestVerifier_Verify(t *testing.T) {
 
 		verifier := NewVerifier[CustomClaims](VerifierConfig{
 			SigningKeysURL: server.URL,
-		}, TypeIDToken)
+		}, TokenTypeID)
 		claims, err := verifier.Verify(context.Background(), signSecond(t))
 		assert.ErrorIs(t, err, ErrInvalidSigningKey)
 		assert.Nil(t, claims)
@@ -129,7 +129,7 @@ func TestVerifier_Verify(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](VerifierConfig{
 			SigningKeysURL:   server.URL,
 			AllowedAudiences: []string{"stack:2"},
-		}, TypeIDToken)
+		}, TokenTypeID)
 		claims, err := verifier.Verify(context.Background(), signFist(t))
 		assert.ErrorIs(t, err, ErrInvalidAudience)
 		assert.Nil(t, claims)
@@ -138,7 +138,7 @@ func TestVerifier_Verify(t *testing.T) {
 	t.Run("invalid: token expired", func(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](VerifierConfig{
 			SigningKeysURL: server.URL,
-		}, TypeIDToken)
+		}, TokenTypeID)
 		claims, err := verifier.Verify(context.Background(), signExpired(t))
 		assert.ErrorIs(t, err, ErrExpiredToken)
 		assert.Nil(t, claims)
@@ -147,7 +147,7 @@ func TestVerifier_Verify(t *testing.T) {
 	t.Run("invalid: wrong token typ", func(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](VerifierConfig{
 			SigningKeysURL: server.URL,
-		}, TypeAccessToken)
+		}, TokenTypeAccess)
 		claims, err := verifier.Verify(context.Background(), signFist(t))
 		assert.ErrorIs(t, err, ErrInvalidTokenType)
 		assert.Nil(t, claims)
@@ -157,7 +157,7 @@ func TestVerifier_Verify(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](VerifierConfig{
 			SigningKeysURL:   server.URL,
 			AllowedAudiences: []string{"stack:1"},
-		}, TypeIDToken)
+		}, TokenTypeID)
 		claims, err := verifier.Verify(context.Background(), signFist(t))
 		assert.NoError(t, err)
 		assert.NotNil(t, claims)
@@ -192,7 +192,7 @@ func signToken(t *testing.T, keyID string, key *ecdsa.PrivateKey, exp time.Time)
 	}, &jose.SignerOptions{
 		ExtraHeaders: map[jose.HeaderKey]interface{}{
 			"kid": keyID,
-			"typ": TypeIDToken,
+			"typ": TokenTypeID,
 		},
 	})
 	require.NoError(t, err)

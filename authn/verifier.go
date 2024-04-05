@@ -12,8 +12,8 @@ import (
 type TokenType = string
 
 const (
-	TypeIDToken     TokenType = "jwt"
-	TypeAccessToken TokenType = "at+jwt"
+	TokenTypeID     TokenType = "jwt"
+	TokenTypeAccess TokenType = "at+jwt"
 )
 
 type Verifier[T any] interface {
