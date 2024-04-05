@@ -75,7 +75,7 @@ func newClient(cfg Config, opts ...clientOption) (*clientImpl, error) {
 		})
 	}
 
-	client.verifier = authn.NewVerifier[customClaims](authn.IDVerifierConfig{SigningKeysURL: cfg.JWKsURL})
+	client.verifier = authn.NewVerifier[customClaims](authn.VerifierConfig{SigningKeysURL: cfg.JWKsURL}, authn.TokenTypeID)
 
 	// create httpClient, if not already present
 	if client.client == nil {
@@ -124,7 +124,7 @@ func (query *searchQuery) processResource() {
 // processIDToken verifies the id token is legit and extracts its subject in the query.NamespacedID.
 func (query *searchQuery) processIDToken(c *clientImpl) error {
 	if query.IdToken != "" {
-		claims, err := c.verifier.Verify(context.Background(), query.IdToken, authn.TypeIDToken)
+		claims, err := c.verifier.Verify(context.Background(), query.IdToken)
 		if err != nil {
 			return fmt.Errorf("%v: %w", ErrInvalidIDToken, err)
 		}
