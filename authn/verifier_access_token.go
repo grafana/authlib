@@ -15,22 +15,22 @@ type AccessTokenClaims struct {
 	DelegatedPermissions []string `json:"delegatedPermissions"`
 }
 
-func NewAccessExtractor(cfg VerifierConfig) *AccessExtractor {
-	return &AccessExtractor{
-		v: NewVerifier[AccessTokenClaims](cfg, TypeAccessToken),
+func NewAccessTokenVerifier(cfg VerifierConfig) *AccessTokenVerifier {
+	return &AccessTokenVerifier{
+		v: NewVerifier[AccessTokenClaims](cfg, TokenTypeAccess),
 	}
 }
 
-func NewAccessExtractorWithCache(cfg VerifierConfig, cache cache.Cache) *AccessExtractor {
-	return &AccessExtractor{
-		v: newVerifierWithKeyService[AccessTokenClaims](cfg, TypeAccessToken, newKeyServiceWithCache(cfg.SigningKeysURL, cache)),
+func NewAccessTokenVerifierWithCache(cfg VerifierConfig, cache cache.Cache) *AccessTokenVerifier {
+	return &AccessTokenVerifier{
+		v: newVerifierWithKeyService[AccessTokenClaims](cfg, TokenTypeAccess, newKeyServiceWithCache(cfg.SigningKeysURL, cache)),
 	}
 }
 
-type AccessExtractor struct {
+type AccessTokenVerifier struct {
 	v Verifier[AccessTokenClaims]
 }
 
-func (e *AccessExtractor) FromToken(ctx context.Context, token string) (*Claims[AccessTokenClaims], error) {
+func (e *AccessTokenVerifier) Verify(ctx context.Context, token string) (*Claims[AccessTokenClaims], error) {
 	return e.v.Verify(ctx, token)
 }

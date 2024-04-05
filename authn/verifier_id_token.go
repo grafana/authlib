@@ -11,22 +11,22 @@ type IDTokenClaims struct {
 	AuthenticatedBy string
 }
 
-func NewIdentityExtractor(cfg VerifierConfig) *IdentityExtractor {
-	return &IdentityExtractor{
-		v: NewVerifier[IDTokenClaims](cfg, TypeIDToken),
+func NewIDTokenVerifier(cfg VerifierConfig) *IDTokenVerifier {
+	return &IDTokenVerifier{
+		v: NewVerifier[IDTokenClaims](cfg, TokenTypeID),
 	}
 }
 
-func NewIdentityExtractorWithCache(cfg VerifierConfig, cache cache.Cache) *IdentityExtractor {
-	return &IdentityExtractor{
-		v: newVerifierWithKeyService[IDTokenClaims](cfg, TypeIDToken, newKeyServiceWithCache(cfg.SigningKeysURL, cache)),
+func NewIDTokenVerifierWithCache(cfg VerifierConfig, cache cache.Cache) *IDTokenVerifier {
+	return &IDTokenVerifier{
+		v: newVerifierWithKeyService[IDTokenClaims](cfg, TokenTypeID, newKeyServiceWithCache(cfg.SigningKeysURL, cache)),
 	}
 }
 
-type IdentityExtractor struct {
+type IDTokenVerifier struct {
 	v Verifier[IDTokenClaims]
 }
 
-func (e *IdentityExtractor) FromToken(ctx context.Context, token string) (*Claims[IDTokenClaims], error) {
+func (e *IDTokenVerifier) FromToken(ctx context.Context, token string) (*Claims[IDTokenClaims], error) {
 	return e.v.Verify(ctx, token)
 }
