@@ -60,8 +60,6 @@ This package exports an token verifier that can be used to verify signed jwt tok
 
 This package will handle retrival and caching of jwks. It was desing to be generic over "Custom claims" so that we are not only restricted to the current structure of id tokens. This means that the parsed claims will contain standard jwts claims such as `aud`, `exp` etc plus specified custom claims.
 
-## Example
-
 ```go
 package main
 
@@ -90,3 +88,7 @@ func main() {
 }
 
 ```
+
+The verifier is generic over jwt.Claims. Most common use cases will be to either verify Grafana issued ID-Token or Access token.
+For those we have `AccessTokenVerifier` and `IDTokenVerifier`. Those are just simple wrappers around `Verifier` with expected claims.
+
