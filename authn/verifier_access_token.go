@@ -27,6 +27,8 @@ func NewAccessTokenVerifierWithCache(cfg VerifierConfig, cache cache.Cache) *Acc
 	}
 }
 
+// AccessTokenVerifier is a convient wrapper around `Verifier`
+// used to verify and authenticate Grafana issued AccessTokens.
 type AccessTokenVerifier struct {
 	v Verifier[AccessTokenClaims]
 }
