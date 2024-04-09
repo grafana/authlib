@@ -23,7 +23,7 @@ func NewIDTokenVerifierWithCache(cfg VerifierConfig, cache cache.Cache) *IDToken
 	}
 }
 
-// IDTokenVerifier is a convient wrapper around `Verifier`
+// IDTokenVerifier is a convenient wrapper around `Verifier`
 // used to verify grafana issued id tokens.
 type IDTokenVerifier struct {
 	v Verifier[IDTokenClaims]
