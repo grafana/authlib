@@ -11,6 +11,7 @@ var (
 	// Private error we wrap all other exported errors with
 	errInvalidToken      = errors.New("invalid token")
 	ErrParseToken        = fmt.Errorf("%w: failed to parse as jwt token", errInvalidToken)
+	ErrInvalidTokenType  = fmt.Errorf("%w: invalid token type", errInvalidToken)
 	ErrInvalidSigningKey = fmt.Errorf("%w: unrecognized signing key", errInvalidToken)
 
 	ErrExpiredToken    = fmt.Errorf("%w: expired token", errInvalidToken)

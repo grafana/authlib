@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestIDVerifierConfig_RegisterFlags(t *testing.T) {
-	var cfg IDVerifierConfig
+func TestVerifierConfig_RegisterFlags(t *testing.T) {
+	var cfg VerifierConfig
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
 	cfg.RegisterFlags("test", fs)
 

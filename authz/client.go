@@ -75,7 +75,7 @@ func newClient(cfg Config, opts ...clientOption) (*clientImpl, error) {
 		})
 	}
 
-	client.verifier = authn.NewVerifier[customClaims](authn.IDVerifierConfig{SigningKeysURL: cfg.JWKsURL})
+	client.verifier = authn.NewVerifier[customClaims](authn.VerifierConfig{SigningKeysURL: cfg.JWKsURL}, authn.TokenTypeID)
 
 	// create httpClient, if not already present
 	if client.client == nil {
