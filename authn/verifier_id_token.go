@@ -8,7 +8,9 @@ import (
 
 type IDTokenClaims struct {
 	// AuthenticatedBy is the method used to authenticate the identity.
-	AuthenticatedBy string
+	AuthenticatedBy string `json:"authenticatedBy"`
+	Email           string `json:"email"`
+	EmailVerified   string `json:"email_verified"`
 }
 
 func NewIDTokenVerifier(cfg VerifierConfig) *IDTokenVerifier {
@@ -29,6 +31,6 @@ type IDTokenVerifier struct {
 	v Verifier[IDTokenClaims]
 }
 
-func (e *IDTokenVerifier) FromToken(ctx context.Context, token string) (*Claims[IDTokenClaims], error) {
+func (e *IDTokenVerifier) Verify(ctx context.Context, token string) (*Claims[IDTokenClaims], error) {
 	return e.v.Verify(ctx, token)
 }
