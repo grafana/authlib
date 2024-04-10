@@ -9,7 +9,16 @@ import (
 	"github.com/go-jose/go-jose/v3/jwt"
 )
 
+type TokenType = string
+
+const (
+	TokenTypeID     TokenType = "jwt"
+	TokenTypeAccess TokenType = "at+jwt"
+)
+
 type Verifier[T any] interface {
+	// Verify will parse and verify provided token using public key from `VerifierConfig.SigningKeysURL`.
+	// If `AllowedAudiences` was configured those will be validated as well.
 	Verify(ctx context.Context, token string) (*Claims[T], error)
 }
 
@@ -18,19 +27,30 @@ type Claims[T any] struct {
 	Rest T
 }
 
-func NewVerifier[T any](cfg IDVerifierConfig) *VerifierBase[T] {
-	return &VerifierBase[T]{cfg, newKeyService(cfg.SigningKeysURL)}
+func NewVerifier[T any](cfg VerifierConfig, typ TokenType) *VerifierBase[T] {
+	return newVerifierWithKeyService[T](cfg, typ, newKeyService(cfg.SigningKeysURL))
+}
+
+func newVerifierWithKeyService[T any](cfg VerifierConfig, typ TokenType, keys *keyService) *VerifierBase[T] {
+	return &VerifierBase[T]{cfg, typ, keys}
 }
 
 type VerifierBase[T any] struct {
-	cfg  IDVerifierConfig
-	keys *keyService
+	cfg       VerifierConfig
+	tokenType TokenType
+	keys      *keyService
 }
 
+// Verify will parse and verify provided token using public key from `SigningKeysURL`.
+// If `AllowedAudiences` was configured those will be validated as well.
 func (v *VerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T], error) {
 	parsed, err := jwt.ParseSigned(token)
 	if err != nil {
 		return nil, ErrParseToken
+	}
+
+	if !validType(parsed, v.tokenType) {
+		return nil, ErrInvalidTokenType
 	}
 
 	keyID, err := getKeyID(parsed.Headers)
@@ -56,6 +76,19 @@ func (v *VerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T],
 	}
 
 	return &claims, nil
+}
+
+func validType(token *jwt.JSONWebToken, typ string) bool {
+	if typ == "" {
+		return true
+	}
+
+	for _, h := range token.Headers {
+		if t, ok := h.ExtraHeaders["typ"].(string); ok && t == typ {
+			return true
+		}
+	}
+	return false
 }
 
 func mapErr(err error) error {
