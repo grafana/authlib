@@ -27,20 +27,20 @@ type TokenExchangeClient interface {
 }
 
 type TokenExchangeConfig struct {
-	CAP           string // cloud access policy token used for authorising the request
-	usesSystemCAP bool
-	AuthAPIURL    string // URL of the auth server
+	CAPToken   string // cloud access policy token used for authorising the request
+	capOrgID   int    // org ID extracted from the CAPToken
+	AuthAPIURL string // URL of the auth server
 }
 
 func NewTokenExchangeClient(cfg TokenExchangeConfig) (*tokenExchangeClientImpl, error) {
-	if cfg.CAP == "" {
-		return nil, fmt.Errorf("cloud access policy (CAP) is required")
+	if cfg.CAPToken == "" {
+		return nil, fmt.Errorf("cloud access policy (CAPToken) is required")
 	}
-	usesSystemCAP, err := isSystemWideCAP(cfg.CAP)
+	orgID, err := getCAPOrgID(cfg.CAPToken)
 	if err != nil {
-		return nil, fmt.Errorf("invalid CAP: %v", err)
+		return nil, fmt.Errorf("invalid CAPToken: %v", err)
 	}
-	cfg.usesSystemCAP = usesSystemCAP
+	cfg.capOrgID = orgID
 
 	if cfg.AuthAPIURL == "" {
 		return nil, fmt.Errorf("auth API URL is required")
@@ -73,23 +73,25 @@ func NewTokenExchangeClient(cfg TokenExchangeConfig) (*tokenExchangeClientImpl, 
 	return client, nil
 }
 
-// isSystemWideCAP checks if the given CAP is a system-wide CAP by looking at the org ID in the CAP.
-func isSystemWideCAP(cap string) (bool, error) {
+// getCAPOrgID gets the org ID from the CAPToken (it's 0 for system wide or stack wide tokens).
+func getCAPOrgID(cap string) (int, error) {
 	capParts := strings.Split(cap, "_")
-	// strip CAP prefix
+	// strip CAPToken prefix
 	strippedCAP := capParts[len(capParts)-1]
 	decodedCAP, err := base64.StdEncoding.DecodeString(strippedCAP)
 	if err != nil {
-		return false, fmt.Errorf("failed to decode CAP: %v", err)
+		return 0, fmt.Errorf("failed to decode CAPToken: %v", err)
 	}
 	type capToken struct {
 		OrgID string `json:"o"`
 	}
 	var capData capToken
 	if err := json.Unmarshal(decodedCAP, &capData); err != nil {
-		return false, fmt.Errorf("failed to unmarshal CAP: %v", err)
+		return 0, fmt.Errorf("failed to unmarshal CAPToken: %v", err)
 	}
-	return capData.OrgID == "0", nil
+
+	orgID, err := strconv.Atoi(capData.OrgID)
+	return orgID, err
 }
 
 type tokenExchangeClientImpl struct {
@@ -109,19 +111,21 @@ type TokenExchangeRequest struct {
 	OrgID  int64   // ID of the org the request should be restricted to.
 }
 
-type TokenExchangeData struct {
+type tokenExchangeData struct {
 	Token string `json:"token"`
 }
 
 type tokenExchangeResponse struct {
-	Data   TokenExchangeData `json:"data"`
+	Data   tokenExchangeData `json:"data"`
 	Status string            `json:"status"`
 	Error  string            `json:"error"`
 }
 
 func (c *tokenExchangeClientImpl) GetAccessToken(ctx context.Context, tokenReq TokenExchangeRequest) (string, error) {
-	if c.cfg.usesSystemCAP && (tokenReq.OrgID == 0 || len(tokenReq.Realms) == 0) {
-		return "", fmt.Errorf("org ID and realms must be specified when using system-wide CAP")
+	if c.cfg.capOrgID == 0 && (tokenReq.OrgID == 0 || len(tokenReq.Realms) == 0) {
+		return "", fmt.Errorf("org ID and realms must be specified when using system-wide CAPToken")
+	} else {
+		tokenReq.OrgID = int64(c.cfg.capOrgID)
 	}
 
 	key, err := tokenExchangeCacheKey(tokenReq)
@@ -143,9 +147,10 @@ func (c *tokenExchangeClientImpl) GetAccessToken(ctx context.Context, tokenReq T
 		if err != nil {
 			return nil, err
 		}
-		req.Header.Set("Authorization", "Bearer "+c.cfg.CAP)
+		req.Header.Set("Authorization", "Bearer "+c.cfg.CAPToken)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
+		req.Header.Set("User-Agent", "authlib-client")
 		if len(tokenReq.Realms) > 0 {
 			realms, err := json.Marshal(tokenReq.Realms)
 			if err != nil {
@@ -184,7 +189,9 @@ func (c *tokenExchangeClientImpl) GetAccessToken(ctx context.Context, tokenReq T
 		return "", fmt.Errorf("unexpected response type")
 	}
 
-	c.cacheValue(ctx, response.Data.Token, key)
+	if err := c.cacheValue(ctx, response.Data.Token, key); err != nil {
+		return "", err
+	}
 
 	return response.Data.Token, nil
 }

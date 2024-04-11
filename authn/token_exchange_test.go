@@ -19,7 +19,7 @@ func Test_TokenExchangeClient(t *testing.T) {
 		wantErr  bool
 	}{
 		{
-			name:    "Error if realm and org ID are not provided for a system wide CAP",
+			name:    "Error if realm and org ID are not provided for a system wide CAP token",
 			request: TokenExchangeRequest{},
 			want:    "",
 			wantErr: true,
@@ -67,7 +67,7 @@ func Test_TokenExchangeClient(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			c, err := NewTokenExchangeClient(TokenExchangeConfig{
 				AuthAPIURL: server.URL,
-				CAP:        capToken,
+				CAPToken:   capToken,
 			})
 			require.NoError(t, err)
 
