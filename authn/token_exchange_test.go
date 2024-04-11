@@ -11,6 +11,7 @@ import (
 )
 
 func Test_TokenExchangeClient(t *testing.T) {
+	testToken := "eyJhbGciOiJFUzI1NiIsImtpZCI6ImlkLXNpZ25pbmcta2V5IiwidHlwIjoiYXQrand0In0.eyJhdWQiOiJvcmc6MSIsImV4cCI6MTcxMjg0MzM3MCwiaWF0IjoxNzEyODQyNzcwLCJpc3MiOiJjMDU4MWRiNy1hNWNjLTQ0NzYtYWQ5YS00NmZmMmE3M2M2MzAiLCJqdGkiOiI0YWM3NGRlNi00MzZlLTQwZDItOWRkZi05MDJhY2I1MjkxYzciLCJvcmdfaWQiOiIxIiwic3ViIjoiYWNjZXNzLXBvbGljeTpjMDU4MWRiNy1hNWNjLTQ0NzYtYWQ5YS00NmZmMmE3M2M2MzAifQ.DezKTVvy__TFyI7cJXHYubK5vuCp8RIst1Ce-Cgrl5k9U3aCP6NvoaMywP_YVHb_Xar-wHP2aoJ1jct80oiofA"
 	tests := []struct {
 		name     string
 		request  TokenExchangeRequest
@@ -35,8 +36,8 @@ func Test_TokenExchangeClient(t *testing.T) {
 				},
 				OrgID: 1,
 			},
-			response: `{"status":"success","data":{"token":"exchanged_token"}}`,
-			want:     "exchanged_token",
+			response: fmt.Sprintf(`{"status":"success","data":{"token":"%s"}}`, testToken),
+			want:     testToken,
 			wantErr:  false,
 		},
 		{
@@ -73,7 +74,7 @@ func Test_TokenExchangeClient(t *testing.T) {
 
 			c.client = server.Client()
 
-			token, err := c.GetAccessToken(context.Background(), tt.request)
+			token, err := c.getAccessToken(context.Background(), tt.request)
 			if tt.wantErr {
 				require.Error(t, err)
 				return

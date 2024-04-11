@@ -2,10 +2,8 @@ package authn
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/go-jose/go-jose/v3/jwt"
 	"net"
 	"net/http"
 	"net/url"
@@ -13,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-jose/go-jose/v3/jwt"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/grafana/authlib/cache"
@@ -22,13 +21,14 @@ const cacheBuffer = 15 * time.Second
 const tokenExchangePath = "/v1/sign-access-token"
 
 type TokenExchangeClient interface {
-	// GetAccessToken returns a short-lived access Token for the given claims.
-	GetAccessToken(ctx context.Context, req TokenExchangeRequest) (string, error)
+	// GetAccessTokenOnBehalfOf exchanges a system-wide CAP token for a short-lived access token for the org or stack specified in the request.
+	GetAccessTokenOnBehalfOf(ctx context.Context, req TokenExchangeRequest) (string, error)
+	// GetAccessToken returns a short-lived access token for the org or stack that CAP token is for.
+	GetAccessToken(ctx context.Context) (string, error)
 }
 
 type TokenExchangeConfig struct {
 	CAPToken   string // cloud access policy token used for authorising the request
-	capOrgID   int    // org ID extracted from the CAPToken
 	AuthAPIURL string // URL of the auth server
 }
 
@@ -36,11 +36,6 @@ func NewTokenExchangeClient(cfg TokenExchangeConfig) (*tokenExchangeClientImpl, 
 	if cfg.CAPToken == "" {
 		return nil, fmt.Errorf("cloud access policy (CAPToken) is required")
 	}
-	orgID, err := getCAPOrgID(cfg.CAPToken)
-	if err != nil {
-		return nil, fmt.Errorf("invalid CAPToken: %v", err)
-	}
-	cfg.capOrgID = orgID
 
 	if cfg.AuthAPIURL == "" {
 		return nil, fmt.Errorf("auth API URL is required")
@@ -73,27 +68,6 @@ func NewTokenExchangeClient(cfg TokenExchangeConfig) (*tokenExchangeClientImpl, 
 	return client, nil
 }
 
-// getCAPOrgID gets the org ID from the CAPToken (it's 0 for system wide or stack wide tokens).
-func getCAPOrgID(cap string) (int, error) {
-	capParts := strings.Split(cap, "_")
-	// strip CAPToken prefix
-	strippedCAP := capParts[len(capParts)-1]
-	decodedCAP, err := base64.StdEncoding.DecodeString(strippedCAP)
-	if err != nil {
-		return 0, fmt.Errorf("failed to decode CAPToken: %v", err)
-	}
-	type capToken struct {
-		OrgID string `json:"o"`
-	}
-	var capData capToken
-	if err := json.Unmarshal(decodedCAP, &capData); err != nil {
-		return 0, fmt.Errorf("failed to unmarshal CAPToken: %v", err)
-	}
-
-	orgID, err := strconv.Atoi(capData.OrgID)
-	return orgID, err
-}
-
 type tokenExchangeClientImpl struct {
 	cache   cache.Cache
 	cfg     TokenExchangeConfig
@@ -121,13 +95,19 @@ type tokenExchangeResponse struct {
 	Error  string            `json:"error"`
 }
 
-func (c *tokenExchangeClientImpl) GetAccessToken(ctx context.Context, tokenReq TokenExchangeRequest) (string, error) {
-	if c.cfg.capOrgID == 0 && (tokenReq.OrgID == 0 || len(tokenReq.Realms) == 0) {
-		return "", fmt.Errorf("org ID and realms must be specified when using system-wide CAPToken")
-	} else {
-		tokenReq.OrgID = int64(c.cfg.capOrgID)
+func (c *tokenExchangeClientImpl) GetAccessTokenOnBehalfOf(ctx context.Context, tokenReq TokenExchangeRequest) (string, error) {
+	if tokenReq.OrgID == 0 || len(tokenReq.Realms) == 0 {
+		return "", fmt.Errorf("org ID and realms must be specified when fecthing access token on behalf of a user")
 	}
 
+	return c.getAccessToken(ctx, tokenReq)
+}
+
+func (c *tokenExchangeClientImpl) GetAccessToken(ctx context.Context) (string, error) {
+	return c.getAccessToken(ctx, TokenExchangeRequest{})
+}
+
+func (c *tokenExchangeClientImpl) getAccessToken(ctx context.Context, tokenReq TokenExchangeRequest) (string, error) {
 	key, err := tokenExchangeCacheKey(tokenReq)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate cache key: %v", err)
