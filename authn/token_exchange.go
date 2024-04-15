@@ -35,7 +35,17 @@ type TokenExchangeConfig struct {
 	AuthAPIURL string // URL of the auth server
 }
 
-func NewTokenExchangeClient(cfg TokenExchangeConfig) (*tokenExchangeClientImpl, error) {
+// ClientOption allows setting custom parameters during construction.
+type ClientOption func(impl *tokenExchangeClientImpl)
+
+// WithHTTPClient allows setting the HTTP client to be used by the token exchange client.
+func WithHTTPClient(client *http.Client) ClientOption {
+	return func(c *tokenExchangeClientImpl) {
+		c.client = client
+	}
+}
+
+func NewTokenExchangeClient(cfg TokenExchangeConfig, opts ...ClientOption) (*tokenExchangeClientImpl, error) {
 	if cfg.CAPToken == "" {
 		return nil, fmt.Errorf("cloud access policy (CAPToken) is required")
 	}
@@ -44,8 +54,7 @@ func NewTokenExchangeClient(cfg TokenExchangeConfig) (*tokenExchangeClientImpl, 
 		return nil, fmt.Errorf("auth API URL is required")
 	}
 
-	client := &tokenExchangeClientImpl{
-		client: nil,
+	tc := &tokenExchangeClientImpl{
 		cache: cache.NewLocalCache(cache.Config{
 			CleanupInterval: 5 * time.Minute,
 		}),
@@ -53,22 +62,28 @@ func NewTokenExchangeClient(cfg TokenExchangeConfig) (*tokenExchangeClientImpl, 
 		singlef: singleflight.Group{},
 	}
 
-	client.client = &http.Client{
-		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-			DialContext: (&net.Dialer{
-				Timeout:   4 * time.Second,
-				KeepAlive: 15 * time.Second,
-			}).DialContext,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
-			MaxIdleConns:          100,
-			IdleConnTimeout:       30 * time.Second,
-		},
-		Timeout: 5 * time.Second,
+	for _, opt := range opts {
+		opt(tc)
 	}
 
-	return client, nil
+	if tc.client == nil {
+		tc.client = &http.Client{
+			Transport: &http.Transport{
+				Proxy: http.ProxyFromEnvironment,
+				DialContext: (&net.Dialer{
+					Timeout:   4 * time.Second,
+					KeepAlive: 15 * time.Second,
+				}).DialContext,
+				TLSHandshakeTimeout:   10 * time.Second,
+				ExpectContinueTimeout: 1 * time.Second,
+				MaxIdleConns:          100,
+				IdleConnTimeout:       30 * time.Second,
+			},
+			Timeout: 5 * time.Second,
+		}
+	}
+
+	return tc, nil
 }
 
 type tokenExchangeClientImpl struct {
