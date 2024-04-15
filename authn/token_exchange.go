@@ -20,11 +20,14 @@ import (
 const cacheBuffer = 15 * time.Second
 const tokenExchangePath = "/v1/sign-access-token"
 
-type TokenExchangeClient interface {
-	// GetAccessTokenOnBehalfOf exchanges a system-wide CAP token for a short-lived access token for the org or stack specified in the request.
-	GetAccessTokenOnBehalfOf(ctx context.Context, req TokenExchangeRequest) (string, error)
-	// GetAccessToken returns a short-lived access token for the org or stack that CAP token is for.
-	GetAccessToken(ctx context.Context) (string, error)
+type RealmTokenExchangeClient interface {
+	// ExchangeRealmToken returns a short-lived access token for the org or stack that CAP token is for.
+	ExchangeRealmToken(ctx context.Context) (string, error)
+}
+
+type SystemTokenExchangeClient interface {
+	// ExchangeSystemToken exchanges a system-wide CAP token for a short-lived access token for the org or stack specified in the request.
+	ExchangeSystemToken(ctx context.Context, req TokenExchangeRequest) (string, error)
 }
 
 type TokenExchangeConfig struct {
@@ -95,19 +98,19 @@ type tokenExchangeResponse struct {
 	Error  string            `json:"error"`
 }
 
-func (c *tokenExchangeClientImpl) GetAccessTokenOnBehalfOf(ctx context.Context, tokenReq TokenExchangeRequest) (string, error) {
+func (c *tokenExchangeClientImpl) ExchangeSystemToken(ctx context.Context, tokenReq TokenExchangeRequest) (string, error) {
 	if tokenReq.OrgID == 0 || len(tokenReq.Realms) == 0 {
 		return "", fmt.Errorf("org ID and realms must be specified when fecthing access token on behalf of a user")
 	}
 
-	return c.getAccessToken(ctx, tokenReq)
+	return c.exchangeToken(ctx, tokenReq)
 }
 
-func (c *tokenExchangeClientImpl) GetAccessToken(ctx context.Context) (string, error) {
-	return c.getAccessToken(ctx, TokenExchangeRequest{})
+func (c *tokenExchangeClientImpl) ExchangeRealmToken(ctx context.Context) (string, error) {
+	return c.exchangeToken(ctx, TokenExchangeRequest{})
 }
 
-func (c *tokenExchangeClientImpl) getAccessToken(ctx context.Context, tokenReq TokenExchangeRequest) (string, error) {
+func (c *tokenExchangeClientImpl) exchangeToken(ctx context.Context, tokenReq TokenExchangeRequest) (string, error) {
 	key, err := tokenExchangeCacheKey(tokenReq)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate cache key: %v", err)

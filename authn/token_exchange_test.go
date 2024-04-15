@@ -74,7 +74,7 @@ func Test_TokenExchangeClient(t *testing.T) {
 
 			c.client = server.Client()
 
-			token, err := c.getAccessToken(context.Background(), tt.request)
+			token, err := c.exchangeToken(context.Background(), tt.request)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
