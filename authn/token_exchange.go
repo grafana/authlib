@@ -45,7 +45,15 @@ func WithHTTPClient(client *http.Client) ClientOption {
 	}
 }
 
-func NewTokenExchangeClient(cfg TokenExchangeConfig, opts ...ClientOption) (*tokenExchangeClientImpl, error) {
+func NewSystemTokenExchangeClient(cfg TokenExchangeConfig, opts ...ClientOption) (SystemTokenExchangeClient, error) {
+	return newTokenExchangeClient(cfg, opts...)
+}
+
+func NewRealmTokenExchangeClient(cfg TokenExchangeConfig, opts ...ClientOption) (RealmTokenExchangeClient, error) {
+	return newTokenExchangeClient(cfg, opts...)
+}
+
+func newTokenExchangeClient(cfg TokenExchangeConfig, opts ...ClientOption) (*tokenExchangeClientImpl, error) {
 	if cfg.CAPToken == "" {
 		return nil, fmt.Errorf("cloud access policy (CAPToken) is required")
 	}
@@ -115,7 +123,7 @@ type tokenExchangeResponse struct {
 
 func (c *tokenExchangeClientImpl) ExchangeSystemToken(ctx context.Context, tokenReq TokenExchangeRequest) (string, error) {
 	if tokenReq.OrgID == 0 || len(tokenReq.Realms) == 0 {
-		return "", fmt.Errorf("org ID and realms must be specified when fecthing access token on behalf of a user")
+		return "", fmt.Errorf("org ID and realms must be specified when fecthing access token for a system token")
 	}
 
 	return c.exchangeToken(ctx, tokenReq)
