@@ -66,15 +66,13 @@ func Test_TokenExchangeClient(t *testing.T) {
 		}))
 		defer server.Close()
 		t.Run(tt.name, func(t *testing.T) {
-			c, err := NewTokenExchangeClient(TokenExchangeConfig{
+			c, err := NewSystemTokenExchangeClient(TokenExchangeConfig{
 				AuthAPIURL: server.URL,
 				CAPToken:   capToken,
-			})
+			}, WithHTTPClient(server.Client()))
 			require.NoError(t, err)
 
-			c.client = server.Client()
-
-			token, err := c.exchangeToken(context.Background(), tt.request)
+			token, err := c.ExchangeSystemToken(context.Background(), tt.request)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
