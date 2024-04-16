@@ -123,7 +123,7 @@ type tokenExchangeResponse struct {
 
 func (c *tokenExchangeClientImpl) ExchangeSystemToken(ctx context.Context, tokenReq TokenExchangeRequest) (string, error) {
 	if tokenReq.OrgID == 0 || len(tokenReq.Realms) == 0 {
-		return "", fmt.Errorf("org ID and realms must be specified when fecthing access token for a system token")
+		return "", fmt.Errorf("org ID and realms must be specified when fetching access token for a system token")
 	}
 
 	return c.exchangeToken(ctx, tokenReq)
