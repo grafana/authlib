@@ -125,6 +125,10 @@ func (c *TokenExchangeClient) Exhange(ctx context.Context, r TokenExchangeReques
 		}
 		defer res.Body.Close()
 
+		if res.StatusCode >= http.StatusInternalServerError {
+			return nil, fmt.Errorf("%w: %s", ErrInvalidExchangeResponse, res.Status)
+		}
+
 		response := tokenExchangeResponse{}
 		if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
 			return nil, err
