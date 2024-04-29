@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -78,6 +79,7 @@ func (r TokenExchangeRequest) hash() string {
 	br := strings.Builder{}
 	br.WriteString(r.Namespace)
 	br.WriteByte('-')
+	sort.Strings(r.Audiences)
 	br.WriteString(strings.Join(r.Audiences, "-"))
 
 	return br.String()
