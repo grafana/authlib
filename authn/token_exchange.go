@@ -3,11 +3,10 @@ package authn
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
-	"net"
+	"io"
 	"net/http"
-	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -15,54 +14,29 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/grafana/authlib/cache"
+	"github.com/grafana/authlib/internal/httpclient"
 )
 
-const cacheBuffer = 15 * time.Second
-const tokenExchangePath = "/v1/sign-access-token"
-
-type RealmTokenExchangeClient interface {
-	// ExchangeRealmToken returns a short-lived access token for the org or stack that CAP token is for.
-	ExchangeRealmToken(ctx context.Context) (string, error)
-}
-
-type SystemTokenExchangeClient interface {
-	// ExchangeSystemToken exchanges a system-wide CAP token for a short-lived access token for the org or stack specified in the request.
-	ExchangeSystemToken(ctx context.Context, req TokenExchangeRequest) (string, error)
-}
-
-type TokenExchangeConfig struct {
-	CAPToken   string // cloud access policy token used for authorising the request
-	AuthAPIURL string // URL of the auth server
-}
-
-// ClientOption allows setting custom parameters during construction.
-type ClientOption func(impl *tokenExchangeClientImpl)
+// ExchangeClientOpts allows setting custom parameters during construction.
+type ExchangeClientOpts func(c *TokenExchangeClient)
 
 // WithHTTPClient allows setting the HTTP client to be used by the token exchange client.
-func WithHTTPClient(client *http.Client) ClientOption {
-	return func(c *tokenExchangeClientImpl) {
+func WithHTTPClient(client *http.Client) ExchangeClientOpts {
+	return func(c *TokenExchangeClient) {
 		c.client = client
 	}
 }
 
-func NewSystemTokenExchangeClient(cfg TokenExchangeConfig, opts ...ClientOption) (SystemTokenExchangeClient, error) {
-	return newTokenExchangeClient(cfg, opts...)
-}
-
-func NewRealmTokenExchangeClient(cfg TokenExchangeConfig, opts ...ClientOption) (RealmTokenExchangeClient, error) {
-	return newTokenExchangeClient(cfg, opts...)
-}
-
-func newTokenExchangeClient(cfg TokenExchangeConfig, opts ...ClientOption) (*tokenExchangeClientImpl, error) {
-	if cfg.CAPToken == "" {
-		return nil, fmt.Errorf("cloud access policy (CAPToken) is required")
+func NewTokenExhangeClient(cfg TokenExchangeConfig, opts ...ExchangeClientOpts) (*TokenExchangeClient, error) {
+	if cfg.Token == "" {
+		return nil, fmt.Errorf("missing required token")
 	}
 
-	if cfg.AuthAPIURL == "" {
-		return nil, fmt.Errorf("auth API URL is required")
+	if cfg.TokenExchangeURL == "" {
+		return nil, fmt.Errorf("missing required token exhange url")
 	}
 
-	tc := &tokenExchangeClientImpl{
+	c := &TokenExchangeClient{
 		cache: cache.NewLocalCache(cache.Config{
 			CleanupInterval: 5 * time.Minute,
 		}),
@@ -71,48 +45,43 @@ func newTokenExchangeClient(cfg TokenExchangeConfig, opts ...ClientOption) (*tok
 	}
 
 	for _, opt := range opts {
-		opt(tc)
+		opt(c)
 	}
 
-	if tc.client == nil {
-		tc.client = &http.Client{
-			Transport: &http.Transport{
-				Proxy: http.ProxyFromEnvironment,
-				DialContext: (&net.Dialer{
-					Timeout:   4 * time.Second,
-					KeepAlive: 15 * time.Second,
-				}).DialContext,
-				TLSHandshakeTimeout:   10 * time.Second,
-				ExpectContinueTimeout: 1 * time.Second,
-				MaxIdleConns:          100,
-				IdleConnTimeout:       30 * time.Second,
-			},
-			Timeout: 5 * time.Second,
-		}
+	if c.client == nil {
+		c.client = httpclient.New()
 	}
 
-	return tc, nil
+	return c, nil
+
 }
 
-type tokenExchangeClientImpl struct {
+type TokenExchangeClient struct {
 	cache   cache.Cache
 	cfg     TokenExchangeConfig
 	client  *http.Client
 	singlef singleflight.Group
 }
 
-type Realm struct {
-	Type       string `json:"type"`       // org or stack
-	Identifier string `json:"identifier"` // org id or stack id
-}
-
 type TokenExchangeRequest struct {
-	Realms []Realm // A JSON-encoded array of objects containing the realms the request should be restricted to.
-	OrgID  int64   // ID of the org the request should be restricted to.
+	// Namespace token should be signed with.
+	// Use wildcard '*' to create a token for all namespaces.
+	Namespace string
+	// Audiences token should be signed with.
+	Audiences []string
 }
 
-type tokenExchangeData struct {
-	Token string `json:"token"`
+type TokenExhangeResponse struct {
+	Token string
+}
+
+func (r TokenExchangeRequest) hash() string {
+	br := strings.Builder{}
+	br.WriteString(r.Namespace)
+	br.WriteByte('-')
+	br.WriteString(strings.Join(r.Audiences, "-"))
+
+	return br.String()
 }
 
 type tokenExchangeResponse struct {
@@ -121,104 +90,95 @@ type tokenExchangeResponse struct {
 	Error  string            `json:"error"`
 }
 
-func (c *tokenExchangeClientImpl) ExchangeSystemToken(ctx context.Context, tokenReq TokenExchangeRequest) (string, error) {
-	if tokenReq.OrgID == 0 || len(tokenReq.Realms) == 0 {
-		return "", fmt.Errorf("org ID and realms must be specified when fetching access token for a system token")
-	}
-
-	return c.exchangeToken(ctx, tokenReq)
+type tokenExchangeData struct {
+	Token string `json:"token"`
 }
 
-func (c *tokenExchangeClientImpl) ExchangeRealmToken(ctx context.Context) (string, error) {
-	return c.exchangeToken(ctx, TokenExchangeRequest{})
-}
-
-func (c *tokenExchangeClientImpl) exchangeToken(ctx context.Context, tokenReq TokenExchangeRequest) (string, error) {
-	key, err := tokenExchangeCacheKey(tokenReq)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate cache key: %v", err)
+func (c *TokenExchangeClient) Exhange(ctx context.Context, r TokenExchangeRequest) (*TokenExhangeResponse, error) {
+	if r.Namespace == "" {
+		return nil, ErrMissingNamespace
 	}
-	if res, err := c.cache.Get(ctx, key); err == nil {
-		token := string(res)
-		return token, nil
+
+	if len(r.Audiences) == 0 {
+		return nil, ErrMissingAudiences
+	}
+
+	key := r.hash()
+	token, ok := c.getCache(ctx, key)
+	if ok {
+		return &TokenExhangeResponse{Token: token}, nil
 	}
 
 	resp, err, _ := c.singlef.Do(key, func() (interface{}, error) {
-		target, err := url.JoinPath(c.cfg.AuthAPIURL, tokenExchangePath)
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.TokenExchangeURL, strings.NewReader("{}"))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to build http request: %w", err)
 		}
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, target, strings.NewReader("{}"))
+		res, err := c.client.Do(c.withHeaders(req))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w: %w", ErrInvalidExchangeResponse, err)
 		}
-		req.Header.Set("Authorization", "Bearer "+c.cfg.CAPToken)
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Accept", "application/json")
-		req.Header.Set("User-Agent", "authlib-client")
-		if len(tokenReq.Realms) > 0 {
-			realms, err := json.Marshal(tokenReq.Realms)
-			if err != nil {
-				return nil, fmt.Errorf("failed to marshal realms: %v", err)
-			}
-			req.Header.Set("X-Realms", string(realms))
-		}
-		if tokenReq.OrgID != 0 {
-			req.Header.Set("X-Org-ID", strconv.Itoa(int(tokenReq.OrgID)))
-		}
-
-		res, err := c.client.Do(req)
-		if err != nil {
-			return nil, fmt.Errorf("failed to fetch access token: %v", err)
-		}
-
 		defer res.Body.Close()
 
 		response := tokenExchangeResponse{}
-		if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
+		if err := json.NewDecoder(res.Body).Decode(&response); err != nil && !errors.Is(err, io.EOF) {
 			return nil, err
 		}
 
-		if res.StatusCode != http.StatusOK || response.Status != "success" {
-			return nil, fmt.Errorf("status code: %d, error: %s", res.StatusCode, response.Error)
+		if res.StatusCode != http.StatusOK {
+			if response.Error != "" {
+				return nil, fmt.Errorf("%w: %s", ErrInvalidExchangeResponse, response.Error)
+			}
+			return nil, fmt.Errorf("%w: %s", ErrInvalidExchangeResponse, res.Status)
 		}
 
+		// FIXME: for now we ignore errors when updating the cache becasue we still
+		// have a valid response to return.
+		_ = c.setCache(ctx, response.Data.Token, key)
 		return response, nil
 	})
+
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch access token: %v", err)
+		return nil, err
 	}
 
-	response, ok := resp.(tokenExchangeResponse)
-	if !ok {
-		return "", fmt.Errorf("unexpected response type")
-	}
-
-	if err := c.cacheValue(ctx, response.Data.Token, key); err != nil {
-		return "", err
-	}
-
-	return response.Data.Token, nil
+	response := resp.(tokenExchangeResponse)
+	return &TokenExhangeResponse{Token: response.Data.Token}, nil
 }
 
-func tokenExchangeCacheKey(query TokenExchangeRequest) (string, error) {
-	data, err := json.Marshal(query)
-	return string(data), err
+func (c *TokenExchangeClient) withHeaders(r *http.Request) *http.Request {
+	r.Header.Set("Authorization", "Bearer "+c.cfg.Token)
+	r.Header.Set("Content-Type", "application/json")
+	r.Header.Set("Accept", "application/json")
+	r.Header.Set("User-Agent", "authlib-client")
+
+	// Always propagate system token headers.
+	// These will be ignored for non system tokens.
+	r.Header.Set("X-Org-ID", "0")
+	r.Header.Set("X-Realms", `{"type": "system", "identifier": "system"}`)
+	return r
 }
 
-func (c *tokenExchangeClientImpl) cacheValue(ctx context.Context, token string, key string) error {
-	// decode JWT token without verifying the signature to extract the expiry time
-	var claims jwt.Claims
-	parsedToken, err := jwt.ParseSigned(token)
+func (c *TokenExchangeClient) getCache(ctx context.Context, key string) (string, bool) {
+	if token, err := c.cache.Get(ctx, key); err == nil {
+		return string(token), true
+	}
+	return "", false
+}
+
+func (c *TokenExchangeClient) setCache(ctx context.Context, token string, key string) error {
+	const cacheLeeway = 15 * time.Second
+
+	parsed, err := jwt.ParseSigned(token)
 	if err != nil {
 		return fmt.Errorf("failed to parse token: %v", err)
 	}
-	err = parsedToken.UnsafeClaimsWithoutVerification(&claims)
-	if err != nil {
+
+	var claims jwt.Claims
+	if err = parsed.UnsafeClaimsWithoutVerification(&claims); err != nil {
 		return fmt.Errorf("failed to extract claims from the token: %v", err)
 	}
-	ttl := time.Until(claims.Expiry.Time()) - cacheBuffer
 
-	return c.cache.Set(ctx, key, []byte(token), ttl)
+	return c.cache.Set(ctx, key, []byte(token), time.Until(claims.Expiry.Time())-cacheLeeway)
 }

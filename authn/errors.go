@@ -21,3 +21,10 @@ var (
 func IsInvalidTokenErr(err error) bool {
 	return errors.Is(err, errInvalidToken)
 }
+
+var (
+	ErrMissingNamespace = errors.New("missing required namespace")
+	ErrMissingAudiences = errors.New("missing required audiences")
+
+	ErrInvalidExchangeResponse = errors.New("invalid exchange response")
+)

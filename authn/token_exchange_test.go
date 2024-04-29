@@ -1,84 +1,127 @@
 package authn
 
 import (
+	"bytes"
 	"context"
-	"fmt"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/go-jose/go-jose/v3"
+	"github.com/go-jose/go-jose/v3/jwt"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func Test_TokenExchangeClient(t *testing.T) {
-	testToken := "eyJhbGciOiJFUzI1NiIsImtpZCI6ImlkLXNpZ25pbmcta2V5IiwidHlwIjoiYXQrand0In0.eyJhdWQiOiJvcmc6MSIsImV4cCI6MTcxMjg0MzM3MCwiaWF0IjoxNzEyODQyNzcwLCJpc3MiOiJjMDU4MWRiNy1hNWNjLTQ0NzYtYWQ5YS00NmZmMmE3M2M2MzAiLCJqdGkiOiI0YWM3NGRlNi00MzZlLTQwZDItOWRkZi05MDJhY2I1MjkxYzciLCJvcmdfaWQiOiIxIiwic3ViIjoiYWNjZXNzLXBvbGljeTpjMDU4MWRiNy1hNWNjLTQ0NzYtYWQ5YS00NmZmMmE3M2M2MzAifQ.DezKTVvy__TFyI7cJXHYubK5vuCp8RIst1Ce-Cgrl5k9U3aCP6NvoaMywP_YVHb_Xar-wHP2aoJ1jct80oiofA"
-	tests := []struct {
-		name     string
-		request  TokenExchangeRequest
-		response string
-		want     string
-		wantErr  bool
-	}{
-		{
-			name:    "Error if realm and org ID are not provided for a system wide CAP token",
-			request: TokenExchangeRequest{},
-			want:    "",
-			wantErr: true,
-		},
-		{
-			name: "Can parse a successful response",
-			request: TokenExchangeRequest{
-				Realms: []Realm{
-					{
-						Type:       "org",
-						Identifier: "1",
-					},
-				},
-				OrgID: 1,
-			},
-			response: fmt.Sprintf(`{"status":"success","data":{"token":"%s"}}`, testToken),
-			want:     testToken,
-			wantErr:  false,
-		},
-		{
-			name: "Can parse an error response",
-			request: TokenExchangeRequest{
-				Realms: []Realm{
-					{
-						Type:       "org",
-						Identifier: "1",
-					},
-				},
-				OrgID: 1,
-			},
-			response: `{"status":"error","error":"invalid permission"}`,
-			want:     "",
-			wantErr:  true,
-		},
-	}
-	for _, tt := range tests {
-		capToken := "glcd_eyJvIjoiMCIsIm4iOiJ0b2tlbl8xIiwiayI6Ik84RTREMmU3Rk9DNmhQMXBRMHRqOEswNCIsIm0iOnsiciI6ImRldi11cyJ9fQ=="
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			require.Equal(t, r.Header.Get("Authorization"), fmt.Sprintf("Bearer %s", capToken))
-			require.Equal(t, r.URL.Path, tokenExchangePath)
-			_, _ = w.Write([]byte(tt.response))
-
-		}))
-		defer server.Close()
-		t.Run(tt.name, func(t *testing.T) {
-			c, err := NewSystemTokenExchangeClient(TokenExchangeConfig{
-				AuthAPIURL: server.URL,
-				CAPToken:   capToken,
-			}, WithHTTPClient(server.Client()))
-			require.NoError(t, err)
-
-			token, err := c.ExchangeSystemToken(context.Background(), tt.request)
-			if tt.wantErr {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-			require.Equal(t, tt.want, token)
+func TestNewTokenExchangeClient(t *testing.T) {
+	t.Run("should not be able to create client wihtout token", func(t *testing.T) {
+		_, err := NewTokenExhangeClient(TokenExchangeConfig{
+			TokenExchangeURL: "some-url",
 		})
+		require.Error(t, err)
+
+	})
+
+	t.Run("should not be able to create client wihtout url", func(t *testing.T) {
+		_, err := NewTokenExhangeClient(TokenExchangeConfig{
+			Token: "some-token",
+		})
+		require.Error(t, err)
+	})
+
+	t.Run("should be able to create client", func(t *testing.T) {
+		_, err := NewTokenExhangeClient(TokenExchangeConfig{
+			Token:            "some-token",
+			TokenExchangeURL: "some-url",
+		})
+		require.NoError(t, err)
+	})
+}
+
+func Test_TokenExchangeClient_Exhange(t *testing.T) {
+	setup := func(srv *httptest.Server) *TokenExchangeClient {
+		c, err := NewTokenExhangeClient(TokenExchangeConfig{
+			Token:            "some-token",
+			TokenExchangeURL: srv.URL,
+		})
+		require.NoError(t, err)
+		return c
 	}
+
+	t.Run("should return error if namespace is empty", func(t *testing.T) {
+		c := setup(httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {})))
+		res, err := c.Exhange(context.Background(), TokenExchangeRequest{})
+		assert.ErrorIs(t, err, ErrMissingNamespace)
+		assert.Nil(t, res)
+
+	})
+
+	t.Run("should return error if audiences is empty", func(t *testing.T) {
+		c := setup(httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {})))
+		res, err := c.Exhange(context.Background(), TokenExchangeRequest{Namespace: "*"})
+		assert.ErrorIs(t, err, ErrMissingAudiences)
+		assert.Nil(t, res)
+	})
+
+	t.Run("should return error for unexpected server response", func(t *testing.T) {
+		c := setup(httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte("{}"))
+		})))
+		res, err := c.Exhange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service"}})
+		assert.ErrorIs(t, err, ErrInvalidExchangeResponse)
+		assert.Nil(t, res)
+	})
+
+	t.Run("should cache and return token on successful request", func(t *testing.T) {
+		var calls int
+		c := setup(httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			calls++
+			require.Equal(t, r.Header.Get("Authorization"), "Bearer some-token")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"data": {"token": "` + signAccessToken(t) + `"}}`))
+			bytes.NewBuffer([]byte(`{}`))
+			json.NewEncoder(&bytes.Buffer{})
+		})))
+
+		res, err := c.Exhange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service"}})
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		require.Equal(t, 1, calls)
+
+		// same namespace and audiences should load token from cache
+		res, err = c.Exhange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service"}})
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		require.Equal(t, 1, calls)
+
+		// different namespace should issue new token request
+		res, err = c.Exhange(context.Background(), TokenExchangeRequest{Namespace: "stack-1", Audiences: []string{"some-service"}})
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		require.Equal(t, 2, calls)
+
+		// different different audiences should issue new token request
+		res, err = c.Exhange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service-2"}})
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		require.Equal(t, 3, calls)
+	})
+}
+
+func signAccessToken(t *testing.T) string {
+	signer, err := jose.NewSigner(jose.SigningKey{
+		Algorithm: jose.HS256,
+		Key:       []byte("key"),
+	}, nil)
+	require.NoError(t, err)
+
+	token, err := jwt.Signed(signer).
+		Claims(&jwt.Claims{Expiry: jwt.NewNumericDate(time.Now().Add(10 * time.Minute))}).
+		CompactSerialize()
+
+	require.NoError(t, err)
+	return token
 }
