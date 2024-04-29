@@ -1,11 +1,10 @@
 package authn
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -66,9 +65,9 @@ type TokenExchangeClient struct {
 type TokenExchangeRequest struct {
 	// Namespace token should be signed with.
 	// Use wildcard '*' to create a token for all namespaces.
-	Namespace string
+	Namespace string `json:"namespace"`
 	// Audiences token should be signed with.
-	Audiences []string
+	Audiences []string `json:"audiences"`
 }
 
 type TokenExhangeResponse struct {
@@ -110,7 +109,12 @@ func (c *TokenExchangeClient) Exhange(ctx context.Context, r TokenExchangeReques
 	}
 
 	resp, err, _ := c.singlef.Do(key, func() (interface{}, error) {
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.TokenExchangeURL, strings.NewReader("{}"))
+		data, err := json.Marshal(&r)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrInvalidExchangeResponse, err)
+		}
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.TokenExchangeURL, bytes.NewReader(data))
 		if err != nil {
 			return nil, fmt.Errorf("failed to build http request: %w", err)
 		}
@@ -122,7 +126,7 @@ func (c *TokenExchangeClient) Exhange(ctx context.Context, r TokenExchangeReques
 		defer res.Body.Close()
 
 		response := tokenExchangeResponse{}
-		if err := json.NewDecoder(res.Body).Decode(&response); err != nil && !errors.Is(err, io.EOF) {
+		if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
 			return nil, err
 		}
 
