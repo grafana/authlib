@@ -166,7 +166,7 @@ func (c *TokenExchangeClient) withHeaders(r *http.Request) *http.Request {
 	// Always propagate system token headers.
 	// These will be ignored for non system tokens.
 	r.Header.Set("X-Org-ID", "0")
-	r.Header.Set("X-Realms", `{"type": "system", "identifier": "system"}`)
+	r.Header.Set("X-Realms", `[{"type": "system", "identifier": "system"}]`)
 	return r
 }
 
