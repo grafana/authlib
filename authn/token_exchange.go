@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -100,9 +101,28 @@ func (c *TokenExchangeClient) Exhange(ctx context.Context, r TokenExchangeReques
 		return nil, ErrMissingNamespace
 	}
 
-	if len(r.Audiences) == 0 {
+	// NOTE: we can't possibly configure a CAP's allowedAudiences to allow all current stacks (its a dynamic value)
+	// If this check could be relaxed when X-Org-ID and X-Realms are present
+	// That would be optimal. The API already works with that.
+	if r.Namespace == "*" && len(r.Audiences) == 0 {
 		return nil, ErrMissingAudiences
 	}
+
+	var orgIdHeader, realmsHeader string
+
+	if r.Namespace == "*" {
+				// Always propagate system token headers for "*" namespace.
+		// These will be ignored for non system tokens.
+		orgIdHeader = "0"
+		realmsHeader = `[{"type": "system", "identifier": "system"}]`
+	} else {
+		var err error
+		orgIdHeader, realmsHeader, err = namespaceToOrgAndRealmsHeaders(r.Namespace)
+		if err != nil {
+			return nil, ErrInvalidNamespace
+		}
+	}
+
 
 	key := r.hash()
 	token, ok := c.getCache(ctx, key)
@@ -121,7 +141,7 @@ func (c *TokenExchangeClient) Exhange(ctx context.Context, r TokenExchangeReques
 			return nil, fmt.Errorf("failed to build http request: %w", err)
 		}
 
-		res, err := c.client.Do(c.withHeaders(req))
+		res, err := c.client.Do(c.withHeaders(req, orgIdHeader, realmsHeader))
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrInvalidExchangeResponse, err)
 		}
@@ -157,16 +177,13 @@ func (c *TokenExchangeClient) Exhange(ctx context.Context, r TokenExchangeReques
 	return &TokenExhangeResponse{Token: response.Data.Token}, nil
 }
 
-func (c *TokenExchangeClient) withHeaders(r *http.Request) *http.Request {
+func (c *TokenExchangeClient) withHeaders(r *http.Request, orgIdHeader string, realmsHeader string) *http.Request {
 	r.Header.Set("Authorization", "Bearer "+c.cfg.Token)
 	r.Header.Set("Content-Type", "application/json")
 	r.Header.Set("Accept", "application/json")
 	r.Header.Set("User-Agent", "authlib-client")
-
-	// Always propagate system token headers.
-	// These will be ignored for non system tokens.
-	r.Header.Set("X-Org-ID", "0")
-	r.Header.Set("X-Realms", `[{"type": "system", "identifier": "system"}]`)
+	r.Header.Set("X-Org-ID", orgIdHeader)
+	r.Header.Set("X-Realms", realmsHeader)
 	return r
 }
 
@@ -191,4 +208,22 @@ func (c *TokenExchangeClient) setCache(ctx context.Context, token string, key st
 	}
 
 	return c.cache.Set(ctx, key, []byte(token), time.Until(claims.Expiry.Time())-cacheLeeway)
+}
+
+func namespaceToOrgAndRealmsHeaders(namespace string) (orgIdHeader string, realmsHeader string, err error) {
+	namespaceSplit := strings.Split(namespace, "-")
+	if len(namespaceSplit) < 2 || namespaceSplit[0] != "stack" {
+		err = fmt.Errorf("invalid namespace format: should be stack-<stack-id>, was %s", namespace)
+		return
+	}
+
+	if _, atoiErr := strconv.Atoi(namespaceSplit[1]); atoiErr != nil {
+		err = fmt.Errorf("invalid namespace format: stack-id should be a integer, was %s", namespaceSplit[1])
+		return
+	}
+
+	// Still need another parameter to account for org, unless this can be relaxed in the API
+	orgIdHeader = "2"
+	realmsHeader = fmt.Sprintf(`[{"type":"stack","identifier":"%s"}]`, namespaceSplit[1])
+	return
 }

@@ -24,6 +24,8 @@ func IsInvalidTokenErr(err error) bool {
 
 var (
 	ErrMissingNamespace = errors.New("missing required namespace")
+	ErrInvalidNamespace = errors.New("invalid namespace specified during exchange")
+
 	ErrMissingAudiences = errors.New("missing required audiences")
 
 	ErrInvalidExchangeResponse = errors.New("invalid exchange response")
