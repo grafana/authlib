@@ -7,7 +7,7 @@ import (
 )
 
 type AccessTokenClaims struct {
-	// Namespace
+	// Namespace takes the form of '<type>-<id>', '*' means all namespaces.
 	Namespace string `json:"namespace"`
 	// Access policy scopes
 	Scopes []string `json:"scopes"`
