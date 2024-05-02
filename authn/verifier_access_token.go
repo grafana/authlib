@@ -7,6 +7,8 @@ import (
 )
 
 type AccessTokenClaims struct {
+	// Namespace
+	Namespace string `json:"namespace"`
 	// Access policy scopes
 	Scopes []string `json:"scopes"`
 	// Grafana roles
