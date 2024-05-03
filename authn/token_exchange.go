@@ -27,7 +27,7 @@ func WithHTTPClient(client *http.Client) ExchangeClientOpts {
 	}
 }
 
-func NewTokenExhangeClient(cfg TokenExchangeConfig, opts ...ExchangeClientOpts) (*TokenExchangeClient, error) {
+func NewTokenExchangeClient(cfg TokenExchangeConfig, opts ...ExchangeClientOpts) (*TokenExchangeClient, error) {
 	if cfg.Token == "" {
 		return nil, fmt.Errorf("missing required token")
 	}

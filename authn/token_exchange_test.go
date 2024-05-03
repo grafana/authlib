@@ -17,7 +17,7 @@ import (
 
 func TestNewTokenExchangeClient(t *testing.T) {
 	t.Run("should not be able to create client wihtout token", func(t *testing.T) {
-		_, err := NewTokenExhangeClient(TokenExchangeConfig{
+		_, err := NewTokenExchangeClient(TokenExchangeConfig{
 			TokenExchangeURL: "some-url",
 		})
 		require.Error(t, err)
@@ -25,14 +25,14 @@ func TestNewTokenExchangeClient(t *testing.T) {
 	})
 
 	t.Run("should not be able to create client wihtout url", func(t *testing.T) {
-		_, err := NewTokenExhangeClient(TokenExchangeConfig{
+		_, err := NewTokenExchangeClient(TokenExchangeConfig{
 			Token: "some-token",
 		})
 		require.Error(t, err)
 	})
 
 	t.Run("should be able to create client", func(t *testing.T) {
-		_, err := NewTokenExhangeClient(TokenExchangeConfig{
+		_, err := NewTokenExchangeClient(TokenExchangeConfig{
 			Token:            "some-token",
 			TokenExchangeURL: "some-url",
 		})
@@ -42,7 +42,7 @@ func TestNewTokenExchangeClient(t *testing.T) {
 
 func Test_TokenExchangeClient_Exhange(t *testing.T) {
 	setup := func(srv *httptest.Server) *TokenExchangeClient {
-		c, err := NewTokenExhangeClient(TokenExchangeConfig{
+		c, err := NewTokenExchangeClient(TokenExchangeConfig{
 			Token:            "some-token",
 			TokenExchangeURL: srv.URL,
 		})
