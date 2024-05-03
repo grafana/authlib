@@ -8,6 +8,7 @@ import (
 
 type AccessTokenClaims struct {
 	// Namespace takes the form of '<type>-<id>', '*' means all namespaces.
+	// Type can be either org or stack.
 	Namespace string `json:"namespace"`
 	// Access policy scopes
 	Scopes []string `json:"scopes"`

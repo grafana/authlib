@@ -7,6 +7,9 @@ import (
 )
 
 type IDTokenClaims struct {
+	// Namespace takes the form of '<type>-<id>', '*' means all namespaces.
+	// Type can be either org or stack.
+	Namespace string `json:"namespace"`
 	// AuthenticatedBy is the method used to authenticate the identity.
 	AuthenticatedBy string `json:"authenticatedBy"`
 	Email           string `json:"email"`
