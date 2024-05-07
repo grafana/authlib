@@ -18,6 +18,13 @@ type AccessTokenClaims struct {
 	DelegatedPermissions []string `json:"delegatedPermissions"`
 }
 
+func (c AccessTokenClaims) NamespaceMatches(namespace string) bool {
+	if c.Namespace == "*" {
+		return true
+	}
+	return c.Namespace == namespace
+}
+
 func NewAccessTokenVerifier(cfg VerifierConfig) *AccessTokenVerifier {
 	return &AccessTokenVerifier{
 		v: NewVerifier[AccessTokenClaims](cfg, TokenTypeAccess),
