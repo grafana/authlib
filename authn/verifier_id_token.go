@@ -13,7 +13,7 @@ type IDTokenClaims struct {
 	// AuthenticatedBy is the method used to authenticate the identity.
 	AuthenticatedBy string `json:"authenticatedBy"`
 	Email           string `json:"email"`
-	EmailVerified   string `json:"email_verified"`
+	EmailVerified   bool   `json:"email_verified"`
 }
 
 func NewIDTokenVerifier(cfg VerifierConfig) *IDTokenVerifier {
