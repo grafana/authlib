@@ -16,6 +16,13 @@ type IDTokenClaims struct {
 	EmailVerified   bool   `json:"email_verified"`
 }
 
+func (c IDTokenClaims) NamespaceMatches(namespace string) bool {
+	if c.Namespace == "*" {
+		return true
+	}
+	return c.Namespace == namespace
+}
+
 func NewIDTokenVerifier(cfg VerifierConfig) *IDTokenVerifier {
 	return &IDTokenVerifier{
 		v: NewVerifier[IDTokenClaims](cfg, TokenTypeID),
