@@ -17,6 +17,13 @@ import (
 	"github.com/grafana/authlib/internal/httpclient"
 )
 
+// Provided for mockability of client
+type TokenExchangeClientInterface interface {
+	Exchange(ctx context.Context, r TokenExchangeRequest) (*TokenExchangeResponse, error)
+}
+
+var _ TokenExchangeClientInterface = &TokenExchangeClient{}
+
 // ExchangeClientOpts allows setting custom parameters during construction.
 type ExchangeClientOpts func(c *TokenExchangeClient)
 
@@ -33,7 +40,7 @@ func NewTokenExchangeClient(cfg TokenExchangeConfig, opts ...ExchangeClientOpts)
 	}
 
 	if cfg.TokenExchangeURL == "" {
-		return nil, fmt.Errorf("missing required token exhange url")
+		return nil, fmt.Errorf("missing required token exchange url")
 	}
 
 	c := &TokenExchangeClient{
@@ -71,7 +78,7 @@ type TokenExchangeRequest struct {
 	Audiences []string `json:"audiences"`
 }
 
-type TokenExhangeResponse struct {
+type TokenExchangeResponse struct {
 	Token string
 }
 
@@ -95,7 +102,7 @@ type tokenExchangeData struct {
 	Token string `json:"token"`
 }
 
-func (c *TokenExchangeClient) Exhange(ctx context.Context, r TokenExchangeRequest) (*TokenExhangeResponse, error) {
+func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeRequest) (*TokenExchangeResponse, error) {
 	if r.Namespace == "" {
 		return nil, ErrMissingNamespace
 	}
@@ -107,7 +114,7 @@ func (c *TokenExchangeClient) Exhange(ctx context.Context, r TokenExchangeReques
 	key := r.hash()
 	token, ok := c.getCache(ctx, key)
 	if ok {
-		return &TokenExhangeResponse{Token: token}, nil
+		return &TokenExchangeResponse{Token: token}, nil
 	}
 
 	resp, err, _ := c.singlef.Do(key, func() (interface{}, error) {
@@ -154,7 +161,7 @@ func (c *TokenExchangeClient) Exhange(ctx context.Context, r TokenExchangeReques
 	}
 
 	response := resp.(tokenExchangeResponse)
-	return &TokenExhangeResponse{Token: response.Data.Token}, nil
+	return &TokenExchangeResponse{Token: response.Data.Token}, nil
 }
 
 func (c *TokenExchangeClient) withHeaders(r *http.Request) *http.Request {

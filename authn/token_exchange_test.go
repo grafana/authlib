@@ -40,7 +40,7 @@ func TestNewTokenExchangeClient(t *testing.T) {
 	})
 }
 
-func Test_TokenExchangeClient_Exhange(t *testing.T) {
+func Test_TokenExchangeClient_Exchange(t *testing.T) {
 	setup := func(srv *httptest.Server) *TokenExchangeClient {
 		c, err := NewTokenExchangeClient(TokenExchangeConfig{
 			Token:            "some-token",
@@ -52,7 +52,7 @@ func Test_TokenExchangeClient_Exhange(t *testing.T) {
 
 	t.Run("should return error if namespace is empty", func(t *testing.T) {
 		c := setup(httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {})))
-		res, err := c.Exhange(context.Background(), TokenExchangeRequest{})
+		res, err := c.Exchange(context.Background(), TokenExchangeRequest{})
 		assert.ErrorIs(t, err, ErrMissingNamespace)
 		assert.Nil(t, res)
 
@@ -60,7 +60,7 @@ func Test_TokenExchangeClient_Exhange(t *testing.T) {
 
 	t.Run("should return error if audiences is empty", func(t *testing.T) {
 		c := setup(httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {})))
-		res, err := c.Exhange(context.Background(), TokenExchangeRequest{Namespace: "*"})
+		res, err := c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "*"})
 		assert.ErrorIs(t, err, ErrMissingAudiences)
 		assert.Nil(t, res)
 	})
@@ -70,7 +70,7 @@ func Test_TokenExchangeClient_Exhange(t *testing.T) {
 			w.WriteHeader(http.StatusUnauthorized)
 			w.Write([]byte("{}"))
 		})))
-		res, err := c.Exhange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service"}})
+		res, err := c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service"}})
 		assert.ErrorIs(t, err, ErrInvalidExchangeResponse)
 		assert.Nil(t, res)
 	})
@@ -86,25 +86,25 @@ func Test_TokenExchangeClient_Exhange(t *testing.T) {
 			json.NewEncoder(&bytes.Buffer{})
 		})))
 
-		res, err := c.Exhange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service"}})
+		res, err := c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service"}})
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 		require.Equal(t, 1, calls)
 
 		// same namespace and audiences should load token from cache
-		res, err = c.Exhange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service"}})
+		res, err = c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service"}})
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 		require.Equal(t, 1, calls)
 
 		// different namespace should issue new token request
-		res, err = c.Exhange(context.Background(), TokenExchangeRequest{Namespace: "stack-1", Audiences: []string{"some-service"}})
+		res, err = c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "stack-1", Audiences: []string{"some-service"}})
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 		require.Equal(t, 2, calls)
 
 		// different different audiences should issue new token request
-		res, err = c.Exhange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service-2"}})
+		res, err = c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service-2"}})
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 		require.Equal(t, 3, calls)
