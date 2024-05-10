@@ -24,11 +24,11 @@ func (c *VerifierConfig) RegisterFlags(prefix string, fs *flag.FlagSet) {
 type TokenExchangeConfig struct {
 	// Token used to perform the exchange request.
 	Token string
-	// Url called to perform exhange request.
+	// Url called to perform exchange request.
 	TokenExchangeURL string
 }
 
 func (c *TokenExchangeConfig) RegisterFlags(prefix string, fs *flag.FlagSet) {
 	fs.StringVar(&c.Token, prefix+".token", "", "Token used to perform the exchange request.")
-	fs.StringVar(&c.TokenExchangeURL, prefix+".token-exchange-url", "", "Url called to perform exhange request.")
+	fs.StringVar(&c.TokenExchangeURL, prefix+".token-exchange-url", "", "Url called to perform exchange request.")
 }
