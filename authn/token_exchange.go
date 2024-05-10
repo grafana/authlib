@@ -18,11 +18,11 @@ import (
 )
 
 // Provided for mockability of client
-type TokenExchangeClientInterface interface {
+type TokenExchanger interface {
 	Exchange(ctx context.Context, r TokenExchangeRequest) (*TokenExchangeResponse, error)
 }
 
-var _ TokenExchangeClientInterface = &TokenExchangeClient{}
+var _ TokenExchanger = &TokenExchangeClient{}
 
 // ExchangeClientOpts allows setting custom parameters during construction.
 type ExchangeClientOpts func(c *TokenExchangeClient)
