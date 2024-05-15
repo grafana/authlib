@@ -2,8 +2,6 @@ package authn
 
 import (
 	"context"
-
-	"github.com/grafana/authlib/cache"
 )
 
 type IDTokenClaims struct {
@@ -23,15 +21,9 @@ func (c IDTokenClaims) NamespaceMatches(namespace string) bool {
 	return c.Namespace == namespace
 }
 
-func NewIDTokenVerifier(cfg VerifierConfig) *IDTokenVerifier {
+func NewIDTokenVerifier(cfg VerifierConfig, keys KeyRetriever) *IDTokenVerifier {
 	return &IDTokenVerifier{
-		v: NewVerifier[IDTokenClaims](cfg, TokenTypeID),
-	}
-}
-
-func NewIDTokenVerifierWithCache(cfg VerifierConfig, cache cache.Cache) *IDTokenVerifier {
-	return &IDTokenVerifier{
-		v: newVerifierWithKeyService[IDTokenClaims](cfg, TokenTypeID, newKeyServiceWithCache(cfg.SigningKeysURL, cache)),
+		v: NewVerifier[IDTokenClaims](cfg, TokenTypeID, keys),
 	}
 }
 

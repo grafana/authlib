@@ -14,34 +14,33 @@ import (
 	"github.com/grafana/authlib/cache"
 )
 
+type KeyRetriever interface {
+	Get(ctx context.Context, keyID string) (*jose.JSONWebKey, error)
+}
+
 const (
 	cacheTTL             = 10 * time.Minute
 	cacheCleanupInterval = 10 * time.Minute
 )
 
-func newKeyService(jwksURL string) *keyService {
-	return newKeyServiceWithCache(jwksURL, cache.NewLocalCache(cache.Config{
-		Expiry:          cacheTTL,
-		CleanupInterval: cacheCleanupInterval,
-	}))
-
-}
-
-func newKeyServiceWithCache(jwksURL string, cache cache.Cache) *keyService {
-	return &keyService{
-		url: jwksURL,
-		c:   cache,
-		s:   &singleflight.Group{},
+func NewKeyRetiever(cfg KeyRetrieverConfig) *DefaultKeyRetriever {
+	return &DefaultKeyRetriever{
+		cfg: cfg,
+		c: cache.NewLocalCache(cache.Config{
+			Expiry:          cacheTTL,
+			CleanupInterval: cacheCleanupInterval,
+		}),
+		s: &singleflight.Group{},
 	}
 }
 
-type keyService struct {
-	url string
+type DefaultKeyRetriever struct {
+	cfg KeyRetrieverConfig
 	s   *singleflight.Group
 	c   cache.Cache
 }
 
-func (s *keyService) Get(ctx context.Context, keyID string) (*jose.JSONWebKey, error) {
+func (s *DefaultKeyRetriever) Get(ctx context.Context, keyID string) (*jose.JSONWebKey, error) {
 	jwk, ok := s.getCachedItem(ctx, keyID)
 	if !ok {
 		_, err, _ := s.s.Do("fetch", func() (interface{}, error) {
@@ -63,8 +62,8 @@ func (s *keyService) Get(ctx context.Context, keyID string) (*jose.JSONWebKey, e
 
 		jwk, ok = s.getCachedItem(ctx, keyID)
 		if !ok {
-			// Key still don't exist after a refetch.
-			// Cache the invalid key to prevent refetch
+			// Key still don't exist after a re-fetch.
+			// Cache the invalid key to prevent re-fetch
 			// for known invalid keys.
 			s.setEmptyCacheItem(ctx, keyID)
 		}
@@ -77,8 +76,8 @@ func (s *keyService) Get(ctx context.Context, keyID string) (*jose.JSONWebKey, e
 	return jwk, nil
 }
 
-func (s *keyService) fetchJWKS(ctx context.Context) (*jose.JSONWebKeySet, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", s.url, nil)
+func (s *DefaultKeyRetriever) fetchJWKS(ctx context.Context) (*jose.JSONWebKeySet, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", s.cfg.SigningKeysURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +100,7 @@ func (s *keyService) fetchJWKS(ctx context.Context) (*jose.JSONWebKeySet, error)
 	return &jwks, nil
 }
 
-func (s *keyService) getCachedItem(ctx context.Context, keyID string) (*jose.JSONWebKey, bool) {
+func (s *DefaultKeyRetriever) getCachedItem(ctx context.Context, keyID string) (*jose.JSONWebKey, bool) {
 	data, err := s.c.Get(ctx, keyID)
 	// error is a noop for local cache
 	if err != nil {
@@ -122,7 +121,7 @@ func (s *keyService) getCachedItem(ctx context.Context, keyID string) (*jose.JSO
 	return &jwk, true
 }
 
-func (s *keyService) setCachedItem(ctx context.Context, key jose.JSONWebKey) {
+func (s *DefaultKeyRetriever) setCachedItem(ctx context.Context, key jose.JSONWebKey) {
 	buf := bytes.Buffer{}
 	if err := json.NewEncoder(&buf).Encode(&key); err != nil {
 		return
@@ -132,7 +131,7 @@ func (s *keyService) setCachedItem(ctx context.Context, key jose.JSONWebKey) {
 	_ = s.c.Set(ctx, key.KeyID, buf.Bytes(), cache.NoExpiration)
 }
 
-func (s *keyService) setEmptyCacheItem(ctx context.Context, keyID string) {
+func (s *DefaultKeyRetriever) setEmptyCacheItem(ctx context.Context, keyID string) {
 	// Set cannot fail when using local cache
 	_ = s.c.Set(ctx, keyID, []byte{}, cacheTTL)
 }

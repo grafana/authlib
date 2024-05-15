@@ -27,18 +27,14 @@ type Claims[T any] struct {
 	Rest T
 }
 
-func NewVerifier[T any](cfg VerifierConfig, typ TokenType) *VerifierBase[T] {
-	return newVerifierWithKeyService[T](cfg, typ, newKeyService(cfg.SigningKeysURL))
-}
-
-func newVerifierWithKeyService[T any](cfg VerifierConfig, typ TokenType, keys *keyService) *VerifierBase[T] {
+func NewVerifier[T any](cfg VerifierConfig, typ TokenType, keys KeyRetriever) *VerifierBase[T] {
 	return &VerifierBase[T]{cfg, typ, keys}
 }
 
 type VerifierBase[T any] struct {
 	cfg       VerifierConfig
 	tokenType TokenType
-	keys      *keyService
+	keys      KeyRetriever
 }
 
 // Verify will parse and verify provided token using public key from `SigningKeysURL`.
