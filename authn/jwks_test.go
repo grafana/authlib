@@ -32,7 +32,7 @@ func TestDefaultKeyRetriever_Get(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		w.Write(keys())
 	}))
-	service := NewKeyRetiever(KeyRetrieverConfig{
+	service := NewKeyRetriever(KeyRetrieverConfig{
 		SigningKeysURL: server.URL,
 	})
 
