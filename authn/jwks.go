@@ -23,7 +23,7 @@ const (
 	cacheCleanupInterval = 10 * time.Minute
 )
 
-func NewKeyRetiever(cfg KeyRetrieverConfig) *DefaultKeyRetriever {
+func NewKeyRetriever(cfg KeyRetrieverConfig) *DefaultKeyRetriever {
 	return &DefaultKeyRetriever{
 		cfg: cfg,
 		c: cache.NewLocalCache(cache.Config{

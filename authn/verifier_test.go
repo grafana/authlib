@@ -71,7 +71,7 @@ func TestVerifier_Verify(t *testing.T) {
 	verifier := NewVerifier[CustomClaims](
 		VerifierConfig{},
 		TokenTypeID,
-		NewKeyRetiever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
+		NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
 	)
 
 	t.Run("invalid: wrong token format", func(t *testing.T) {
@@ -90,7 +90,7 @@ func TestVerifier_Verify(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](
 			VerifierConfig{},
 			TokenTypeID,
-			NewKeyRetiever(KeyRetrieverConfig{SigningKeysURL: "http://localhost:8000/v1/unknown"}),
+			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: "http://localhost:8000/v1/unknown"}),
 		)
 		claims, err := verifier.Verify(context.Background(), signFist(t))
 		assert.ErrorIs(t, err, ErrFetchingSigningKey)
@@ -105,7 +105,7 @@ func TestVerifier_Verify(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](
 			VerifierConfig{},
 			TokenTypeID,
-			NewKeyRetiever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
+			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
 		)
 		claims, err := verifier.Verify(context.Background(), signFist(t))
 		assert.ErrorIs(t, err, ErrFetchingSigningKey)
@@ -127,7 +127,7 @@ func TestVerifier_Verify(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](
 			VerifierConfig{},
 			TokenTypeID,
-			NewKeyRetiever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
+			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
 		)
 		claims, err := verifier.Verify(context.Background(), signSecond(t))
 		assert.ErrorIs(t, err, ErrInvalidSigningKey)
@@ -138,7 +138,7 @@ func TestVerifier_Verify(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](
 			VerifierConfig{AllowedAudiences: []string{"stack:2"}},
 			TokenTypeID,
-			NewKeyRetiever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
+			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
 		)
 		claims, err := verifier.Verify(context.Background(), signFist(t))
 		assert.ErrorIs(t, err, ErrInvalidAudience)
@@ -149,7 +149,7 @@ func TestVerifier_Verify(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](
 			VerifierConfig{},
 			TokenTypeID,
-			NewKeyRetiever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
+			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
 		)
 		claims, err := verifier.Verify(context.Background(), signExpired(t))
 		assert.ErrorIs(t, err, ErrExpiredToken)
@@ -160,7 +160,7 @@ func TestVerifier_Verify(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](
 			VerifierConfig{},
 			TokenTypeAccess,
-			NewKeyRetiever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
+			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
 		)
 		claims, err := verifier.Verify(context.Background(), signFist(t))
 		assert.ErrorIs(t, err, ErrInvalidTokenType)
@@ -171,7 +171,7 @@ func TestVerifier_Verify(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](
 			VerifierConfig{AllowedAudiences: []string{"stack:1"}},
 			TokenTypeID,
-			NewKeyRetiever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
+			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
 		)
 		claims, err := verifier.Verify(context.Background(), signFist(t))
 		assert.NoError(t, err)
