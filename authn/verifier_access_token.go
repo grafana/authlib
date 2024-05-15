@@ -2,8 +2,6 @@ package authn
 
 import (
 	"context"
-
-	"github.com/grafana/authlib/cache"
 )
 
 type AccessTokenClaims struct {
@@ -25,15 +23,9 @@ func (c AccessTokenClaims) NamespaceMatches(namespace string) bool {
 	return c.Namespace == namespace
 }
 
-func NewAccessTokenVerifier(cfg VerifierConfig) *AccessTokenVerifier {
+func NewAccessTokenVerifier(cfg VerifierConfig, keys KeyRetriever) *AccessTokenVerifier {
 	return &AccessTokenVerifier{
-		v: NewVerifier[AccessTokenClaims](cfg, TokenTypeAccess),
-	}
-}
-
-func NewAccessTokenVerifierWithCache(cfg VerifierConfig, cache cache.Cache) *AccessTokenVerifier {
-	return &AccessTokenVerifier{
-		v: newVerifierWithKeyService[AccessTokenClaims](cfg, TokenTypeAccess, newKeyServiceWithCache(cfg.SigningKeysURL, cache)),
+		v: NewVerifier[AccessTokenClaims](cfg, TokenTypeAccess, keys),
 	}
 }
 
