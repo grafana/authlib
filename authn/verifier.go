@@ -17,8 +17,7 @@ const (
 )
 
 type Verifier[T any] interface {
-	// Verify will parse and verify provided token using public key from `VerifierConfig.SigningKeysURL`.
-	// If `AllowedAudiences` was configured those will be validated as well.
+	// Verify will parse and verify provided token, if `AllowedAudiences` was configured those will be validated as well.
 	Verify(ctx context.Context, token string) (*Claims[T], error)
 }
 
@@ -37,8 +36,7 @@ type VerifierBase[T any] struct {
 	keys      KeyRetriever
 }
 
-// Verify will parse and verify provided token using public key from `SigningKeysURL`.
-// If `AllowedAudiences` was configured those will be validated as well.
+// Verify will parse and verify provided token, if `AllowedAudiences` was configured those will be validated as well.
 func (v *VerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T], error) {
 	parsed, err := jwt.ParseSigned(token)
 	if err != nil {
