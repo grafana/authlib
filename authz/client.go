@@ -53,12 +53,13 @@ func withCache(cache cache.Cache) clientOption {
 	}
 }
 
-func newClient(cfg Config, opts ...clientOption) (*clientImpl, error) {
+func newClient(cfg Config, tknVerifier *authn.IDTokenVerifier, opts ...clientOption) (*clientImpl, error) {
 	client := &clientImpl{
-		singlef: singleflight.Group{},
-		client:  nil,
-		cache:   nil,
-		cfg:     cfg,
+		cache:       nil,
+		cfg:         cfg,
+		client:      nil,
+		singlef:     singleflight.Group{},
+		tknVerifier: tknVerifier,
 	}
 
 	for _, opt := range opts {
@@ -74,8 +75,6 @@ func newClient(cfg Config, opts ...clientOption) (*clientImpl, error) {
 		})
 	}
 
-	client.verifier = authn.NewVerifier[customClaims](authn.VerifierConfig{}, authn.TokenTypeID, authn.NewKeyRetriever(authn.KeyRetrieverConfig{SigningKeysURL: cfg.JWKsURL}))
-
 	// create httpClient, if not already present
 	if client.client == nil {
 		client.client = httpclient.New()
@@ -85,11 +84,11 @@ func newClient(cfg Config, opts ...clientOption) (*clientImpl, error) {
 }
 
 type clientImpl struct {
-	cache    cache.Cache
-	cfg      Config
-	client   HTTPRequestDoer
-	verifier authn.Verifier[customClaims]
-	singlef  singleflight.Group
+	cache       cache.Cache
+	cfg         Config
+	client      HTTPRequestDoer
+	tknVerifier authn.Verifier[authn.IDTokenClaims]
+	singlef     singleflight.Group
 }
 
 func searchCacheKey(query searchQuery) string {
@@ -107,7 +106,7 @@ func (query *searchQuery) processResource() {
 // processIDToken verifies the id token is legit and extracts its subject in the query.NamespacedID.
 func (query *searchQuery) processIDToken(c *clientImpl) error {
 	if query.IdToken != "" {
-		claims, err := c.verifier.Verify(context.Background(), query.IdToken)
+		claims, err := c.tknVerifier.Verify(context.Background(), query.IdToken)
 		if err != nil {
 			return fmt.Errorf("%v: %w", ErrInvalidIDToken, err)
 		}

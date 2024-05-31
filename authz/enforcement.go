@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/grafana/authlib/authn"
 	"github.com/grafana/authlib/cache"
 )
 
@@ -45,7 +46,7 @@ func WithSearchByPrefix(prefix string) ClientOption {
 	}
 }
 
-func NewEnforcementClient(cfg Config, opt ...ClientOption) (*EnforcementClientImpl, error) {
+func NewEnforcementClient(cfg Config, verifier *authn.IDTokenVerifier, opt ...ClientOption) (*EnforcementClientImpl, error) {
 	s := &EnforcementClientImpl{
 		client:        nil,
 		queryTemplate: nil,
@@ -56,7 +57,7 @@ func NewEnforcementClient(cfg Config, opt ...ClientOption) (*EnforcementClientIm
 	}
 
 	var err error
-	if s.client, err = newClient(cfg, s.clientOpts...); err != nil {
+	if s.client, err = newClient(cfg, verifier, s.clientOpts...); err != nil {
 		return nil, err
 	}
 

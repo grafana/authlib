@@ -54,9 +54,8 @@ type permissionsByID map[int64]permissions
 type permissions map[string][]string
 
 type Config struct {
-	APIURL  string
-	Token   string
-	JWKsURL string
+	APIURL string
+	Token  string
 }
 
 // Resource represents a resource in Grafana.

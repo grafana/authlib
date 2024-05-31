@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/grafana/authlib/authn"
 	"github.com/grafana/authlib/cache"
 )
 
@@ -52,7 +53,7 @@ func TestClientImpl_Search(t *testing.T) {
 			c, err := newClient(Config{
 				APIURL: server.URL,
 				Token:  "aabbcc",
-			}, withCache(testCache))
+			}, authn.NewIDTokenVerifier(authn.VerifierConfig{}, authn.NewKeyRetriever(authn.KeyRetrieverConfig{})), withCache(testCache))
 			require.NoError(t, err)
 
 			c.client = server.Client()

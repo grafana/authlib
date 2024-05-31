@@ -12,7 +12,7 @@ Grafana needs to be configured with the `accessControlOnCall` feature toggle set
 
 ```ini
 [feature_toggles]
-enable = accessControlOnCall 
+enable = accessControlOnCall
 ```
 
 ## Examples
@@ -30,11 +30,15 @@ import (
 )
 
 func main() {
+	verifier := authn.NewIDTokenVerifier(
+		authn.VerifierConfig{AllowedAudiences: []string{}},
+		authn.NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: "<jwks url>"})
+	)
+
 	client, err := authz.NewEnforcementClient(authz.Config{
 		APIURL:  "http://localhost:3000",
 		Token:   "<service account token>",
-		JWKsURL: "<jwks url>",
-	})
+	}, verifier)
 
 	if err != nil {
 		log.Fatal("failed to construct authz client", err)
@@ -75,7 +79,7 @@ type CustomClaims struct{}
 func main() {
 	verifier := authn.NewVerifier[CustomClaims](authn.VerifierConfig{
 		AllowedAudiences: []string{},
-	}, authn.TokenTypeID, authn.NewKeyRetiever(KeyRetrieverConfig{SigningKeysURL: "<jwks url>"}))
+	}, authn.TokenTypeID, authn.NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: "<jwks url>"}))
 
 	claims, err := verifier.Verify(context.Background(), "<token>")
 
