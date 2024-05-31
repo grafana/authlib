@@ -18,26 +18,42 @@ type KeyRetriever interface {
 	Get(ctx context.Context, keyID string) (*jose.JSONWebKey, error)
 }
 
+type DefaultKeyRetrieverOption func(*DefaultKeyRetriever)
+
+// WithHTTPClientKeyRetrieverOpt allows setting the HTTP client to be used by the key retriever.
+func WithHTTPClientKeyRetrieverOpt(client *http.Client) DefaultKeyRetrieverOption {
+	return func(c *DefaultKeyRetriever) {
+		c.client = client
+	}
+}
+
 const (
 	cacheTTL             = 10 * time.Minute
 	cacheCleanupInterval = 10 * time.Minute
 )
 
-func NewKeyRetriever(cfg KeyRetrieverConfig) *DefaultKeyRetriever {
-	return &DefaultKeyRetriever{
+func NewKeyRetriever(cfg KeyRetrieverConfig, opt ...DefaultKeyRetrieverOption) *DefaultKeyRetriever {
+	s := &DefaultKeyRetriever{
 		cfg: cfg,
 		c: cache.NewLocalCache(cache.Config{
 			Expiry:          cacheTTL,
 			CleanupInterval: cacheCleanupInterval,
 		}),
-		s: &singleflight.Group{},
+		client: http.DefaultClient,
+		s:      &singleflight.Group{},
 	}
+
+	for _, o := range opt {
+		o(s)
+	}
+	return s
 }
 
 type DefaultKeyRetriever struct {
-	cfg KeyRetrieverConfig
-	s   *singleflight.Group
-	c   cache.Cache
+	cfg    KeyRetrieverConfig
+	client *http.Client
+	s      *singleflight.Group
+	c      cache.Cache
 }
 
 func (s *DefaultKeyRetriever) Get(ctx context.Context, keyID string) (*jose.JSONWebKey, error) {
@@ -82,7 +98,7 @@ func (s *DefaultKeyRetriever) fetchJWKS(ctx context.Context) (*jose.JSONWebKeySe
 		return nil, err
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("%w: request error", ErrFetchingSigningKey)
 	}
