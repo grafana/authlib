@@ -34,6 +34,13 @@ const (
 	searchPath = "/api/access-control/users/permissions/search"
 )
 
+func withTokenExchanger(exchanger authn.TokenExchanger) clientOption {
+	return func(c *clientImpl) error {
+		c.tknExchanger = exchanger
+		return nil
+	}
+}
+
 // withHTTPClient allows overriding the default Doer, which is
 // automatically created using http.Client. This is useful for tests.
 func withHTTPClient(doer HTTPRequestDoer) clientOption {
@@ -85,11 +92,12 @@ func newClient(cfg Config, opts ...clientOption) (*clientImpl, error) {
 }
 
 type clientImpl struct {
-	cache    cache.Cache
-	cfg      Config
-	client   HTTPRequestDoer
-	verifier authn.Verifier[customClaims]
-	singlef  singleflight.Group
+	cache        cache.Cache
+	cfg          Config
+	client       HTTPRequestDoer
+	singlef      singleflight.Group
+	tknExchanger authn.TokenExchanger
+	verifier     authn.Verifier[customClaims]
 }
 
 func searchCacheKey(query searchQuery) string {
@@ -133,6 +141,25 @@ func (query *searchQuery) validateQuery() error {
 	return nil
 }
 
+func (c *clientImpl) getToken(ctx context.Context) (string, error) {
+	// return token if no token exchanger is provided
+	if c.tknExchanger == nil {
+		return c.cfg.Token, nil
+	}
+
+	// TODO: add namespace and audiences
+	tkn, err := c.tknExchanger.Exchange(ctx, authn.TokenExchangeRequest{
+		Namespace: "",
+		Audiences: []string{"grafana"},
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	return tkn.Token, nil
+}
+
 // Search returns the permissions for the given query.
 func (c *clientImpl) Search(ctx context.Context, query searchQuery) (*searchResponse, error) {
 	// set scope if resource is provided
@@ -173,7 +200,12 @@ func (c *clientImpl) Search(ctx context.Context, query searchQuery) (*searchResp
 			return nil, err
 		}
 
-		req.Header.Set("Authorization", "Bearer "+c.cfg.Token)
+		token, err := c.getToken(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Authorization", "Bearer "+token)
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Accept", "application/json")
 

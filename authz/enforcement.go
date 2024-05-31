@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/grafana/authlib/authn"
 	"github.com/grafana/authlib/cache"
 )
 
@@ -41,6 +42,13 @@ func WithSearchByPrefix(prefix string) ClientOption {
 		s.queryTemplate = &searchQuery{
 			ActionPrefix: prefix,
 		}
+		return nil
+	}
+}
+
+func WithTokenExchanger(exchanger authn.TokenExchanger) ClientOption {
+	return func(s *EnforcementClientImpl) error {
+		s.clientOpts = append(s.clientOpts, withTokenExchanger(exchanger))
 		return nil
 	}
 }
