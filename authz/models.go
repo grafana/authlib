@@ -5,6 +5,8 @@ import (
 	"net/http"
 )
 
+type NamespacedID string
+
 // HTTPRequestDoer performs HTTP requests.
 // The standard http.Client implements this interface.
 type HTTPRequestDoer interface {
@@ -20,14 +22,14 @@ type client interface {
 type EnforcementClient interface {
 	// Compile generates a function to check whether the user has access to any scope of a given list of scopes.
 	// This is particularly useful when you want to verify access to a list of resources.
-	Compile(ctx context.Context, namespacedID string, action string, kinds ...string) (Checker, error)
+	Compile(ctx context.Context, namespacedID NamespacedID, action string, kinds ...string) (Checker, error)
 
 	// HasAccess checks whether the user can perform the given action on any of the given resources.
 	// If the scope is empty, it checks whether the user can perform the action.
-	HasAccess(ctx context.Context, namespacedID string, action string, resources ...Resource) (bool, error)
+	HasAccess(ctx context.Context, namespacedID NamespacedID, action string, resources ...Resource) (bool, error)
 
 	// Experimental: LookupResources returns the resources that the user has access to for the given action.
-	LookupResources(ctx context.Context, namespacedID string, action string) ([]Resource, error)
+	LookupResources(ctx context.Context, namespacedID NamespacedID, action string) ([]Resource, error)
 }
 
 // Checker checks whether a user has access to any of the provided resources.
@@ -74,9 +76,9 @@ func (r *Resource) Scope() string {
 
 // searchQuery is the query to search for permissions.
 type searchQuery struct {
-	ActionPrefix string    `json:"actionPrefix,omitempty" url:"actionPrefix,omitempty"`
-	Action       string    `json:"action,omitempty" url:"action,omitempty"`
-	Scope        string    `json:"scope,omitempty" url:"scope,omitempty"`
-	NamespacedID string    `json:"namespacedId" url:"namespacedId,omitempty"`
-	Resource     *Resource `json:"-" url:"-"`
+	ActionPrefix string       `json:"actionPrefix,omitempty" url:"actionPrefix,omitempty"`
+	Action       string       `json:"action,omitempty" url:"action,omitempty"`
+	Scope        string       `json:"scope,omitempty" url:"scope,omitempty"`
+	NamespacedID NamespacedID `json:"namespacedId" url:"namespacedId,omitempty"`
+	Resource     *Resource    `json:"-" url:"-"`
 }

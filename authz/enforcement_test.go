@@ -12,7 +12,7 @@ import (
 func TestEnforcementClientImpl_fetchPermissions_queryPreload(t *testing.T) {
 	tests := []struct {
 		name         string
-		namespacedID string
+		namespacedID NamespacedID
 		action       string
 		resources    []Resource
 		preloadQuery *searchQuery
@@ -63,7 +63,7 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 	tests := []struct {
 		name         string
 		permissions  map[string][]string
-		namespacedID string
+		namespacedID NamespacedID
 		action       string
 		resources    []Resource
 		wantQuery    searchQuery
@@ -168,7 +168,7 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 func TestEnforcementClientImpl_LookupResources(t *testing.T) {
 	tests := []struct {
 		name        string
-		idToken     string
+		namespaceID NamespacedID
 		action      string
 		permissions permissionsByID
 		want        []Resource
@@ -176,9 +176,9 @@ func TestEnforcementClientImpl_LookupResources(t *testing.T) {
 		wantErr     bool
 	}{
 		{
-			name:    "no permissions",
-			idToken: "jwt_id_token",
-			action:  "teams:read",
+			name:        "no permissions",
+			namespaceID: "user:12",
+			action:      "teams:read",
 			permissions: permissionsByID{
 				1: map[string][]string{},
 			},
@@ -186,9 +186,9 @@ func TestEnforcementClientImpl_LookupResources(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "permission filtering works",
-			idToken: "jwt_id_token",
-			action:  "teams:write",
+			name:        "permission filtering works",
+			namespaceID: "user:12",
+			action:      "teams:write",
 			permissions: permissionsByID{
 				1: map[string][]string{
 					"teams:read": {"teams:id:1", "teams:id:2"},
@@ -198,9 +198,9 @@ func TestEnforcementClientImpl_LookupResources(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "has permissions",
-			idToken: "jwt_id_token",
-			action:  "teams:read",
+			name:        "has permissions",
+			namespaceID: "user:12",
+			action:      "teams:read",
 			permissions: permissionsByID{
 				1: map[string][]string{
 					"teams:read": {"teams:id:1", "teams:id:2"},
@@ -213,9 +213,9 @@ func TestEnforcementClientImpl_LookupResources(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "has permissions wildcard",
-			idToken: "jwt_id_token",
-			action:  "folders:read",
+			name:        "has permissions wildcard",
+			namespaceID: "user:12",
+			action:      "folders:read",
 			permissions: permissionsByID{
 				1: map[string][]string{
 					"folders:read": {"folders:*"},
@@ -228,7 +228,7 @@ func TestEnforcementClientImpl_LookupResources(t *testing.T) {
 		},
 		{
 			name:        "error fetching permissions",
-			idToken:     "jwt_id_token",
+			namespaceID: "user:12",
 			action:      "teams:read",
 			permissions: permissionsByID{},
 			mockErr:     ErrTooManyPermissions,
@@ -244,7 +244,7 @@ func TestEnforcementClientImpl_LookupResources(t *testing.T) {
 
 			mockClient.On("Search", mock.Anything, mock.Anything).Return(&searchResponse{Data: &tt.permissions}, tt.mockErr)
 
-			got, err := s.LookupResources(context.Background(), tt.idToken, tt.action)
+			got, err := s.LookupResources(context.Background(), tt.namespaceID, tt.action)
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {

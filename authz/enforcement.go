@@ -64,7 +64,7 @@ func NewEnforcementClient(cfg Config, opt ...ClientOption) (*EnforcementClientIm
 }
 
 func (s *EnforcementClientImpl) fetchPermissions(ctx context.Context,
-	namespacedID string, action string, resources ...Resource) (permissions, error) {
+	namespacedID NamespacedID, action string, resources ...Resource) (permissions, error) {
 	var query searchQuery
 
 	if s.queryTemplate != nil && s.queryTemplate.ActionPrefix != "" &&
@@ -94,7 +94,7 @@ func (s *EnforcementClientImpl) fetchPermissions(ctx context.Context,
 	return nil, nil
 }
 
-func (s *EnforcementClientImpl) Compile(ctx context.Context, namespacedID string,
+func (s *EnforcementClientImpl) Compile(ctx context.Context, namespacedID NamespacedID,
 	action string, kinds ...string) (Checker, error) {
 	permissions, err := s.fetchPermissions(ctx, namespacedID, action)
 	if err != nil {
@@ -116,7 +116,7 @@ func resourcesKind(resources ...Resource) []string {
 	return kinds
 }
 
-func (s *EnforcementClientImpl) HasAccess(ctx context.Context, namespacedID string,
+func (s *EnforcementClientImpl) HasAccess(ctx context.Context, namespacedID NamespacedID,
 	action string, resources ...Resource) (bool, error) {
 	permissions, err := s.fetchPermissions(ctx, namespacedID, action, resources...)
 	if err != nil {
@@ -128,7 +128,7 @@ func (s *EnforcementClientImpl) HasAccess(ctx context.Context, namespacedID stri
 
 // Experimental: LookupResources returns the resources that the user has access to for the given action.
 // Resource expansion is still not supported in this method.
-func (s *EnforcementClientImpl) LookupResources(ctx context.Context, namespacedID string, action string) ([]Resource, error) {
+func (s *EnforcementClientImpl) LookupResources(ctx context.Context, namespacedID NamespacedID, action string) ([]Resource, error) {
 	permissions, err := s.fetchPermissions(ctx, namespacedID, action)
 	if err != nil {
 		return nil, err
