@@ -32,12 +32,12 @@ import (
 func main() {
 	verifier := authn.NewIDTokenVerifier(
 		authn.VerifierConfig{AllowedAudiences: []string{}},
-		authn.NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: "<jwks url>"})
+		authn.NewKeyRetriever(authn.KeyRetrieverConfig{SigningKeysURL: "<jwks url>"}),
 	)
 
 	client, err := authz.NewEnforcementClient(authz.Config{
-		APIURL:  "http://localhost:3000",
-		Token:   "<service account token>",
+		APIURL: "http://localhost:3000",
+		Token:  "<service account token>",
 	}, verifier)
 
 	if err != nil {
