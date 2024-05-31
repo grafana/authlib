@@ -42,8 +42,8 @@ func NewKeyRetriever(cfg KeyRetrieverConfig, opt ...DefaultKeyRetrieverOption) *
 	return s
 }
 
-// WithHTTPClient allows setting the HTTP client to be used by the token exchange client.
-func WithHTTPClientRetrieverOpt(client *http.Client) DefaultKeyRetrieverOption {
+// WithHTTPClientKeyRetrieverOpt allows setting the HTTP client to be used by the token exchange client.
+func WithHTTPClientKeyRetrieverOpt(client *http.Client) DefaultKeyRetrieverOption {
 	return func(c *DefaultKeyRetriever) {
 		c.client = client
 	}
