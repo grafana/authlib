@@ -30,11 +30,6 @@ import (
 )
 
 func main() {
-	verifier := authn.NewIDTokenVerifier(
-		authn.VerifierConfig{AllowedAudiences: []string{}},
-		authn.NewKeyRetriever(authn.KeyRetrieverConfig{SigningKeysURL: "<jwks url>"}),
-	)
-
 	client, err := authz.NewEnforcementClient(authz.Config{
 		APIURL: "http://localhost:3000",
 		Token:  "<service account token>",
@@ -44,7 +39,7 @@ func main() {
 		log.Fatal("failed to construct authz client", err)
 	}
 
-	ok, err := client.HasAccess(context.Background(), "<id token>", "users:read", authz.Resource{
+	ok, err := client.HasAccess(context.Background(), "<namespaced id>", "users:read", authz.Resource{
 		Kind: "users",
 		Attr: "id",
 		ID:   "1",

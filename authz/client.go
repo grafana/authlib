@@ -14,7 +14,6 @@ import (
 	goquery "github.com/google/go-querystring/query"
 	"golang.org/x/sync/singleflight"
 
-	"github.com/grafana/authlib/authn"
 	"github.com/grafana/authlib/cache"
 	"github.com/grafana/authlib/internal/httpclient"
 )
@@ -53,13 +52,12 @@ func withCache(cache cache.Cache) clientOption {
 	}
 }
 
-func newClient(cfg Config, tknVerifier *authn.IDTokenVerifier, opts ...clientOption) (*clientImpl, error) {
+func newClient(cfg Config, opts ...clientOption) (*clientImpl, error) {
 	client := &clientImpl{
-		cache:       nil,
-		cfg:         cfg,
-		client:      nil,
-		singlef:     singleflight.Group{},
-		tknVerifier: tknVerifier,
+		cache:   nil,
+		cfg:     cfg,
+		client:  nil,
+		singlef: singleflight.Group{},
 	}
 
 	for _, opt := range opts {
@@ -84,11 +82,10 @@ func newClient(cfg Config, tknVerifier *authn.IDTokenVerifier, opts ...clientOpt
 }
 
 type clientImpl struct {
-	cache       cache.Cache
-	cfg         Config
-	client      HTTPRequestDoer
-	tknVerifier authn.Verifier[authn.IDTokenClaims]
-	singlef     singleflight.Group
+	cache   cache.Cache
+	cfg     Config
+	client  HTTPRequestDoer
+	singlef singleflight.Group
 }
 
 func searchCacheKey(query searchQuery) string {
@@ -101,21 +98,6 @@ func (query *searchQuery) processResource() {
 	if query.Resource != nil {
 		query.Scope = query.Resource.Scope()
 	}
-}
-
-// processIDToken verifies the id token is legit and extracts its subject in the query.NamespacedID.
-func (query *searchQuery) processIDToken(c *clientImpl) error {
-	if query.IdToken != "" {
-		claims, err := c.tknVerifier.Verify(context.Background(), query.IdToken)
-		if err != nil {
-			return fmt.Errorf("%v: %w", ErrInvalidIDToken, err)
-		}
-		if claims.Subject == "" {
-			return fmt.Errorf("%v: %w", ErrInvalidIDToken, errors.New("missing subject (namespacedID) in id token"))
-		}
-		query.NamespacedID = claims.Subject
-	}
-	return nil
 }
 
 // validateQuery checks if the query is valid.
@@ -136,11 +118,6 @@ func (query *searchQuery) validateQuery() error {
 func (c *clientImpl) Search(ctx context.Context, query searchQuery) (*searchResponse, error) {
 	// set scope if resource is provided
 	query.processResource()
-
-	// set namespaced ID if id token is provided
-	if err := query.processIDToken(c); err != nil {
-		return nil, err
-	}
 
 	// validate query
 	if err := query.validateQuery(); err != nil {

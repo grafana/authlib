@@ -12,34 +12,34 @@ import (
 func TestEnforcementClientImpl_fetchPermissions_queryPreload(t *testing.T) {
 	tests := []struct {
 		name         string
-		idToken      string
+		namespacedID string
 		action       string
 		resources    []Resource
 		preloadQuery *searchQuery
 		wantQuery    searchQuery
 	}{
 		{
-			name:      "without preload query",
-			idToken:   "jwt_id_token",
-			action:    "teams:read",
-			resources: []Resource{{Kind: "teams", Attr: "id", ID: "1"}},
+			name:         "without preload query",
+			namespacedID: "user:12",
+			action:       "teams:read",
+			resources:    []Resource{{Kind: "teams", Attr: "id", ID: "1"}},
 			wantQuery: searchQuery{
-				IdToken:  "jwt_id_token",
-				Action:   "teams:read",
-				Resource: &Resource{Kind: "teams", Attr: "id", ID: "1"},
+				NamespacedID: "user:12",
+				Action:       "teams:read",
+				Resource:     &Resource{Kind: "teams", Attr: "id", ID: "1"},
 			},
 		},
 		{
-			name:      "with preload query",
-			idToken:   "jwt_id_token",
-			action:    "teams:read",
-			resources: []Resource{{Kind: "teams", Attr: "id", ID: "1"}},
+			name:         "with preload query",
+			namespacedID: "user:12",
+			action:       "teams:read",
+			resources:    []Resource{{Kind: "teams", Attr: "id", ID: "1"}},
 			preloadQuery: &searchQuery{
 				ActionPrefix: "teams",
 			},
 			wantQuery: searchQuery{
 				ActionPrefix: "teams",
-				IdToken:      "jwt_id_token",
+				NamespacedID: "user:12",
 			},
 		},
 	}
@@ -53,7 +53,7 @@ func TestEnforcementClientImpl_fetchPermissions_queryPreload(t *testing.T) {
 			}
 			mockClient.On("Search", mock.Anything, tt.wantQuery).Return(&searchResponse{Data: &permissionsByID{}}, nil)
 
-			_, err := s.fetchPermissions(context.Background(), tt.idToken, tt.action, tt.resources...)
+			_, err := s.fetchPermissions(context.Background(), tt.namespacedID, tt.action, tt.resources...)
 			require.NoError(t, err)
 		})
 	}
@@ -61,93 +61,93 @@ func TestEnforcementClientImpl_fetchPermissions_queryPreload(t *testing.T) {
 
 func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 	tests := []struct {
-		name        string
-		permissions map[string][]string
-		idToken     string
-		action      string
-		resources   []Resource
-		wantQuery   searchQuery
-		want        bool
+		name         string
+		permissions  map[string][]string
+		namespacedID string
+		action       string
+		resources    []Resource
+		wantQuery    searchQuery
+		want         bool
 	}{
 		{
-			name:    "no permission",
-			idToken: "jwt_id_token",
-			action:  "teams:read",
+			name:         "no permission",
+			namespacedID: "user:12",
+			action:       "teams:read",
 			wantQuery: searchQuery{
-				IdToken: "jwt_id_token",
-				Action:  "teams:read",
+				NamespacedID: "user:12",
+				Action:       "teams:read",
 			},
 			want: false,
 		},
 		{
-			name:        "has action",
-			permissions: map[string][]string{"teams:read": {"teams:id:1", "teams:id:2"}},
-			idToken:     "jwt_id_token",
-			action:      "teams:read",
+			name:         "has action",
+			permissions:  map[string][]string{"teams:read": {"teams:id:1", "teams:id:2"}},
+			namespacedID: "user:12",
+			action:       "teams:read",
 			wantQuery: searchQuery{
-				IdToken: "jwt_id_token",
-				Action:  "teams:read",
+				NamespacedID: "user:12",
+				Action:       "teams:read",
 			},
 			want: true,
 		},
 		{
-			name:        "does not have action",
-			permissions: map[string][]string{"teams:read": {"teams:id:1", "teams:id:2"}}, // only likely with query preload
-			idToken:     "jwt_id_token",
-			action:      "teams:write",
+			name:         "does not have action",
+			permissions:  map[string][]string{"teams:read": {"teams:id:1", "teams:id:2"}}, // only likely with query preload
+			namespacedID: "user:12",
+			action:       "teams:write",
 			wantQuery: searchQuery{
-				IdToken: "jwt_id_token",
-				Action:  "teams:write",
+				NamespacedID: "user:12",
+				Action:       "teams:write",
 			},
 			want: false,
 		},
 		{
-			name:        "has action on scope",
-			permissions: map[string][]string{"teams:read": {"teams:id:1", "teams:id:2"}},
-			idToken:     "jwt_id_token",
-			action:      "teams:read",
-			resources:   []Resource{{Kind: "teams", Attr: "id", ID: "1"}},
+			name:         "has action on scope",
+			permissions:  map[string][]string{"teams:read": {"teams:id:1", "teams:id:2"}},
+			namespacedID: "user:12",
+			action:       "teams:read",
+			resources:    []Resource{{Kind: "teams", Attr: "id", ID: "1"}},
 			wantQuery: searchQuery{
-				IdToken:  "jwt_id_token",
-				Action:   "teams:read",
-				Resource: &Resource{Kind: "teams", Attr: "id", ID: "1"},
+				NamespacedID: "user:12",
+				Action:       "teams:read",
+				Resource:     &Resource{Kind: "teams", Attr: "id", ID: "1"},
 			},
 			want: true,
 		},
 		{
-			name:        "does not have action on scope",
-			permissions: map[string][]string{"teams:read": {"teams:id:1", "teams:id:2"}}, // only likely with query preload
-			idToken:     "jwt_id_token",
-			action:      "teams:read",
-			resources:   []Resource{{Kind: "teams", Attr: "id", ID: "3"}},
+			name:         "does not have action on scope",
+			permissions:  map[string][]string{"teams:read": {"teams:id:1", "teams:id:2"}}, // only likely with query preload
+			namespacedID: "user:12",
+			action:       "teams:read",
+			resources:    []Resource{{Kind: "teams", Attr: "id", ID: "3"}},
 			wantQuery: searchQuery{
-				IdToken:  "jwt_id_token",
-				Action:   "teams:read",
-				Resource: &Resource{Kind: "teams", Attr: "id", ID: "3"},
+				NamespacedID: "user:12",
+				Action:       "teams:read",
+				Resource:     &Resource{Kind: "teams", Attr: "id", ID: "3"},
 			},
 			want: false,
 		},
 		{
-			name:        "has action on any of the scopes",
-			permissions: map[string][]string{"dashboards:read": {"dashboards:uid:1", "folders:uid:2"}},
-			idToken:     "jwt_id_token",
-			action:      "dashboards:read",
-			resources:   []Resource{{Kind: "dashboards", Attr: "uid", ID: "3"}, {Kind: "folders", Attr: "uid", ID: "2"}},
+			name:         "has action on any of the scopes",
+			permissions:  map[string][]string{"dashboards:read": {"dashboards:uid:1", "folders:uid:2"}},
+			namespacedID: "user:12",
+			action:       "dashboards:read",
+			resources:    []Resource{{Kind: "dashboards", Attr: "uid", ID: "3"}, {Kind: "folders", Attr: "uid", ID: "2"}},
 			wantQuery: searchQuery{
-				IdToken: "jwt_id_token",
-				Action:  "dashboards:read",
+				NamespacedID: "user:12",
+				Action:       "dashboards:read",
 			},
 			want: true,
 		},
 		{
-			name:        "does not have action on any of the scopes",
-			permissions: map[string][]string{"dashboards:read": {"dashboards:uid:1", "folders:uid:2"}},
-			idToken:     "jwt_id_token",
-			action:      "dashboards:read",
-			resources:   []Resource{{Kind: "dashboards", Attr: "uid", ID: "3"}, {Kind: "folders", Attr: "uid", ID: "4"}},
+			name:         "does not have action on any of the scopes",
+			permissions:  map[string][]string{"dashboards:read": {"dashboards:uid:1", "folders:uid:2"}},
+			namespacedID: "user:12",
+			action:       "dashboards:read",
+			resources:    []Resource{{Kind: "dashboards", Attr: "uid", ID: "3"}, {Kind: "folders", Attr: "uid", ID: "4"}},
 			wantQuery: searchQuery{
-				IdToken: "jwt_id_token",
-				Action:  "dashboards:read",
+				NamespacedID: "user:12",
+				Action:       "dashboards:read",
 			},
 			want: false,
 		},
@@ -158,7 +158,7 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 			mockClient.On("Search", mock.Anything, tt.wantQuery).Return(&searchResponse{Data: &permissionsByID{1: tt.permissions}}, nil)
 			s := EnforcementClientImpl{client: mockClient}
 
-			got, err := s.HasAccess(context.Background(), tt.idToken, tt.action, tt.resources...)
+			got, err := s.HasAccess(context.Background(), tt.namespacedID, tt.action, tt.resources...)
 			require.NoError(t, err)
 			require.Equal(t, got, tt.want)
 		})

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/grafana/authlib/authn"
 	"github.com/grafana/authlib/cache"
 )
 
@@ -46,7 +45,7 @@ func WithSearchByPrefix(prefix string) ClientOption {
 	}
 }
 
-func NewEnforcementClient(cfg Config, verifier *authn.IDTokenVerifier, opt ...ClientOption) (*EnforcementClientImpl, error) {
+func NewEnforcementClient(cfg Config, opt ...ClientOption) (*EnforcementClientImpl, error) {
 	s := &EnforcementClientImpl{
 		client:        nil,
 		queryTemplate: nil,
@@ -57,7 +56,7 @@ func NewEnforcementClient(cfg Config, verifier *authn.IDTokenVerifier, opt ...Cl
 	}
 
 	var err error
-	if s.client, err = newClient(cfg, verifier, s.clientOpts...); err != nil {
+	if s.client, err = newClient(cfg, s.clientOpts...); err != nil {
 		return nil, err
 	}
 
@@ -65,7 +64,7 @@ func NewEnforcementClient(cfg Config, verifier *authn.IDTokenVerifier, opt ...Cl
 }
 
 func (s *EnforcementClientImpl) fetchPermissions(ctx context.Context,
-	idToken string, action string, resources ...Resource) (permissions, error) {
+	namespacedID string, action string, resources ...Resource) (permissions, error) {
 	var query searchQuery
 
 	if s.queryTemplate != nil && s.queryTemplate.ActionPrefix != "" &&
@@ -79,7 +78,7 @@ func (s *EnforcementClientImpl) fetchPermissions(ctx context.Context,
 		}
 	}
 
-	query.IdToken = idToken
+	query.NamespacedID = namespacedID
 	searchRes, err := s.client.Search(ctx, query)
 	if err != nil || searchRes.Data == nil || len(*searchRes.Data) == 0 {
 		return nil, err
@@ -95,9 +94,9 @@ func (s *EnforcementClientImpl) fetchPermissions(ctx context.Context,
 	return nil, nil
 }
 
-func (s *EnforcementClientImpl) Compile(ctx context.Context, idToken string,
+func (s *EnforcementClientImpl) Compile(ctx context.Context, namespacedID string,
 	action string, kinds ...string) (Checker, error) {
-	permissions, err := s.fetchPermissions(ctx, idToken, action)
+	permissions, err := s.fetchPermissions(ctx, namespacedID, action)
 	if err != nil {
 		return noAccessChecker, err
 	}
@@ -117,9 +116,9 @@ func resourcesKind(resources ...Resource) []string {
 	return kinds
 }
 
-func (s *EnforcementClientImpl) HasAccess(ctx context.Context, idToken string,
+func (s *EnforcementClientImpl) HasAccess(ctx context.Context, namespacedID string,
 	action string, resources ...Resource) (bool, error) {
-	permissions, err := s.fetchPermissions(ctx, idToken, action, resources...)
+	permissions, err := s.fetchPermissions(ctx, namespacedID, action, resources...)
 	if err != nil {
 		return false, err
 	}
@@ -129,8 +128,8 @@ func (s *EnforcementClientImpl) HasAccess(ctx context.Context, idToken string,
 
 // Experimental: LookupResources returns the resources that the user has access to for the given action.
 // Resource expansion is still not supported in this method.
-func (s *EnforcementClientImpl) LookupResources(ctx context.Context, idToken string, action string) ([]Resource, error) {
-	permissions, err := s.fetchPermissions(ctx, idToken, action)
+func (s *EnforcementClientImpl) LookupResources(ctx context.Context, namespacedID string, action string) ([]Resource, error) {
+	permissions, err := s.fetchPermissions(ctx, namespacedID, action)
 	if err != nil {
 		return nil, err
 	}
