@@ -20,6 +20,13 @@ type KeyRetriever interface {
 
 type DefaultKeyRetrieverOption func(*DefaultKeyRetriever)
 
+// WithHTTPClientKeyRetrieverOpt allows setting the HTTP client to be used by the key retriever.
+func WithHTTPClientKeyRetrieverOpt(client *http.Client) DefaultKeyRetrieverOption {
+	return func(c *DefaultKeyRetriever) {
+		c.client = client
+	}
+}
+
 const (
 	cacheTTL             = 10 * time.Minute
 	cacheCleanupInterval = 10 * time.Minute
@@ -40,13 +47,6 @@ func NewKeyRetriever(cfg KeyRetrieverConfig, opt ...DefaultKeyRetrieverOption) *
 		o(s)
 	}
 	return s
-}
-
-// WithHTTPClientKeyRetrieverOpt allows setting the HTTP client to be used by the key retriever.
-func WithHTTPClientKeyRetrieverOpt(client *http.Client) DefaultKeyRetrieverOption {
-	return func(c *DefaultKeyRetriever) {
-		c.client = client
-	}
 }
 
 type DefaultKeyRetriever struct {
