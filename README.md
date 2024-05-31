@@ -33,7 +33,7 @@ func main() {
 	client, err := authz.NewEnforcementClient(authz.Config{
 		APIURL: "http://localhost:3000",
 		Token:  "<service account token>",
-	}, verifier)
+	})
 
 	if err != nil {
 		log.Fatal("failed to construct authz client", err)
