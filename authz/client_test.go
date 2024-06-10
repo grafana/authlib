@@ -30,7 +30,7 @@ func TestClientImpl_Search(t *testing.T) {
 			name:  "NamespacedID user:1 no error",
 			query: searchQuery{Action: "users:read", NamespacedID: "user:1"},
 			want: searchResponse{
-				Data: &permissionsByID{1: {"users:read": {"org.users:*"}}},
+				Data: &permissions{"users:read": {"org.users:*"}},
 			},
 		},
 	}

@@ -2,15 +2,10 @@ package authz
 
 import (
 	"context"
-	"errors"
 	"strings"
 
 	"github.com/grafana/authlib/authn"
 	"github.com/grafana/authlib/cache"
-)
-
-var (
-	ErrTooManyPermissions = errors.New("unexpected number of permissions returned by the server")
 )
 
 var _ EnforcementClient = &EnforcementClientImpl{}
@@ -88,18 +83,11 @@ func (s *EnforcementClientImpl) fetchPermissions(ctx context.Context,
 
 	query.NamespacedID = namespacedID
 	searchRes, err := s.client.Search(ctx, query)
-	if err != nil || searchRes.Data == nil || len(*searchRes.Data) == 0 {
+	if err != nil || searchRes.Data == nil {
 		return nil, err
 	}
 
-	if len(*searchRes.Data) != 1 {
-		return nil, ErrTooManyPermissions
-	}
-
-	for _, perms := range *searchRes.Data {
-		return perms, nil
-	}
-	return nil, nil
+	return *searchRes.Data, nil
 }
 
 func (s *EnforcementClientImpl) Compile(ctx context.Context, namespacedID NamespacedID,

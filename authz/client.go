@@ -22,11 +22,12 @@ import (
 var _ client = &clientImpl{}
 
 var (
-	ErrInvalidQuery     = errors.New("invalid query")
-	ErrInvalidIDToken   = errors.New("invalid id token: cannot extract namespaced ID")
-	ErrInvalidToken     = errors.New("invalid token: cannot query server")
-	ErrInvalidResponse  = errors.New("invalid response from server")
-	ErrUnexpectedStatus = errors.New("unexpected response status")
+	ErrInvalidQuery       = errors.New("invalid query")
+	ErrInvalidIDToken     = errors.New("invalid id token: cannot extract namespaced ID")
+	ErrInvalidToken       = errors.New("invalid token: cannot query server")
+	ErrInvalidResponse    = errors.New("invalid response from server")
+	ErrUnexpectedStatus   = errors.New("unexpected response status")
+	ErrTooManyPermissions = errors.New("unexpected number of permissions returned by the server")
 )
 
 const (
@@ -160,7 +161,7 @@ func (c *clientImpl) Search(ctx context.Context, query searchQuery) (*searchResp
 	}
 
 	if err == nil {
-		perms := permissionsByID{}
+		perms := permissions{}
 		err := gob.NewDecoder(bytes.NewReader(item)).Decode(&perms)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decode cache entry: %w", err)
@@ -205,14 +206,22 @@ func (c *clientImpl) Search(ctx context.Context, query searchQuery) (*searchResp
 		if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
 			return nil, fmt.Errorf("%w: %s", ErrInvalidResponse, err)
 		}
-		return response, nil
+
+		extract := []permissions{}
+		if len(response) > 1 {
+			return nil, fmt.Errorf("%w: response contains more than 1 element, length %d", ErrTooManyPermissions, len(response))
+		}
+		for _, perms := range response {
+			extract = append(extract, perms)
+		}
+		return extract, nil
 	})
 
 	if err != nil {
 		return nil, err
 	}
 
-	perms := res.(permissionsByID)
+	perms := res.(permissions)
 	if err := c.cacheValue(ctx, perms, key); err != nil {
 		return nil, fmt.Errorf("failed to cache response: %w", err)
 	}
@@ -220,7 +229,7 @@ func (c *clientImpl) Search(ctx context.Context, query searchQuery) (*searchResp
 	return &searchResponse{Data: &perms}, nil
 }
 
-func (c *clientImpl) cacheValue(ctx context.Context, perms permissionsByID, key string) error {
+func (c *clientImpl) cacheValue(ctx context.Context, perms permissions, key string) error {
 	buf := bytes.Buffer{}
 	err := gob.NewEncoder(&buf).Encode(perms)
 	if err != nil {

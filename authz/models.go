@@ -40,12 +40,16 @@ type ClientOption func(*EnforcementClientImpl) error
 
 // ClientOption allows setting custom parameters during construction.
 type clientOption func(*clientImpl) error
+
+// ClientOption allows setting custom parameters during construction.
+type grpcClientOption func(*grpcClientImpl) error
+
 type response[T any] struct {
 	Data  *T     `json:"data"`
 	Error string `json:"error"`
 }
 
-type searchResponse response[permissionsByID]
+type searchResponse response[permissions]
 
 // permissionsByID groups permissions (with scopes grouped by action) by user/service-account ID.
 // ex: { 1: { "teams:read": ["teams:id:2", "teams:id:3"] }, 3: { "teams:read": ["teams:id:1", "teams:id:3"] } }
