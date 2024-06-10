@@ -62,10 +62,10 @@ func withCache(cache cache.Cache) clientOption {
 
 func newClient(cfg Config, opts ...clientOption) (*clientImpl, error) {
 	client := &clientImpl{
-		singlef: singleflight.Group{},
-		client:  nil,
 		cache:   nil,
 		cfg:     cfg,
+		client:  nil,
+		singlef: singleflight.Group{},
 	}
 
 	for _, opt := range opts {
@@ -81,8 +81,6 @@ func newClient(cfg Config, opts ...clientOption) (*clientImpl, error) {
 		})
 	}
 
-	client.verifier = authn.NewVerifier[customClaims](authn.VerifierConfig{}, authn.TokenTypeID, authn.NewKeyRetriever(authn.KeyRetrieverConfig{SigningKeysURL: cfg.JWKsURL}))
-
 	// create httpClient, if not already present
 	if client.client == nil {
 		client.client = httpclient.New()
@@ -97,7 +95,6 @@ type clientImpl struct {
 	client       HTTPRequestDoer
 	singlef      singleflight.Group
 	tknExchanger authn.TokenExchanger
-	verifier     authn.Verifier[customClaims]
 }
 
 func searchCacheKey(query searchQuery) string {
@@ -110,21 +107,6 @@ func (query *searchQuery) processResource() {
 	if query.Resource != nil {
 		query.Scope = query.Resource.Scope()
 	}
-}
-
-// processIDToken verifies the id token is legit and extracts its subject in the query.NamespacedID.
-func (query *searchQuery) processIDToken(c *clientImpl) error {
-	if query.IdToken != "" {
-		claims, err := c.verifier.Verify(context.Background(), query.IdToken)
-		if err != nil {
-			return fmt.Errorf("%v: %w", ErrInvalidIDToken, err)
-		}
-		if claims.Subject == "" {
-			return fmt.Errorf("%v: %w", ErrInvalidIDToken, errors.New("missing subject (namespacedID) in id token"))
-		}
-		query.NamespacedID = claims.Subject
-	}
-	return nil
 }
 
 // validateQuery checks if the query is valid.
@@ -164,11 +146,6 @@ func (c *clientImpl) getToken(ctx context.Context) (string, error) {
 func (c *clientImpl) Search(ctx context.Context, query searchQuery) (*searchResponse, error) {
 	// set scope if resource is provided
 	query.processResource()
-
-	// set namespaced ID if id token is provided
-	if err := query.processIDToken(c); err != nil {
-		return nil, err
-	}
 
 	// validate query
 	if err := query.validateQuery(); err != nil {

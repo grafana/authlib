@@ -40,7 +40,7 @@ func TestClientImpl_Search(t *testing.T) {
 			d := []byte{}
 			if tt.query.Action != "" {
 				// Using a string instead of an int on purpose as this is what is returned by the API.
-				d, _ = json.Marshal(map[string]map[string][]string{fmt.Sprintf("%v", strings.Split(tt.query.NamespacedID, ":")[1]): {tt.query.Action: perms[tt.query.Action]}})
+				d, _ = json.Marshal(map[string]map[string][]string{fmt.Sprintf("%v", strings.Split(string(tt.query.NamespacedID), ":")[1]): {tt.query.Action: perms[tt.query.Action]}})
 			}
 			require.Equal(t, r.Header.Get("Authorization"), "Bearer aabbcc")
 			require.Equal(t, r.URL.Path, searchPath)
