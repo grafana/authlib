@@ -70,16 +70,16 @@ func (c *grpcClientImpl) Search(ctx context.Context, query searchQuery) (*search
 	scope := query.Scope
 	query.Scope = ""
 
+	if query.ActionPrefix != "" {
+		return nil, fmt.Errorf("%w: %v", ErrUnsupported, "'actionPrefix' is not supported in grpc client")
+	}
+
 	// set scope if resource is provided
 	query.processResource()
 
 	// validate query
 	if err := query.validateQuery(); err != nil {
 		return nil, err
-	}
-
-	if query.ActionPrefix != "" {
-		return nil, fmt.Errorf("%w: %v", ErrUnsupported, "'actionPrefix' is not supported in grpc client")
 	}
 
 	key := searchCacheKey(query)
