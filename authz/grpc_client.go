@@ -95,7 +95,7 @@ func (c *grpcClientImpl) Search(ctx context.Context, query searchQuery) (*search
 	}
 
 	if query.ActionPrefix != "" {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidQuery, "'actionPrefix' is not supported in grpc client")
+		return nil, fmt.Errorf("%w: %v", ErrUnsupported, "'actionPrefix' is not supported in grpc client")
 	}
 
 	key := searchCacheKey(query)

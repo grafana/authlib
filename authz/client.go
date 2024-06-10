@@ -23,6 +23,7 @@ var _ client = &clientImpl{}
 
 var (
 	ErrInvalidQuery       = errors.New("invalid query")
+	ErrUnsupported        = errors.New("unsupported query")
 	ErrInvalidIDToken     = errors.New("invalid id token: cannot extract namespaced ID")
 	ErrInvalidToken       = errors.New("invalid token: cannot query server")
 	ErrInvalidResponse    = errors.New("invalid response from server")
