@@ -3,15 +3,14 @@ package authz
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/grafana/authlib/authn"
 	"github.com/grafana/authlib/cache"
 )
 
@@ -28,7 +27,7 @@ func TestClientImpl_Search(t *testing.T) {
 	}{
 		{
 			name:  "NamespacedID user:1 no error",
-			query: searchQuery{Action: "users:read", NamespacedID: "user:1"},
+			query: searchQuery{Action: "users:read", NamespacedID: authn.NewNamespacedID("user", 1)},
 			want: searchResponse{
 				Data: &permissions{"users:read": {"org.users:*"}},
 			},
@@ -40,7 +39,8 @@ func TestClientImpl_Search(t *testing.T) {
 			d := []byte{}
 			if tt.query.Action != "" {
 				// Using a string instead of an int on purpose as this is what is returned by the API.
-				d, _ = json.Marshal(map[string]map[string][]string{fmt.Sprintf("%v", strings.Split(string(tt.query.NamespacedID), ":")[1]): {tt.query.Action: perms[tt.query.Action]}})
+				d, _ = json.Marshal(map[string]map[string][]string{
+					tt.query.NamespacedID.ID(): {tt.query.Action: perms[tt.query.Action]}})
 			}
 			require.Equal(t, r.Header.Get("Authorization"), "Bearer aabbcc")
 			require.Equal(t, r.URL.Path, searchPath)

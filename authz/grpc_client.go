@@ -110,7 +110,7 @@ func (c *grpcClientImpl) Search(ctx context.Context, query searchQuery) (*search
 		ctx := metadata.NewOutgoingContext(ctx, metadata.Pairs("authorization", token))
 
 		res, err := c.client.Read(ctx, &authzv1.ReadRequest{
-			Subject: string(query.NamespacedID),
+			Subject: query.NamespacedID.String(),
 			Action:  query.Action,
 			// StackId: , TODO
 		})

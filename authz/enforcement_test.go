@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/grafana/authlib/authn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -12,7 +13,7 @@ import (
 func TestEnforcementClientImpl_fetchPermissions_queryPreload(t *testing.T) {
 	tests := []struct {
 		name         string
-		namespacedID NamespacedID
+		namespacedID authn.NamespacedID
 		action       string
 		resources    []Resource
 		preloadQuery *searchQuery
@@ -20,18 +21,18 @@ func TestEnforcementClientImpl_fetchPermissions_queryPreload(t *testing.T) {
 	}{
 		{
 			name:         "without preload query",
-			namespacedID: "user:12",
+			namespacedID: authn.NewNamespacedID("user", 12),
 			action:       "teams:read",
 			resources:    []Resource{{Kind: "teams", Attr: "id", ID: "1"}},
 			wantQuery: searchQuery{
-				NamespacedID: "user:12",
+				NamespacedID: authn.NewNamespacedID("user", 12),
 				Action:       "teams:read",
 				Resource:     &Resource{Kind: "teams", Attr: "id", ID: "1"},
 			},
 		},
 		{
 			name:         "with preload query",
-			namespacedID: "user:12",
+			namespacedID: authn.NewNamespacedID("user", 12),
 			action:       "teams:read",
 			resources:    []Resource{{Kind: "teams", Attr: "id", ID: "1"}},
 			preloadQuery: &searchQuery{
@@ -39,7 +40,7 @@ func TestEnforcementClientImpl_fetchPermissions_queryPreload(t *testing.T) {
 			},
 			wantQuery: searchQuery{
 				ActionPrefix: "teams",
-				NamespacedID: "user:12",
+				NamespacedID: authn.NewNamespacedID("user", 12),
 			},
 		},
 	}
@@ -63,7 +64,7 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 	tests := []struct {
 		name         string
 		permissions  permissions
-		namespacedID NamespacedID
+		namespacedID authn.NamespacedID
 		action       string
 		resources    []Resource
 		wantQuery    searchQuery
@@ -71,10 +72,10 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 	}{
 		{
 			name:         "no permission",
-			namespacedID: "user:12",
+			namespacedID: authn.NewNamespacedID("user", 12),
 			action:       "teams:read",
 			wantQuery: searchQuery{
-				NamespacedID: "user:12",
+				NamespacedID: authn.NewNamespacedID("user", 12),
 				Action:       "teams:read",
 			},
 			want: false,
@@ -82,10 +83,10 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 		{
 			name:         "has action",
 			permissions:  map[string][]string{"teams:read": {"teams:id:1", "teams:id:2"}},
-			namespacedID: "user:12",
+			namespacedID: authn.NewNamespacedID("user", 12),
 			action:       "teams:read",
 			wantQuery: searchQuery{
-				NamespacedID: "user:12",
+				NamespacedID: authn.NewNamespacedID("user", 12),
 				Action:       "teams:read",
 			},
 			want: true,
@@ -93,10 +94,10 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 		{
 			name:         "does not have action",
 			permissions:  map[string][]string{"teams:read": {"teams:id:1", "teams:id:2"}}, // only likely with query preload
-			namespacedID: "user:12",
+			namespacedID: authn.NewNamespacedID("user", 12),
 			action:       "teams:write",
 			wantQuery: searchQuery{
-				NamespacedID: "user:12",
+				NamespacedID: authn.NewNamespacedID("user", 12),
 				Action:       "teams:write",
 			},
 			want: false,
@@ -104,11 +105,11 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 		{
 			name:         "has action on scope",
 			permissions:  map[string][]string{"teams:read": {"teams:id:1", "teams:id:2"}},
-			namespacedID: "user:12",
+			namespacedID: authn.NewNamespacedID("user", 12),
 			action:       "teams:read",
 			resources:    []Resource{{Kind: "teams", Attr: "id", ID: "1"}},
 			wantQuery: searchQuery{
-				NamespacedID: "user:12",
+				NamespacedID: authn.NewNamespacedID("user", 12),
 				Action:       "teams:read",
 				Resource:     &Resource{Kind: "teams", Attr: "id", ID: "1"},
 			},
@@ -117,11 +118,11 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 		{
 			name:         "does not have action on scope",
 			permissions:  map[string][]string{"teams:read": {"teams:id:1", "teams:id:2"}}, // only likely with query preload
-			namespacedID: "user:12",
+			namespacedID: authn.NewNamespacedID("user", 12),
 			action:       "teams:read",
 			resources:    []Resource{{Kind: "teams", Attr: "id", ID: "3"}},
 			wantQuery: searchQuery{
-				NamespacedID: "user:12",
+				NamespacedID: authn.NewNamespacedID("user", 12),
 				Action:       "teams:read",
 				Resource:     &Resource{Kind: "teams", Attr: "id", ID: "3"},
 			},
@@ -130,11 +131,11 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 		{
 			name:         "has action on any of the scopes",
 			permissions:  map[string][]string{"dashboards:read": {"dashboards:uid:1", "folders:uid:2"}},
-			namespacedID: "user:12",
+			namespacedID: authn.NewNamespacedID("user", 12),
 			action:       "dashboards:read",
 			resources:    []Resource{{Kind: "dashboards", Attr: "uid", ID: "3"}, {Kind: "folders", Attr: "uid", ID: "2"}},
 			wantQuery: searchQuery{
-				NamespacedID: "user:12",
+				NamespacedID: authn.NewNamespacedID("user", 12),
 				Action:       "dashboards:read",
 			},
 			want: true,
@@ -142,11 +143,11 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 		{
 			name:         "does not have action on any of the scopes",
 			permissions:  map[string][]string{"dashboards:read": {"dashboards:uid:1", "folders:uid:2"}},
-			namespacedID: "user:12",
+			namespacedID: authn.NewNamespacedID("user", 12),
 			action:       "dashboards:read",
 			resources:    []Resource{{Kind: "dashboards", Attr: "uid", ID: "3"}, {Kind: "folders", Attr: "uid", ID: "4"}},
 			wantQuery: searchQuery{
-				NamespacedID: "user:12",
+				NamespacedID: authn.NewNamespacedID("user", 12),
 				Action:       "dashboards:read",
 			},
 			want: false,
@@ -168,7 +169,7 @@ func TestEnforcementClientImpl_HasAccess(t *testing.T) {
 func TestEnforcementClientImpl_LookupResources(t *testing.T) {
 	tests := []struct {
 		name        string
-		namespaceID NamespacedID
+		namespaceID authn.NamespacedID
 		action      string
 		permissions permissions
 		want        []Resource
@@ -177,7 +178,7 @@ func TestEnforcementClientImpl_LookupResources(t *testing.T) {
 	}{
 		{
 			name:        "no permissions",
-			namespaceID: "user:12",
+			namespaceID: authn.NewNamespacedID("user", 12),
 			action:      "teams:read",
 			permissions: permissions{},
 			want:        []Resource{},
@@ -185,7 +186,7 @@ func TestEnforcementClientImpl_LookupResources(t *testing.T) {
 		},
 		{
 			name:        "permission filtering works",
-			namespaceID: "user:12",
+			namespaceID: authn.NewNamespacedID("user", 12),
 			action:      "teams:write",
 			permissions: permissions{
 				"teams:read": {"teams:id:1", "teams:id:2"},
@@ -195,7 +196,7 @@ func TestEnforcementClientImpl_LookupResources(t *testing.T) {
 		},
 		{
 			name:        "has permissions",
-			namespaceID: "user:12",
+			namespaceID: authn.NewNamespacedID("user", 12),
 			action:      "teams:read",
 			permissions: permissions{
 				"teams:read": {"teams:id:1", "teams:id:2"},
@@ -208,7 +209,7 @@ func TestEnforcementClientImpl_LookupResources(t *testing.T) {
 		},
 		{
 			name:        "has permissions wildcard",
-			namespaceID: "user:12",
+			namespaceID: authn.NewNamespacedID("user", 12),
 			action:      "folders:read",
 			permissions: permissions{
 				"folders:read": {"folders:*"},
@@ -220,7 +221,7 @@ func TestEnforcementClientImpl_LookupResources(t *testing.T) {
 		},
 		{
 			name:        "error fetching permissions",
-			namespaceID: "user:12",
+			namespaceID: authn.NewNamespacedID("user", 12),
 			action:      "teams:read",
 			permissions: permissions{},
 			mockErr:     ErrTooManyPermissions,

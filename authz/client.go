@@ -120,11 +120,14 @@ func (query *searchQuery) processResource() {
 // validateQuery checks if the query is valid.
 func (query *searchQuery) validateQuery() error {
 	// Validate inputs
+	if !query.NamespacedID.IsValid() {
+		return fmt.Errorf("%w: %v", ErrInvalidQuery, "namespaced ID is required")
+	}
 	if (query.ActionPrefix != "") && (query.Action != "") {
 		return fmt.Errorf("%w: %v", ErrInvalidQuery,
 			"'action' and 'actionPrefix' are mutually exclusive")
 	}
-	if query.NamespacedID == "" && query.ActionPrefix == "" && query.Action == "" {
+	if query.ActionPrefix == "" && query.Action == "" {
 		return fmt.Errorf("%w: %v", ErrInvalidQuery,
 			"at least one search option must be provided")
 	}
@@ -195,12 +198,12 @@ func (c *clientImpl) Search(ctx context.Context, query searchQuery) (*searchResp
 			return nil, fmt.Errorf("%w: %s", ErrInvalidResponse, err)
 		}
 
-		extract := []permissions{}
+		extract := permissions{}
 		if len(response) > 1 {
 			return nil, fmt.Errorf("%w: response contains more than 1 element, length %d", ErrTooManyPermissions, len(response))
 		}
 		for _, perms := range response {
-			extract = append(extract, perms)
+			extract = perms
 		}
 		return extract, nil
 	})

@@ -16,6 +16,8 @@ var (
 
 	ErrExpiredToken    = fmt.Errorf("%w: expired token", errInvalidToken)
 	ErrInvalidAudience = fmt.Errorf("%w: invalid audience", errInvalidToken)
+
+	ErrInvalidNamespacedID = fmt.Errorf("%w: invalid namespaced id", errInvalidToken)
 )
 
 func IsInvalidTokenErr(err error) bool {
