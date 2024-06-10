@@ -85,6 +85,7 @@ type searchQuery struct {
 	Scope        string             `json:"scope,omitempty" url:"scope,omitempty"`
 	NamespacedID authn.NamespacedID `json:"namespacedId" url:"namespacedId,omitempty"`
 	Resource     *Resource          `json:"-" url:"-"`
+	StackID      int64              `json:"stackId,omitempty" url:"stackId,omitempty"`
 }
 
 type TokenProviderFunc func(ctx context.Context) (string, error)

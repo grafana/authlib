@@ -74,6 +74,10 @@ func (c *grpcClientImpl) Search(ctx context.Context, query searchQuery) (*search
 		return nil, fmt.Errorf("%w: %v", ErrUnsupported, "'actionPrefix' is not supported in grpc client")
 	}
 
+	if query.StackID == 0 {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidQuery, "stack ID is required")
+	}
+
 	// set scope if resource is provided
 	query.processResource()
 
@@ -112,7 +116,7 @@ func (c *grpcClientImpl) Search(ctx context.Context, query searchQuery) (*search
 		res, err := c.client.Read(ctx, &authzv1.ReadRequest{
 			Subject: query.NamespacedID.String(),
 			Action:  query.Action,
-			// StackId: , TODO
+			StackId: query.StackID,
 		})
 		if err != nil {
 			return nil, err
