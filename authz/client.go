@@ -14,7 +14,6 @@ import (
 	goquery "github.com/google/go-querystring/query"
 	"golang.org/x/sync/singleflight"
 
-	"github.com/grafana/authlib/authn"
 	"github.com/grafana/authlib/cache"
 	"github.com/grafana/authlib/internal/httpclient"
 )
@@ -36,9 +35,10 @@ const (
 	searchPath = "/api/access-control/users/permissions/search"
 )
 
-func withTokenExchanger(exchanger authn.TokenExchanger) clientOption {
+func withTokenProvider(provider TokenProviderFunc) clientOption {
 	return func(c *clientImpl) error {
-		c.tknExchanger = exchanger
+		c.getToken = provider
+
 		return nil
 	}
 }
@@ -88,15 +88,21 @@ func newClient(cfg Config, opts ...clientOption) (*clientImpl, error) {
 		client.client = httpclient.New()
 	}
 
+	if client.getToken == nil {
+		client.getToken = func(_ context.Context) (string, error) {
+			return cfg.Token, nil
+		}
+	}
+
 	return client, nil
 }
 
 type clientImpl struct {
-	cache        cache.Cache
-	cfg          Config
-	client       HTTPRequestDoer
-	singlef      singleflight.Group
-	tknExchanger authn.TokenExchanger
+	cache    cache.Cache
+	cfg      Config
+	client   HTTPRequestDoer
+	singlef  singleflight.Group
+	getToken TokenProviderFunc
 }
 
 func searchCacheKey(query searchQuery) string {
@@ -123,25 +129,6 @@ func (query *searchQuery) validateQuery() error {
 			"at least one search option must be provided")
 	}
 	return nil
-}
-
-func (c *clientImpl) getToken(ctx context.Context) (string, error) {
-	// return token if no token exchanger is provided
-	if c.tknExchanger == nil {
-		return c.cfg.Token, nil
-	}
-
-	// TODO: add namespace and audiences
-	tkn, err := c.tknExchanger.Exchange(ctx, authn.TokenExchangeRequest{
-		Namespace: "",
-		Audiences: []string{"grafana"},
-	})
-
-	if err != nil {
-		return "", err
-	}
-
-	return tkn.Token, nil
 }
 
 // Search returns the permissions for the given query.

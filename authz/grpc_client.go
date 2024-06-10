@@ -12,7 +12,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
-	"github.com/grafana/authlib/authn"
 	authzv1 "github.com/grafana/authlib/authz/proto/v1"
 	"github.com/grafana/authlib/cache"
 )
@@ -22,7 +21,6 @@ var _ client = &grpcClientImpl{}
 func newGRPCClient(cfg Config, opts ...grpcClientOption) (*grpcClientImpl, error) {
 	client := &grpcClientImpl{
 		cache:   nil,
-		cfg:     cfg,
 		client:  nil,
 		singlef: singleflight.Group{},
 	}
@@ -49,34 +47,20 @@ func newGRPCClient(cfg Config, opts ...grpcClientOption) (*grpcClientImpl, error
 		client.client = authzv1.NewAuthzServiceClient(grpcClient)
 	}
 
+	if client.getToken == nil {
+		client.getToken = func(ctx context.Context) (string, error) {
+			return cfg.Token, nil
+		}
+	}
+
 	return client, nil
 }
 
 type grpcClientImpl struct {
-	cache        cache.Cache
-	cfg          Config
-	client       authzv1.AuthzServiceClient
-	singlef      singleflight.Group
-	tknExchanger authn.TokenExchanger
-}
-
-func (c *grpcClientImpl) getToken(ctx context.Context) (string, error) {
-	// return token if no token exchanger is provided
-	if c.tknExchanger == nil {
-		return c.cfg.Token, nil
-	}
-
-	// TODO: add namespace and audiences
-	tkn, err := c.tknExchanger.Exchange(ctx, authn.TokenExchangeRequest{
-		Namespace: "",
-		Audiences: []string{"grafana"},
-	})
-
-	if err != nil {
-		return "", err
-	}
-
-	return tkn.Token, nil
+	cache    cache.Cache
+	client   authzv1.AuthzServiceClient
+	singlef  singleflight.Group
+	getToken TokenProviderFunc
 }
 
 // Search returns the permissions for the given query.

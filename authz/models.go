@@ -86,3 +86,5 @@ type searchQuery struct {
 	NamespacedID NamespacedID `json:"namespacedId" url:"namespacedId,omitempty"`
 	Resource     *Resource    `json:"-" url:"-"`
 }
+
+type TokenProviderFunc func(ctx context.Context) (string, error)

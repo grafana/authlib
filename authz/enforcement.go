@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/grafana/authlib/authn"
 	"github.com/grafana/authlib/cache"
 )
 
@@ -41,9 +40,9 @@ func WithSearchByPrefix(prefix string) ClientOption {
 	}
 }
 
-func WithTokenExchanger(exchanger authn.TokenExchanger) ClientOption {
+func WithTokenProvider(provider TokenProviderFunc) ClientOption {
 	return func(s *EnforcementClientImpl) error {
-		s.clientOpts = append(s.clientOpts, withTokenExchanger(exchanger))
+		s.clientOpts = append(s.clientOpts, withTokenProvider(provider))
 		return nil
 	}
 }
