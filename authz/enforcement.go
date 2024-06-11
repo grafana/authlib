@@ -14,7 +14,15 @@ type EnforcementClientImpl struct {
 	client        client
 	queryTemplate *searchQuery
 	clientOpts    []clientOption
+	// grpcClientOpts []grpcClientOption
 }
+
+// func WithGRPCClient(client authzv1.AuthzServiceClient) ClientOption {
+// 	return func(s *EnforcementClientImpl) error {
+// 		s.grpcClientOpts = append(s.grpcClientOpts, with)
+// 		return nil
+// 	}
+// }
 
 func WithHTTPClient(doer HTTPRequestDoer) ClientOption {
 	return func(s *EnforcementClientImpl) error {

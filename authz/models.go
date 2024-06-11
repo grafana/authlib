@@ -60,8 +60,9 @@ type permissionsByID map[int64]permissions
 type permissions map[string][]string
 
 type Config struct {
-	APIURL string
-	Token  string
+	APIURL  string
+	Token   string
+	StackID int64
 }
 
 // Resource represents a resource in Grafana.
@@ -85,7 +86,6 @@ type searchQuery struct {
 	Scope        string             `json:"scope,omitempty" url:"scope,omitempty"`
 	NamespacedID authn.NamespacedID `json:"namespacedId" url:"namespacedId,omitempty"`
 	Resource     *Resource          `json:"-" url:"-"`
-	StackID      int64              `json:"stackId,omitempty" url:"stackId,omitempty"`
 }
 
 type TokenProviderFunc func(ctx context.Context) (string, error)

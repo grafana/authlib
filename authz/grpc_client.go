@@ -21,6 +21,7 @@ var _ client = &grpcClientImpl{}
 func newGRPCClient(cfg Config, opts ...grpcClientOption) (*grpcClientImpl, error) {
 	client := &grpcClientImpl{
 		cache:   nil,
+		cfg:     cfg,
 		client:  nil,
 		singlef: singleflight.Group{},
 	}
@@ -38,7 +39,7 @@ func newGRPCClient(cfg Config, opts ...grpcClientOption) (*grpcClientImpl, error
 		})
 	}
 
-	// create httpClient, if not already present
+	// Default client
 	if client.client == nil {
 		grpcClient, err := grpc.NewClient(cfg.APIURL)
 		if err != nil {
@@ -47,10 +48,15 @@ func newGRPCClient(cfg Config, opts ...grpcClientOption) (*grpcClientImpl, error
 		client.client = authzv1.NewAuthzServiceClient(grpcClient)
 	}
 
+	// Default token provider
 	if client.getToken == nil {
 		client.getToken = func(ctx context.Context) (string, error) {
 			return cfg.Token, nil
 		}
+	}
+
+	if client.cfg.StackID <= 0 {
+		return nil, fmt.Errorf("stack id is required")
 	}
 
 	return client, nil
@@ -58,6 +64,7 @@ func newGRPCClient(cfg Config, opts ...grpcClientOption) (*grpcClientImpl, error
 
 type grpcClientImpl struct {
 	cache    cache.Cache
+	cfg      Config
 	client   authzv1.AuthzServiceClient
 	singlef  singleflight.Group
 	getToken TokenProviderFunc
@@ -72,10 +79,6 @@ func (c *grpcClientImpl) Search(ctx context.Context, query searchQuery) (*search
 
 	if query.ActionPrefix != "" {
 		return nil, fmt.Errorf("%w: %v", ErrUnsupported, "'actionPrefix' is not supported in grpc client")
-	}
-
-	if query.StackID == 0 {
-		return nil, fmt.Errorf("%w: %v", ErrInvalidQuery, "stack ID is required")
 	}
 
 	// set scope if resource is provided
@@ -116,7 +119,7 @@ func (c *grpcClientImpl) Search(ctx context.Context, query searchQuery) (*search
 		res, err := c.client.Read(ctx, &authzv1.ReadRequest{
 			Subject: query.NamespacedID.String(),
 			Action:  query.Action,
-			StackId: query.StackID,
+			StackId: c.cfg.StackID,
 		})
 		if err != nil {
 			return nil, err
