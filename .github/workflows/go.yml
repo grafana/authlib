@@ -23,8 +23,8 @@ jobs:
       - name: Build
         run: go build -v ./...
 
-      - name: Proto generate
-        uses: bufbuild/buf-setup-action@v2
+      - name: Buf generate
+        uses: bufbuild/buf-setup-action@v1.32.2
 
       - name: Test
         run: go test -v ./...
