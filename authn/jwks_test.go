@@ -24,7 +24,7 @@ func keys() []byte {
 	return data
 }
 
-func TestKeyService_Get(t *testing.T) {
+func TestDefaultKeyRetriever_Get(t *testing.T) {
 	var calls int
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -32,7 +32,9 @@ func TestKeyService_Get(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		w.Write(keys())
 	}))
-	service := newKeyService(server.URL)
+	service := NewKeyRetriever(KeyRetrieverConfig{
+		SigningKeysURL: server.URL,
+	})
 
 	t.Run("should fetched key if not cached", func(t *testing.T) {
 		key, err := service.Get(context.Background(), firstKeyID)

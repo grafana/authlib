@@ -3,12 +3,10 @@ package authz
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
 	"encoding/gob"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -17,7 +15,8 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/grafana/authlib/authn"
-	"github.com/grafana/authlib/internal/cache"
+	"github.com/grafana/authlib/cache"
+	"github.com/grafana/authlib/internal/httpclient"
 )
 
 var _ client = &clientImpl{}
@@ -76,27 +75,11 @@ func newClient(cfg Config, opts ...clientOption) (*clientImpl, error) {
 		})
 	}
 
-	client.verifier = authn.NewVerifier[customClaims](authn.IDVerifierConfig{SigningKeysURL: cfg.JWKsURL})
+	client.verifier = authn.NewVerifier[customClaims](authn.VerifierConfig{}, authn.TokenTypeID, authn.NewKeyRetriever(authn.KeyRetrieverConfig{SigningKeysURL: cfg.JWKsURL}))
 
 	// create httpClient, if not already present
 	if client.client == nil {
-		client.client = &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{
-					Renegotiation: tls.RenegotiateFreelyAsClient,
-				},
-				Proxy: http.ProxyFromEnvironment,
-				DialContext: (&net.Dialer{
-					Timeout:   4 * time.Second,
-					KeepAlive: 15 * time.Second,
-				}).DialContext,
-				TLSHandshakeTimeout:   10 * time.Second,
-				ExpectContinueTimeout: 1 * time.Second,
-				MaxIdleConns:          100,
-				IdleConnTimeout:       30 * time.Second,
-			},
-			Timeout: 20 * time.Second,
-		}
+		client.client = httpclient.New()
 	}
 
 	return client, nil

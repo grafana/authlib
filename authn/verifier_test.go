@@ -68,13 +68,15 @@ func TestVerifier_Verify(t *testing.T) {
 
 	type CustomClaims struct{}
 
-	verifier := NewVerifier[CustomClaims](IDVerifierConfig{
-		SigningKeysURL: server.URL,
-	})
+	verifier := NewVerifier[CustomClaims](
+		VerifierConfig{},
+		TokenTypeID,
+		NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
+	)
 
 	t.Run("invalid: wrong token format", func(t *testing.T) {
 		claims, err := verifier.Verify(context.Background(), "not a jwt token")
-		assert.ErrorIs(t, err, ErrPraseToken)
+		assert.ErrorIs(t, err, ErrParseToken)
 		assert.Nil(t, claims)
 	})
 
@@ -85,9 +87,11 @@ func TestVerifier_Verify(t *testing.T) {
 	})
 
 	t.Run("invalid: transient http error", func(t *testing.T) {
-		verifier := NewVerifier[CustomClaims](IDVerifierConfig{
-			SigningKeysURL: "http://localhost:8000/v1/unknown",
-		})
+		verifier := NewVerifier[CustomClaims](
+			VerifierConfig{},
+			TokenTypeID,
+			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: "http://localhost:8000/v1/unknown"}),
+		)
 		claims, err := verifier.Verify(context.Background(), signFist(t))
 		assert.ErrorIs(t, err, ErrFetchingSigningKey)
 		assert.Nil(t, claims)
@@ -97,9 +101,12 @@ func TestVerifier_Verify(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusInternalServerError)
 		}))
-		verifier := NewVerifier[CustomClaims](IDVerifierConfig{
-			SigningKeysURL: server.URL,
-		})
+
+		verifier := NewVerifier[CustomClaims](
+			VerifierConfig{},
+			TokenTypeID,
+			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
+		)
 		claims, err := verifier.Verify(context.Background(), signFist(t))
 		assert.ErrorIs(t, err, ErrFetchingSigningKey)
 		assert.Nil(t, claims)
@@ -117,38 +124,55 @@ func TestVerifier_Verify(t *testing.T) {
 			w.Write([]byte(response))
 		}))
 
-		verifier := NewVerifier[CustomClaims](IDVerifierConfig{
-			SigningKeysURL: server.URL,
-		})
+		verifier := NewVerifier[CustomClaims](
+			VerifierConfig{},
+			TokenTypeID,
+			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
+		)
 		claims, err := verifier.Verify(context.Background(), signSecond(t))
 		assert.ErrorIs(t, err, ErrInvalidSigningKey)
 		assert.Nil(t, claims)
 	})
 
 	t.Run("invalid: token audience not allowed", func(t *testing.T) {
-		verifier := NewVerifier[CustomClaims](IDVerifierConfig{
-			SigningKeysURL:   server.URL,
-			AllowedAudiences: []string{"stack:2"},
-		})
+		verifier := NewVerifier[CustomClaims](
+			VerifierConfig{AllowedAudiences: []string{"stack:2"}},
+			TokenTypeID,
+			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
+		)
 		claims, err := verifier.Verify(context.Background(), signFist(t))
 		assert.ErrorIs(t, err, ErrInvalidAudience)
 		assert.Nil(t, claims)
 	})
 
 	t.Run("invalid: token expired", func(t *testing.T) {
-		verifier := NewVerifier[CustomClaims](IDVerifierConfig{
-			SigningKeysURL: server.URL,
-		})
+		verifier := NewVerifier[CustomClaims](
+			VerifierConfig{},
+			TokenTypeID,
+			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
+		)
 		claims, err := verifier.Verify(context.Background(), signExpired(t))
 		assert.ErrorIs(t, err, ErrExpiredToken)
 		assert.Nil(t, claims)
 	})
 
+	t.Run("invalid: wrong token typ", func(t *testing.T) {
+		verifier := NewVerifier[CustomClaims](
+			VerifierConfig{},
+			TokenTypeAccess,
+			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
+		)
+		claims, err := verifier.Verify(context.Background(), signFist(t))
+		assert.ErrorIs(t, err, ErrInvalidTokenType)
+		assert.Nil(t, claims)
+	})
+
 	t.Run("valid: token audience allowed", func(t *testing.T) {
-		verifier := NewVerifier[CustomClaims](IDVerifierConfig{
-			SigningKeysURL:   server.URL,
-			AllowedAudiences: []string{"stack:1"},
-		})
+		verifier := NewVerifier[CustomClaims](
+			VerifierConfig{AllowedAudiences: []string{"stack:1"}},
+			TokenTypeID,
+			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
+		)
 		claims, err := verifier.Verify(context.Background(), signFist(t))
 		assert.NoError(t, err)
 		assert.NotNil(t, claims)
@@ -183,6 +207,7 @@ func signToken(t *testing.T, keyID string, key *ecdsa.PrivateKey, exp time.Time)
 	}, &jose.SignerOptions{
 		ExtraHeaders: map[jose.HeaderKey]interface{}{
 			"kid": keyID,
+			"typ": TokenTypeID,
 		},
 	})
 	require.NoError(t, err)

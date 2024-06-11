@@ -5,24 +5,48 @@ name: Go
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
-
   build:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.21.x'
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.21.x"
 
-    - name: Build
-      run: go build -v ./...
+      - name: Build
+        run: go build -v ./...
 
-    - name: Test
-      run: go test -v ./...
+      - name: Test
+        run: go test -v ./...
+
+  codegen:
+    name: Codegen
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install buf
+        uses: bufbuild/buf-setup-action@v1
+      - name: Generate protobuf
+        run: buf generate
+      - name: Check for git diff
+        run: |
+          if [[ `git status --porcelain` ]]; then
+            git status
+            exit 1
+          fi
+      - name: Format protobuf
+        run: buf format --write
+      - name: Check for git diff
+        run: |
+          if [[ `git status --porcelain` ]]; then
+            git status
+            exit 1
+          fi
