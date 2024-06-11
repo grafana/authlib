@@ -23,8 +23,30 @@ jobs:
       - name: Build
         run: go build -v ./...
 
-      - name: Buf generate
-        uses: bufbuild/buf-setup-action@v1.32.2
-
       - name: Test
         run: go test -v ./...
+
+  codegen:
+    name: Codegen
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install buf
+        uses: bufbuild/buf-setup-action@v1
+      - name: Generate protobuf
+        run: buf generate
+      - name: Check for git diff
+        run: |
+          if [[ `git status --porcelain` ]]; then
+            git status
+            exit 1
+          fi
+      - name: Format protobuf
+        run: buf format --write
+      - name: Check for git diff
+        run: |
+          if [[ `git status --porcelain` ]]; then
+            git status
+            exit 1
+          fi
