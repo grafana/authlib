@@ -133,7 +133,7 @@ func (query *searchQuery) processIDToken(c *clientImpl) error {
 			return fmt.Errorf("%v: %w", ErrInvalidIDToken, errors.New("missing subject (namespacedID) in id token"))
 		}
 		query.NamespacedID = claims.Subject
-		if strings.Contains(query.NamespacedID, "api-key") {
+		if !(strings.HasPrefix(query.NamespacedID, "service-account") || strings.HasPrefix(query.NamespacedID, "user")) {
 			// return an error if we attempt to query an `api-key` - currently not supported by the /search endpoint
 			return ErrIsAPIKey
 		}
