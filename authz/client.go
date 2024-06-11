@@ -28,7 +28,7 @@ var (
 	ErrInvalidToken     = errors.New("invalid token: cannot query server")
 	ErrInvalidResponse  = errors.New("invalid response from server")
 	ErrUnexpectedStatus = errors.New("unexpected response status")
-	ErrIsAPIKey         = errors.New("invalid token: cannot query server with an api-key token")
+	ErrInvalidNamespace         = errors.New("invalid token: can only query server for users and service-accounts")
 )
 
 const (
