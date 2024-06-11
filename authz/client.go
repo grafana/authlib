@@ -27,11 +27,14 @@ var (
 	ErrInvalidToken     = errors.New("invalid token: cannot query server")
 	ErrInvalidResponse  = errors.New("invalid response from server")
 	ErrUnexpectedStatus = errors.New("unexpected response status")
+	ErrInvalidNamespace = errors.New("invalid token: can only query server for users and service-accounts")
 )
 
 const (
-	cacheExp   = 5 * time.Minute
-	searchPath = "/api/access-control/users/permissions/search"
+	cacheExp                = 5 * time.Minute
+	searchPath              = "/api/access-control/users/permissions/search"
+	NamespaceServiceAccount = "service-account"
+	NamespaceUser           = "user"
 )
 
 // withHTTPClient allows overriding the default Doer, which is
@@ -115,6 +118,10 @@ func (query *searchQuery) processIDToken(c *clientImpl) error {
 			return fmt.Errorf("%v: %w", ErrInvalidIDToken, errors.New("missing subject (namespacedID) in id token"))
 		}
 		query.NamespacedID = claims.Subject
+		if !(strings.HasPrefix(query.NamespacedID, NamespaceServiceAccount) || strings.HasPrefix(query.NamespacedID, NamespaceUser)) {
+			// return an error if we attempt to query an `api-key` - currently not supported by the /search endpoint
+			return ErrInvalidNamespace
+		}
 	}
 	return nil
 }
