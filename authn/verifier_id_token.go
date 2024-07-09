@@ -12,6 +12,7 @@ type IDTokenClaims struct {
 	AuthenticatedBy string `json:"authenticatedBy"`
 	Email           string `json:"email"`
 	EmailVerified   bool   `json:"email_verified"`
+	Login           string `json:"login"`
 }
 
 func (c IDTokenClaims) NamespaceMatches(namespace string) bool {

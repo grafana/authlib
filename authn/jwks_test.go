@@ -15,7 +15,7 @@ import (
 
 func keys() []byte {
 	data, err := json.Marshal(jose.JSONWebKeySet{Keys: []jose.JSONWebKey{
-		{KeyID: firstKeyID, Key: fistKey.Public(), Algorithm: string(jose.ES256)},
+		{KeyID: firstKeyID, Key: firstKey.Public(), Algorithm: string(jose.ES256)},
 		{KeyID: secondKeyId, Key: secondKey.Public(), Algorithm: string(jose.ES256)},
 	}})
 	if err != nil {
