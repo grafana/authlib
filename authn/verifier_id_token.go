@@ -12,7 +12,10 @@ type IDTokenClaims struct {
 	AuthenticatedBy string `json:"authenticatedBy"`
 	Email           string `json:"email"`
 	EmailVerified   bool   `json:"email_verified"`
-	Login           string `json:"login"`
+	// Username of the user (login attribute on the Identity)
+	Username string `json:"username"`
+	// UID is the unique ID of the user (UID attribute)
+	UID string `json:"uid"`
 }
 
 func (c IDTokenClaims) NamespaceMatches(namespace string) bool {
