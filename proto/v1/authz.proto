@@ -32,4 +32,5 @@ message ReadResponse {
     string object = 1;
   }
   repeated Data data = 1;
+  bool Found = 2;
 }
