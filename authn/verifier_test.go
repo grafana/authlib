@@ -19,7 +19,7 @@ import (
 )
 
 var firstKeyID = "key-1"
-var fistKey = decodePrivateKey([]byte(`
+var firstKey = decodePrivateKey([]byte(`
 -----BEGIN EC PRIVATE KEY-----
 MHcCAQEEID6lXWsmcv/UWn9SptjOThsy88cifgGIBj2Lu0M9I8tQoAoGCCqGSM49
 AwEHoUQDQgAEsf6eNnNMNhl+q7jXsbdUf3ADPh248uoFUSSV9oBzgptyokHCjJz6
@@ -59,7 +59,7 @@ func TestVerifier_Verify(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		response, err := json.Marshal(jose.JSONWebKeySet{
 			Keys: []jose.JSONWebKey{
-				{Key: fistKey.Public(), KeyID: firstKeyID, Algorithm: string(jose.ES256)},
+				{Key: firstKey.Public(), KeyID: firstKeyID, Algorithm: string(jose.ES256)},
 			},
 		})
 		require.NoError(t, err)
@@ -92,7 +92,7 @@ func TestVerifier_Verify(t *testing.T) {
 			TokenTypeID,
 			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: "http://localhost:8000/v1/unknown"}),
 		)
-		claims, err := verifier.Verify(context.Background(), signFist(t))
+		claims, err := verifier.Verify(context.Background(), signFirst(t))
 		assert.ErrorIs(t, err, ErrFetchingSigningKey)
 		assert.Nil(t, claims)
 	})
@@ -107,7 +107,7 @@ func TestVerifier_Verify(t *testing.T) {
 			TokenTypeID,
 			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
 		)
-		claims, err := verifier.Verify(context.Background(), signFist(t))
+		claims, err := verifier.Verify(context.Background(), signFirst(t))
 		assert.ErrorIs(t, err, ErrFetchingSigningKey)
 		assert.Nil(t, claims)
 	})
@@ -140,7 +140,7 @@ func TestVerifier_Verify(t *testing.T) {
 			TokenTypeID,
 			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
 		)
-		claims, err := verifier.Verify(context.Background(), signFist(t))
+		claims, err := verifier.Verify(context.Background(), signFirst(t))
 		assert.ErrorIs(t, err, ErrInvalidAudience)
 		assert.Nil(t, claims)
 	})
@@ -162,7 +162,7 @@ func TestVerifier_Verify(t *testing.T) {
 			TokenTypeAccess,
 			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
 		)
-		claims, err := verifier.Verify(context.Background(), signFist(t))
+		claims, err := verifier.Verify(context.Background(), signFirst(t))
 		assert.ErrorIs(t, err, ErrInvalidTokenType)
 		assert.Nil(t, claims)
 	})
@@ -173,13 +173,13 @@ func TestVerifier_Verify(t *testing.T) {
 			TokenTypeID,
 			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
 		)
-		claims, err := verifier.Verify(context.Background(), signFist(t))
+		claims, err := verifier.Verify(context.Background(), signFirst(t))
 		assert.NoError(t, err)
 		assert.NotNil(t, claims)
 	})
 
 	t.Run("valid: token", func(t *testing.T) {
-		claims, err := verifier.Verify(context.Background(), signFist(t))
+		claims, err := verifier.Verify(context.Background(), signFirst(t))
 		fmt.Println(claims.Claims)
 		assert.NoError(t, err)
 		assert.NotNil(t, claims)
@@ -187,11 +187,11 @@ func TestVerifier_Verify(t *testing.T) {
 }
 
 func signExpired(t *testing.T) string {
-	return signToken(t, firstKeyID, fistKey, time.Now().Add(-2*time.Minute))
+	return signToken(t, firstKeyID, firstKey, time.Now().Add(-2*time.Minute))
 }
 
-func signFist(t *testing.T) string {
-	return signToken(t, firstKeyID, fistKey, time.Now().Add(1*time.Minute))
+func signFirst(t *testing.T) string {
+	return signToken(t, firstKeyID, firstKey, time.Now().Add(1*time.Minute))
 }
 
 func signSecond(t *testing.T) string {
