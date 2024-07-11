@@ -110,6 +110,9 @@
           "items": {
             "$ref": "#/definitions/ReadResponseData"
           }
+        },
+        "Found": {
+          "type": "boolean"
         }
       }
     }
