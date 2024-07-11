@@ -7,11 +7,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewReadResult(t *testing.T) {
+func TestNewController(t *testing.T) {
 	tests := []struct {
 		name string
 		resp *authzv1.ReadResponse
-		want *ReadResult
+		want *controller
 	}{
 		{
 			name: "User does not have action",
@@ -19,7 +19,7 @@ func TestNewReadResult(t *testing.T) {
 				Found: false,
 				Data:  []*authzv1.ReadResponse_Data{},
 			},
-			want: &ReadResult{
+			want: &controller{
 				Found: false,
 			},
 		},
@@ -29,7 +29,7 @@ func TestNewReadResult(t *testing.T) {
 				Found: true,
 				Data:  []*authzv1.ReadResponse_Data{},
 			},
-			want: &ReadResult{Found: true},
+			want: &controller{Found: true},
 		},
 		{
 			name: "User has the action",
@@ -37,7 +37,7 @@ func TestNewReadResult(t *testing.T) {
 				Found: true,
 				Data:  []*authzv1.ReadResponse_Data{{Object: "dashboards:uid:1"}},
 			},
-			want: &ReadResult{
+			want: &controller{
 				Found:    true,
 				Scopes:   map[string]bool{"dashboards:uid:1": true},
 				Wildcard: map[string]bool{},
@@ -49,7 +49,7 @@ func TestNewReadResult(t *testing.T) {
 				Found: true,
 				Data:  []*authzv1.ReadResponse_Data{{Object: "dashboards:*"}},
 			},
-			want: &ReadResult{
+			want: &controller{
 				Found:    true,
 				Scopes:   map[string]bool{},
 				Wildcard: map[string]bool{"dashboards": true},
@@ -61,7 +61,7 @@ func TestNewReadResult(t *testing.T) {
 				Found: true,
 				Data:  []*authzv1.ReadResponse_Data{{Object: "dashboards:*"}, {Object: "dashboards:uid:1"}},
 			},
-			want: &ReadResult{
+			want: &controller{
 				Found:    true,
 				Scopes:   map[string]bool{"dashboards:uid:1": true},
 				Wildcard: map[string]bool{"dashboards": true},
@@ -73,7 +73,7 @@ func TestNewReadResult(t *testing.T) {
 				Found: true,
 				Data:  []*authzv1.ReadResponse_Data{{Object: "dashboards:*"}, {Object: "folders:*"}},
 			},
-			want: &ReadResult{
+			want: &controller{
 				Found:    true,
 				Scopes:   map[string]bool{},
 				Wildcard: map[string]bool{"dashboards": true, "folders": true},
@@ -85,7 +85,7 @@ func TestNewReadResult(t *testing.T) {
 				Found: true,
 				Data:  []*authzv1.ReadResponse_Data{{Object: "*"}},
 			},
-			want: &ReadResult{
+			want: &controller{
 				Found:    true,
 				Scopes:   map[string]bool{},
 				Wildcard: map[string]bool{"*": true},
@@ -94,7 +94,7 @@ func TestNewReadResult(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := NewReadResult(tt.resp)
+			got := newController(tt.resp)
 
 			require.Equal(t, tt.want.Found, got.Found)
 			require.Len(t, got.Scopes, len(tt.want.Scopes))
@@ -110,16 +110,16 @@ func TestNewReadResult(t *testing.T) {
 	}
 }
 
-func TestReadResult_Check(t *testing.T) {
+func TestController_Check(t *testing.T) {
 	tests := []struct {
 		name      string
-		res       ReadResult
+		ctrl      controller
 		resources []Resource
 		want      bool
 	}{
 		{
 			name: "User does not have action",
-			res: ReadResult{
+			ctrl: controller{
 				Found: false,
 			},
 			resources: []Resource{},
@@ -127,7 +127,7 @@ func TestReadResult_Check(t *testing.T) {
 		},
 		{
 			name: "User has a scopeless action",
-			res: ReadResult{
+			ctrl: controller{
 				Found: true,
 			},
 			resources: []Resource{},
@@ -135,7 +135,7 @@ func TestReadResult_Check(t *testing.T) {
 		},
 		{
 			name: "User has a scopeless action but requested a resource",
-			res: ReadResult{
+			ctrl: controller{
 				Found: true,
 			},
 			resources: []Resource{{Kind: "dashboards", Attr: "uid", ID: "1"}},
@@ -143,7 +143,7 @@ func TestReadResult_Check(t *testing.T) {
 		},
 		{
 			name: "User has action on a specific scope",
-			res: ReadResult{
+			ctrl: controller{
 				Found:  true,
 				Scopes: map[string]bool{"dashboards:uid:1": true},
 			},
@@ -152,7 +152,7 @@ func TestReadResult_Check(t *testing.T) {
 		},
 		{
 			name: "User has action on a specific scope but not on the requested resource",
-			res: ReadResult{
+			ctrl: controller{
 				Found:  true,
 				Scopes: map[string]bool{"dashboards:uid:1": true},
 			},
@@ -161,7 +161,7 @@ func TestReadResult_Check(t *testing.T) {
 		},
 		{
 			name: "User has action on a wildcard",
-			res: ReadResult{
+			ctrl: controller{
 				Found:    true,
 				Wildcard: map[string]bool{"dashboards": true},
 			},
@@ -170,7 +170,7 @@ func TestReadResult_Check(t *testing.T) {
 		},
 		{
 			name: "User has action on a wildcard but not on the requested resource",
-			res: ReadResult{
+			ctrl: controller{
 				Found:    true,
 				Wildcard: map[string]bool{"dashboards": true},
 			},
@@ -179,7 +179,7 @@ func TestReadResult_Check(t *testing.T) {
 		},
 		{
 			name: "User has action on the master wildcard",
-			res: ReadResult{
+			ctrl: controller{
 				Found:    true,
 				Wildcard: map[string]bool{"*": true},
 			},
@@ -188,7 +188,7 @@ func TestReadResult_Check(t *testing.T) {
 		},
 		{
 			name: "User has action on one of the requested resources",
-			res: ReadResult{
+			ctrl: controller{
 				Found:    true,
 				Scopes:   map[string]bool{"folders:uid:1": true},
 				Wildcard: map[string]bool{},
@@ -198,7 +198,7 @@ func TestReadResult_Check(t *testing.T) {
 		},
 		{
 			name: "User has action on none of the requested resources",
-			res: ReadResult{
+			ctrl: controller{
 				Found:    true,
 				Scopes:   map[string]bool{"folders:uid:2": true},
 				Wildcard: map[string]bool{},
@@ -209,7 +209,7 @@ func TestReadResult_Check(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.res.Check(tt.resources...)
+			got := tt.ctrl.Check(tt.resources...)
 			require.Equal(t, tt.want, got)
 		})
 	}

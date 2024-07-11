@@ -118,14 +118,13 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 		return true, nil
 	}
 
-	// Check if the resource is allowed
-	check := res.Check(append(req.Contextual, *req.Resource)...)
-	return check, nil
+	// Check if the user has access to any of the requested resources
+	return res.Check(append(req.Contextual, *req.Resource)...), nil
 }
 
-func (c *LegacyClientImpl) retrievePermissions(ctx context.Context, stackID int64, subject, action string) (*ReadResult, error) {
-	key := ReadCacheKey(stackID, subject, action)
-	res, err := c.getCacheReadResult(ctx, key)
+func (c *LegacyClientImpl) retrievePermissions(ctx context.Context, stackID int64, subject, action string) (*controller, error) {
+	key := controllerCacheKey(stackID, subject, action)
+	res, err := c.getController(ctx, key)
 	if err == nil {
 		return res, nil
 	}
@@ -134,7 +133,7 @@ func (c *LegacyClientImpl) retrievePermissions(ctx context.Context, stackID int6
 	}
 
 	// Instantiate a new context for the request
-	outCtx := NewOutgoingContext(ctx)
+	outCtx := newOutgoingContext(ctx)
 
 	readReq := &authzv1.ReadRequest{
 		StackId: stackID,
@@ -148,17 +147,17 @@ func (c *LegacyClientImpl) retrievePermissions(ctx context.Context, stackID int6
 		return nil, ErrReadPermission
 	}
 
-	res = NewReadResult(resp)
+	res = newController(resp)
 
 	// Cache the result
-	if err := c.cacheReadResult(ctx, key, res); err != nil {
+	if err := c.cacheController(ctx, key, res); err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrCaching, err)
 	}
 
 	return res, nil
 }
 
-func NewOutgoingContext(ctx context.Context) context.Context {
+func newOutgoingContext(ctx context.Context) context.Context {
 	out, cancel := context.WithCancel(context.Background())
 
 	go func() {
@@ -173,21 +172,21 @@ func NewOutgoingContext(ctx context.Context) context.Context {
 // RESULT
 // -----
 
-type ReadResult struct {
-	// Whether the permissions were found
+type controller struct {
+	// Whether the requested action was found in the users' permissions
 	Found bool
-	// All the scopes the user has access to
+	// All the scopes the user has access to for the requested action
 	Scopes map[string]bool
 	// Wildcard per kinds
 	Wildcard map[string]bool
 }
 
-func NewReadResult(resp *authzv1.ReadResponse) *ReadResult {
+func newController(resp *authzv1.ReadResponse) *controller {
 	if resp == nil || !resp.Found {
-		return &ReadResult{Found: false}
+		return &controller{Found: false}
 	}
 
-	res := &ReadResult{
+	res := &controller{
 		Found:    true,
 		Scopes:   make(map[string]bool, len(resp.Data)),
 		Wildcard: make(map[string]bool, 2),
@@ -203,7 +202,7 @@ func NewReadResult(resp *authzv1.ReadResponse) *ReadResult {
 	return res
 }
 
-func (r *ReadResult) Check(resources ...Resource) bool {
+func (r *controller) Check(resources ...Resource) bool {
 	// the user has no permissions
 	if !r.Found {
 		return false
@@ -237,17 +236,17 @@ func (r *ReadResult) Check(resources ...Resource) bool {
 // CACHE
 // -----
 
-func ReadCacheKey(stackID int64, subject, action string) string {
+func controllerCacheKey(stackID int64, subject, action string) string {
 	return fmt.Sprintf("read-%d-%s-%s", stackID, subject, action)
 }
 
-func (c *LegacyClientImpl) cacheReadResult(ctx context.Context, key string, res *ReadResult) error {
-	if res == nil {
+func (c *LegacyClientImpl) cacheController(ctx context.Context, key string, ctrl *controller) error {
+	if ctrl == nil {
 		return nil
 	}
 
 	buf := bytes.Buffer{}
-	err := gob.NewEncoder(&buf).Encode(*res)
+	err := gob.NewEncoder(&buf).Encode(*ctrl)
 	if err != nil {
 		return err
 	}
@@ -256,16 +255,16 @@ func (c *LegacyClientImpl) cacheReadResult(ctx context.Context, key string, res 
 	return c.cache.Set(ctx, key, buf.Bytes(), cache.DefaultExpiration)
 }
 
-func (c *LegacyClientImpl) getCacheReadResult(ctx context.Context, key string) (*ReadResult, error) {
+func (c *LegacyClientImpl) getController(ctx context.Context, key string) (*controller, error) {
 	data, err := c.cache.Get(ctx, key)
 	if err != nil {
 		return nil, err
 	}
 
-	var res ReadResult
-	err = gob.NewDecoder(bytes.NewReader(data)).Decode(&res)
+	var ctrl controller
+	err = gob.NewDecoder(bytes.NewReader(data)).Decode(&ctrl)
 	if err != nil {
 		return nil, err
 	}
-	return &res, nil
+	return &ctrl, nil
 }
