@@ -1,9 +1,7 @@
 package authz
 
 import (
-	"bytes"
 	"context"
-	"encoding/gob"
 	"errors"
 	"fmt"
 	"time"
@@ -15,6 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// TODO (gamab): Caching
 // TODO (gamab): Logs
 // TODO (gamab): Traces
 // TODO (gamab): AccessToken in outgoing context
@@ -73,13 +72,17 @@ func (r *CheckRequest) Validate() error {
 	if r.Action == "" {
 		return ErrMissingAction
 	}
-	if r.Caller.AccessTokenClaims.Subject == "" {
+	if r.Caller.AccessTokenClaims.Claims == nil {
 		return ErrMissingCaller
 	}
 	return nil
 }
 
 func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, error) {
+	if err := req.Validate(); err != nil {
+		return false, err
+	}
+
 	// No user => check on the service permissions
 	if req.Caller.IDTokenClaims == nil {
 		perms := req.Caller.AccessTokenClaims.Rest.Permissions
@@ -103,7 +106,7 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 		return false, nil
 	}
 
-	res, err := c.retrievePermissions(ctx, req.StackID, req.Caller.AccessTokenClaims.Subject, req.Action)
+	res, err := c.retrievePermissions(ctx, req.StackID, req.Caller.IDTokenClaims.Subject, req.Action)
 	if err != nil {
 		return false, err
 	}
@@ -123,14 +126,7 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 }
 
 func (c *LegacyClientImpl) retrievePermissions(ctx context.Context, stackID int64, subject, action string) (*controller, error) {
-	key := controllerCacheKey(stackID, subject, action)
-	res, err := c.getController(ctx, key)
-	if err == nil {
-		return res, nil
-	}
-	if !errors.Is(err, cache.ErrNotFound) {
-		return nil, fmt.Errorf("%w: %w", ErrCaching, err)
-	}
+	// TOD (gamab): Check cache
 
 	// Instantiate a new context for the request
 	outCtx := newOutgoingContext(ctx)
@@ -147,16 +143,13 @@ func (c *LegacyClientImpl) retrievePermissions(ctx context.Context, stackID int6
 		return nil, ErrReadPermission
 	}
 
-	res = newController(resp)
+	res := newController(resp)
 
-	// Cache the result
-	if err := c.cacheController(ctx, key, res); err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrCaching, err)
-	}
-
+	// TODO (gamab) cache the result
 	return res, nil
 }
 
+// newOutgoingContext creates a new context that will be canceled when the input context is canceled.
 func newOutgoingContext(ctx context.Context) context.Context {
 	out, cancel := context.WithCancel(context.Background())
 
@@ -230,41 +223,4 @@ func (r *controller) Check(resources ...Resource) bool {
 		}
 	}
 	return false
-}
-
-// -----
-// CACHE
-// -----
-
-func controllerCacheKey(stackID int64, subject, action string) string {
-	return fmt.Sprintf("read-%d-%s-%s", stackID, subject, action)
-}
-
-func (c *LegacyClientImpl) cacheController(ctx context.Context, key string, ctrl *controller) error {
-	if ctrl == nil {
-		return nil
-	}
-
-	buf := bytes.Buffer{}
-	err := gob.NewEncoder(&buf).Encode(*ctrl)
-	if err != nil {
-		return err
-	}
-
-	// Cache with default expiry
-	return c.cache.Set(ctx, key, buf.Bytes(), cache.DefaultExpiration)
-}
-
-func (c *LegacyClientImpl) getController(ctx context.Context, key string) (*controller, error) {
-	data, err := c.cache.Get(ctx, key)
-	if err != nil {
-		return nil, err
-	}
-
-	var ctrl controller
-	err = gob.NewDecoder(bytes.NewReader(data)).Decode(&ctrl)
-	if err != nil {
-		return nil, err
-	}
-	return &ctrl, nil
 }
