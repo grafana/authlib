@@ -26,7 +26,6 @@ var (
 	ErrMissingAction  = status.Errorf(codes.InvalidArgument, "missing action")
 	ErrMissingCaller  = status.Errorf(codes.Unauthenticated, "missing caller")
 	ErrReadPermission = status.Errorf(codes.PermissionDenied, "read permission failed")
-	ErrCaching        = status.Errorf(codes.Internal, "caching failed")
 )
 
 type CheckRequest struct {
