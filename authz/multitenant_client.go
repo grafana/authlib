@@ -13,6 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+// TODO (gamab): Instatiate the AuthZ client
 // TODO (gamab): Caching
 // TODO (gamab): Logs
 // TODO (gamab): Traces
