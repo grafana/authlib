@@ -1,10 +1,15 @@
 package authz
 
 import (
+	"context"
 	"testing"
 
+	"github.com/go-jose/go-jose/v3/jwt"
+	"github.com/grafana/authlib/authn"
 	authzv1 "github.com/grafana/authlib/authz/proto/v1"
+	"github.com/grafana/authlib/cache"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc"
 )
 
 func TestNewController(t *testing.T) {
@@ -213,4 +218,195 @@ func TestController_Check(t *testing.T) {
 			require.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestLegacyClientImpl_Check(t *testing.T) {
+	type readRes struct {
+		found           bool
+		userPermissions []string
+	}
+
+	makeReadResponse := func(res readRes) *authzv1.ReadResponse {
+		if !res.found {
+			return &authzv1.ReadResponse{Found: false}
+		}
+
+		data := make([]*authzv1.ReadResponse_Data, 0, len(res.userPermissions))
+		for _, p := range res.userPermissions {
+			data = append(data, &authzv1.ReadResponse_Data{Object: p})
+		}
+
+		return &authzv1.ReadResponse{
+			Found: true,
+			Data:  data,
+		}
+	}
+
+	tests := []struct {
+		name    string
+		req     CheckRequest
+		res     readRes
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "No Caller",
+			req: CheckRequest{
+				Caller:  authn.CallerAuthInfo{},
+				StackID: 12,
+				Action:  "dashboards:read",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Service does not have the action",
+			req: CheckRequest{
+				Caller: authn.CallerAuthInfo{
+					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{Claims: &jwt.Claims{Subject: "service"}},
+				},
+				StackID: 12,
+				Action:  "dashboards:read",
+			},
+			want: false,
+		},
+		{
+			name: "Service does not has the action",
+			req: CheckRequest{
+				Caller: authn.CallerAuthInfo{
+					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
+						Claims: &jwt.Claims{Subject: "service"},
+						Rest:   authn.AccessTokenClaims{Permissions: []string{"dashboards:read"}},
+					},
+				},
+				StackID: 12,
+				Action:  "dashboards:read",
+			},
+			want: true,
+		},
+		{
+			name: "On behalf of, service does not have the action",
+			req: CheckRequest{
+				Caller: authn.CallerAuthInfo{
+					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{Claims: &jwt.Claims{Subject: "service"}},
+					IDTokenClaims:     &authn.Claims[authn.IDTokenClaims]{Claims: &jwt.Claims{Subject: "user:1"}},
+				},
+				StackID: 12,
+				Action:  "dashboards:read",
+			},
+			want: false,
+		},
+		{
+			name: "On behalf of, service does have the action, but user not",
+			req: CheckRequest{
+				Caller: authn.CallerAuthInfo{
+					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
+						Claims: &jwt.Claims{Subject: "service"},
+						Rest:   authn.AccessTokenClaims{DelegatedPermissions: []string{"dashboards:read"}},
+					},
+					IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{Claims: &jwt.Claims{Subject: "user:1"}},
+				},
+				StackID: 12,
+				Action:  "dashboards:read",
+			},
+			want: false,
+		},
+		{
+			name: "On behalf of, action check only",
+			req: CheckRequest{
+				Caller: authn.CallerAuthInfo{
+					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
+						Claims: &jwt.Claims{Subject: "service"},
+						Rest:   authn.AccessTokenClaims{DelegatedPermissions: []string{"dashboards:read"}},
+					},
+					IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{Claims: &jwt.Claims{Subject: "user:1"}},
+				},
+				StackID: 12,
+				Action:  "dashboards:read",
+			},
+			res:  readRes{found: true},
+			want: true,
+		},
+		{
+			name: "On behalf of, user has the action on another resource",
+			req: CheckRequest{
+				Caller: authn.CallerAuthInfo{
+					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
+						Claims: &jwt.Claims{Subject: "service"},
+						Rest:   authn.AccessTokenClaims{DelegatedPermissions: []string{"dashboards:read"}},
+					},
+					IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{Claims: &jwt.Claims{Subject: "user:1"}},
+				},
+				StackID:  12,
+				Action:   "dashboards:read",
+				Resource: &Resource{Kind: "dashboards", Attr: "uid", ID: "1"},
+			},
+			res:  readRes{found: true, userPermissions: []string{"dashboards:uid:2"}},
+			want: false,
+		},
+		{
+			name: "On behalf of, user has the action on the resource",
+			req: CheckRequest{
+				Caller: authn.CallerAuthInfo{
+					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
+						Claims: &jwt.Claims{Subject: "service"},
+						Rest:   authn.AccessTokenClaims{DelegatedPermissions: []string{"dashboards:read"}},
+					},
+					IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{Claims: &jwt.Claims{Subject: "user:1"}},
+				},
+				StackID:  12,
+				Action:   "dashboards:read",
+				Resource: &Resource{Kind: "dashboards", Attr: "uid", ID: "1"},
+			},
+			res:  readRes{found: true, userPermissions: []string{"dashboards:uid:1"}},
+			want: true,
+		},
+		{
+			name: "On behalf of, user has the action on the contextual resource",
+			req: CheckRequest{
+				Caller: authn.CallerAuthInfo{
+					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
+						Claims: &jwt.Claims{Subject: "service"},
+						Rest:   authn.AccessTokenClaims{DelegatedPermissions: []string{"dashboards:read"}},
+					},
+					IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{Claims: &jwt.Claims{Subject: "user:1"}},
+				},
+				StackID:    12,
+				Action:     "dashboards:read",
+				Resource:   &Resource{Kind: "dashboards", Attr: "uid", ID: "1"},
+				Contextual: []Resource{{Kind: "folders", Attr: "uid", ID: "2"}, {Kind: "folders", Attr: "uid", ID: "1"}},
+			},
+			res:  readRes{found: true, userPermissions: []string{"folders:uid:1"}},
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, authz := setupLegacyClient()
+			authz.res = makeReadResponse(tt.res)
+
+			got, err := client.Check(context.Background(), &tt.req)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func setupLegacyClient() (*LegacyClientImpl, *FakeAuthzServiceClient) {
+	fakeClient := &FakeAuthzServiceClient{}
+	return &LegacyClientImpl{
+		clientV1: fakeClient,
+		cache:    cache.NewLocalCache(cache.Config{}),
+	}, fakeClient
+}
+
+type FakeAuthzServiceClient struct {
+	res *authzv1.ReadResponse
+}
+
+func (f *FakeAuthzServiceClient) Read(ctx context.Context, in *authzv1.ReadRequest, opts ...grpc.CallOption) (*authzv1.ReadResponse, error) {
+	return f.res, nil
 }
