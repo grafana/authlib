@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// TODO (gamab): Instatiate the AuthZ client
+// TODO (gamab): Instantiate the AuthZ client
 // TODO (gamab): Namespace validation
 // TODO (gamab): Caching
 // TODO (gamab): Logs
