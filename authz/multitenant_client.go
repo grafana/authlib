@@ -14,6 +14,7 @@ import (
 )
 
 // TODO (gamab): Instatiate the AuthZ client
+// TODO (gamab): Namespace validation
 // TODO (gamab): Caching
 // TODO (gamab): Logs
 // TODO (gamab): Traces
