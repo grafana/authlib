@@ -395,6 +395,48 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 	}
 }
 
+func TestLegacyClientImpl_Check_Cache(t *testing.T) {
+	client, authz := setupLegacyClient()
+	authz.res = &authzv1.ReadResponse{Found: true, Data: []*authzv1.ReadResponse_Data{{Object: "dashboards:uid:1"}}}
+
+	req := CheckRequest{
+		Caller: authn.CallerAuthInfo{
+			AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
+				Claims: &jwt.Claims{Subject: "service"},
+				Rest:   authn.AccessTokenClaims{DelegatedPermissions: []string{"dashboards:read"}},
+			},
+			IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{Claims: &jwt.Claims{Subject: "user:1"}},
+		},
+		StackID:  12,
+		Action:   "dashboards:read",
+		Resource: &Resource{Kind: "dashboards", Attr: "uid", ID: "1"},
+	}
+
+	// First call should populate the cache
+	got, err := client.Check(context.Background(), &req)
+	require.NoError(t, err)
+	require.True(t, got)
+
+	// Check that the cache was populated correctly
+	ctrl, err := client.getCachedController(context.Background(), controllerCacheKey(12, "user:1", "dashboards:read"))
+	require.NoError(t, err)
+	require.NotNil(t, ctrl)
+	require.True(t, ctrl.Found)
+	scopes := map[string]bool{"dashboards:uid:1": true}
+	require.Len(t, ctrl.Scopes, len(scopes))
+	for k, v := range scopes {
+		require.Equal(t, v, ctrl.Scopes[k])
+	}
+
+	// Change the response to make sure the cache is used
+	authz.res = &authzv1.ReadResponse{Found: false}
+
+	// Second call should still be true as we hit the cache
+	got, err = client.Check(context.Background(), &req)
+	require.NoError(t, err)
+	require.True(t, got)
+}
+
 func setupLegacyClient() (*LegacyClientImpl, *FakeAuthzServiceClient) {
 	fakeClient := &FakeAuthzServiceClient{}
 	return &LegacyClientImpl{
