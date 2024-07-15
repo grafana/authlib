@@ -24,3 +24,5 @@
 # This should make it easy to add new rules without breaking existing ones.
 
 * @grafana/identity-access-team
+/authn/ @grafana/identity-squad
+/authz/ @grafana/access-squad
