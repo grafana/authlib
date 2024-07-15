@@ -1,10 +1,11 @@
 package authz
 
 import (
+	"bytes"
 	"context"
+	"encoding/gob"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/grafana/authlib/authn"
 	authzv1 "github.com/grafana/authlib/authz/proto/v1"
@@ -15,7 +16,6 @@ import (
 
 // TODO (gamab): Instantiate the AuthZ client
 // TODO (gamab): Namespace validation
-// TODO (gamab): Caching
 // TODO (gamab): Logs
 // TODO (gamab): Traces
 // TODO (gamab): AccessToken in outgoing context
@@ -46,13 +46,15 @@ type MultiTenantClientConfig struct {
 
 var _ MultiTenantClient = (*LegacyClientImpl)(nil)
 
+type MultiTenantClientOption func(*LegacyClientImpl)
+
 type LegacyClientImpl struct {
 	authCfg  *MultiTenantClientConfig
 	clientV1 authzv1.AuthzServiceClient
 	cache    cache.Cache
 }
 
-func NewLegacyClient(cfg *MultiTenantClientConfig) (*LegacyClientImpl, error) {
+func NewLegacyClient(cfg *MultiTenantClientConfig, opts ...MultiTenantClientOption) (*LegacyClientImpl, error) {
 	if cfg == nil {
 		return nil, ErrMissingConfig
 	}
@@ -60,13 +62,22 @@ func NewLegacyClient(cfg *MultiTenantClientConfig) (*LegacyClientImpl, error) {
 		return nil, fmt.Errorf("missing remote address: %w", ErrMissingConfig)
 	}
 
-	return &LegacyClientImpl{
-		authCfg: cfg,
-		cache: cache.NewLocalCache(cache.Config{
-			Expiry:          cacheExp,
-			CleanupInterval: 1 * time.Minute,
-		}),
-	}, nil
+	client := &LegacyClientImpl{authCfg: cfg}
+
+	// Apply options
+	for _, opt := range opts {
+		opt(client)
+	}
+
+	// Instantiate the cache
+	if client.cache == nil {
+		client.cache = cache.NewLocalCache(cache.Config{
+			Expiry:          cache.DefaultExpiration,
+			CleanupInterval: 1 * cache.DefaultExpiration,
+		})
+	}
+
+	return client, nil
 }
 
 func (r *CheckRequest) Validate() error {
@@ -127,7 +138,12 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 }
 
 func (c *LegacyClientImpl) retrievePermissions(ctx context.Context, stackID int64, subject, action string) (*controller, error) {
-	// TOD (gamab): Check cache
+	// Check the cache
+	key := controllerCacheKey(stackID, subject, action)
+	ctrl, err := c.getCachedController(ctx, key)
+	if err == nil || !errors.Is(err, cache.ErrNotFound) {
+		return ctrl, err
+	}
 
 	// Instantiate a new context for the request
 	outCtx := newOutgoingContext(ctx)
@@ -146,8 +162,9 @@ func (c *LegacyClientImpl) retrievePermissions(ctx context.Context, stackID int6
 
 	res := newController(resp)
 
-	// TODO (gamab) cache the result
-	return res, nil
+	// Cache the result
+	err = c.cacheController(ctx, key, res)
+	return res, err
 }
 
 // newOutgoingContext creates a new context that will be canceled when the input context is canceled.
@@ -224,4 +241,41 @@ func (r *controller) Check(resources ...Resource) bool {
 		}
 	}
 	return false
+}
+
+// -----
+// CACHE
+// -----
+
+func controllerCacheKey(stackID int64, subject, action string) string {
+	return fmt.Sprintf("read-%d-%s-%s", stackID, subject, action)
+}
+
+func (c *LegacyClientImpl) cacheController(ctx context.Context, key string, ctrl *controller) error {
+	if ctrl == nil {
+		return nil
+	}
+
+	buf := bytes.Buffer{}
+	err := gob.NewEncoder(&buf).Encode(*ctrl)
+	if err != nil {
+		return err
+	}
+
+	// Cache with default expiry
+	return c.cache.Set(ctx, key, buf.Bytes(), cache.DefaultExpiration)
+}
+
+func (c *LegacyClientImpl) getCachedController(ctx context.Context, key string) (*controller, error) {
+	data, err := c.cache.Get(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+
+	var ctrl controller
+	err = gob.NewDecoder(bytes.NewReader(data)).Decode(&ctrl)
+	if err != nil {
+		return nil, err
+	}
+	return &ctrl, nil
 }
