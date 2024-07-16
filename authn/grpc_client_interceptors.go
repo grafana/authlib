@@ -34,12 +34,11 @@ type GrpcClientInterceptor struct {
 	tokenClient TokenExchanger
 }
 
-type GrpcClientInterceptorOption func(*GrpcClientInterceptor) error
+type GrpcClientInterceptorOption func(*GrpcClientInterceptor)
 
 func WithTokenClientOption(tokenClient TokenExchanger) GrpcClientInterceptorOption {
-	return func(gci *GrpcClientInterceptor) error {
+	return func(gci *GrpcClientInterceptor) {
 		gci.tokenClient = tokenClient
-		return nil
 	}
 }
 
@@ -55,7 +54,7 @@ func NewGrpcClientInterceptor(cfg *GrpcClientConfig, opts ...GrpcClientIntercept
 	}
 
 	for _, opt := range opts {
-		_ = opt(gci)
+		opt(gci)
 	}
 
 	if gci.tokenClient == nil {
