@@ -68,7 +68,7 @@ func WithCacheMTCOption(cache cache.Cache) MultiTenantClientOption {
 func WithGrpcClientMTCOptions(opts ...grpc.DialOption) MultiTenantClientOption {
 	return func(c *LegacyClientImpl) error {
 		var err error
-		c.clientV1, err = newGRPCClient(c.authCfg.remoteAddress, opts...)
+		c.clientV1, err = newGrpcClient(c.authCfg.remoteAddress, opts...)
 		return err
 	}
 }
@@ -102,7 +102,7 @@ func NewLegacyClient(cfg *MultiTenantClientConfig, opts ...MultiTenantClientOpti
 
 	// Instantiate the client
 	if client.clientV1 == nil {
-		clientV1, err := newGRPCClient(cfg.remoteAddress)
+		clientV1, err := newGrpcClient(cfg.remoteAddress)
 		if err != nil {
 			return nil, err
 		}
@@ -112,7 +112,7 @@ func NewLegacyClient(cfg *MultiTenantClientConfig, opts ...MultiTenantClientOpti
 	return client, nil
 }
 
-func newGRPCClient(remoteAddress string, dialOpts ...grpc.DialOption) (authzv1.AuthzServiceClient, error) {
+func newGrpcClient(remoteAddress string, dialOpts ...grpc.DialOption) (authzv1.AuthzServiceClient, error) {
 	conn, err := grpc.NewClient(remoteAddress, dialOpts...)
 	if err != nil {
 		return nil, err
