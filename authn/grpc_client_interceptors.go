@@ -95,7 +95,7 @@ func (gci *GrpcClientInterceptor) wrapContext(ctx context.Context) (context.Cont
 
 	token, err := gci.tokenClient.Exchange(ctx, *gci.cfg.TokenRequest)
 	if err != nil {
-		return nil, err
+		return ctx, err
 	}
 
 	md.Set(gci.cfg.AccessTokenMetadataKey, token.Token)
