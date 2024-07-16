@@ -8,6 +8,8 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+var DefaultAccessTokenMetadataKey = "X-Access-Token"
+
 // TODO (gamab): ID Token
 // TODO (gamab): Make Access Token optional?
 // TODO (gamab): Organization/Stack ID
@@ -16,6 +18,7 @@ import (
 // GrpcClientConfig holds the configuration for the gRPC client interceptor.
 type GrpcClientConfig struct {
 	// AccessTokenMetadataKey is the key used to store the access token in the outgoing context metadata.
+	// Defaults to "X-Access-Token".
 	AccessTokenMetadataKey string
 	// TokenClientConfig holds the configuration for the token exchange client.
 	// Not required if TokenClient is provided.
@@ -42,6 +45,10 @@ func WithTokenClientOption(tokenClient TokenExchanger) GrpcClientInterceptorOpti
 
 func NewGrpcClientInterceptor(cfg *GrpcClientConfig, opts ...GrpcClientInterceptorOption) (*GrpcClientInterceptor, error) {
 	gci := &GrpcClientInterceptor{cfg: cfg}
+
+	if gci.cfg.AccessTokenMetadataKey == "" {
+		gci.cfg.AccessTokenMetadataKey = DefaultAccessTokenMetadataKey
+	}
 
 	if gci.cfg.TokenRequest == nil {
 		return nil, fmt.Errorf("missing required token request: %w", ErrMissingConfig)
