@@ -46,7 +46,7 @@ type MultiTenantClientConfig struct {
 
 var _ MultiTenantClient = (*LegacyClientImpl)(nil)
 
-type MultiTenantClientOption func(*LegacyClientImpl) error
+type LegacyClientOption func(*LegacyClientImpl) error
 
 type LegacyClientImpl struct {
 	authCfg  *MultiTenantClientConfig
@@ -58,14 +58,14 @@ type LegacyClientImpl struct {
 // Options
 // -----
 
-func WithCacheMTCOption(cache cache.Cache) MultiTenantClientOption {
+func WithCacheLCOption(cache cache.Cache) LegacyClientOption {
 	return func(c *LegacyClientImpl) error {
 		c.cache = cache
 		return nil
 	}
 }
 
-func WithGrpcClientMTCOptions(opts ...grpc.DialOption) MultiTenantClientOption {
+func WithGrpcClientLCOptions(opts ...grpc.DialOption) LegacyClientOption {
 	return func(c *LegacyClientImpl) error {
 		var err error
 		c.clientV1, err = newGrpcClient(c.authCfg.remoteAddress, opts...)
@@ -77,7 +77,7 @@ func WithGrpcClientMTCOptions(opts ...grpc.DialOption) MultiTenantClientOption {
 // Initialization
 // -----
 
-func NewLegacyClient(cfg *MultiTenantClientConfig, opts ...MultiTenantClientOption) (*LegacyClientImpl, error) {
+func NewLegacyClient(cfg *MultiTenantClientConfig, opts ...LegacyClientOption) (*LegacyClientImpl, error) {
 	if cfg == nil {
 		return nil, ErrMissingConfig
 	}
