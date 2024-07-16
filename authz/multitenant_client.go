@@ -10,11 +10,11 @@ import (
 	"github.com/grafana/authlib/authn"
 	authzv1 "github.com/grafana/authlib/authz/proto/v1"
 	"github.com/grafana/authlib/cache"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-// TODO (gamab): Instantiate the AuthZ client
 // TODO (gamab): Namespace validation
 // TODO (gamab): Logs
 // TODO (gamab): Traces
@@ -46,7 +46,7 @@ type MultiTenantClientConfig struct {
 
 var _ MultiTenantClient = (*LegacyClientImpl)(nil)
 
-type MultiTenantClientOption func(*LegacyClientImpl)
+type LegacyClientOption func(*LegacyClientImpl) error
 
 type LegacyClientImpl struct {
 	authCfg  *MultiTenantClientConfig
@@ -54,7 +54,30 @@ type LegacyClientImpl struct {
 	cache    cache.Cache
 }
 
-func NewLegacyClient(cfg *MultiTenantClientConfig, opts ...MultiTenantClientOption) (*LegacyClientImpl, error) {
+// -----
+// Options
+// -----
+
+func WithCacheLCOption(cache cache.Cache) LegacyClientOption {
+	return func(c *LegacyClientImpl) error {
+		c.cache = cache
+		return nil
+	}
+}
+
+func WithGrpcClientLCOptions(opts ...grpc.DialOption) LegacyClientOption {
+	return func(c *LegacyClientImpl) error {
+		var err error
+		c.clientV1, err = newGrpcClient(c.authCfg.remoteAddress, opts...)
+		return err
+	}
+}
+
+// -----
+// Initialization
+// -----
+
+func NewLegacyClient(cfg *MultiTenantClientConfig, opts ...LegacyClientOption) (*LegacyClientImpl, error) {
 	if cfg == nil {
 		return nil, ErrMissingConfig
 	}
@@ -77,8 +100,29 @@ func NewLegacyClient(cfg *MultiTenantClientConfig, opts ...MultiTenantClientOpti
 		})
 	}
 
+	// Instantiate the client
+	if client.clientV1 == nil {
+		clientV1, err := newGrpcClient(cfg.remoteAddress)
+		if err != nil {
+			return nil, err
+		}
+		client.clientV1 = clientV1
+	}
+
 	return client, nil
 }
+
+func newGrpcClient(remoteAddress string, dialOpts ...grpc.DialOption) (authzv1.AuthzServiceClient, error) {
+	conn, err := grpc.NewClient(remoteAddress, dialOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return authzv1.NewAuthzServiceClient(conn), nil
+}
+
+// -----
+// Implementation
+// -----
 
 func (r *CheckRequest) Validate() error {
 	if r.Action == "" {
