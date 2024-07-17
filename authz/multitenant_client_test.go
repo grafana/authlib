@@ -5,11 +5,13 @@ import (
 	"testing"
 
 	"github.com/go-jose/go-jose/v3/jwt"
+	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/trace/noop"
+	"google.golang.org/grpc"
+
 	"github.com/grafana/authlib/authn"
 	authzv1 "github.com/grafana/authlib/authz/proto/v1"
 	"github.com/grafana/authlib/cache"
-	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
 )
 
 func TestNewController(t *testing.T) {
@@ -442,6 +444,7 @@ func setupLegacyClient() (*LegacyClientImpl, *FakeAuthzServiceClient) {
 	return &LegacyClientImpl{
 		clientV1: fakeClient,
 		cache:    cache.NewLocalCache(cache.Config{}),
+		tracer:   noop.NewTracerProvider().Tracer("noopTracer"),
 	}, fakeClient
 }
 

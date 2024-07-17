@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/grpc-ecosystem/grpc-opentracing/go/otgrpc"
-	"github.com/opentracing/opentracing-go"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -55,7 +57,7 @@ type LegacyClientImpl struct {
 	clientV1    authzv1.AuthzServiceClient
 	cache       cache.Cache
 	grpcOptions []grpc.DialOption
-	tracer      opentracing.Tracer
+	tracer      trace.Tracer
 }
 
 // -----
@@ -76,7 +78,7 @@ func WithGrpcClientLCOptions(opts ...grpc.DialOption) LegacyClientOption {
 	}
 }
 
-func WithTracerLCOption(tracer opentracing.Tracer) LegacyClientOption {
+func WithTracerLCOption(tracer trace.Tracer) LegacyClientOption {
 	return func(c *LegacyClientImpl) error {
 		c.tracer = tracer
 		return nil
@@ -110,14 +112,13 @@ func NewLegacyClient(cfg *MultiTenantClientConfig, opts ...LegacyClientOption) (
 		})
 	}
 
-	// Set default tracer if not provided
 	if client.tracer == nil {
-		client.tracer = opentracing.GlobalTracer()
+		client.tracer = otel.Tracer("authz.LegacyClient")
 	}
 
 	// Instantiate the client
 	grpcOpts := client.grpcOptions
-	grpcOpts = append(grpcOpts, grpc.WithUnaryInterceptor(otgrpc.OpenTracingClientInterceptor(client.tracer)))
+	grpcOpts = append(grpcOpts, grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	clientV1, err := newGrpcClient(cfg.remoteAddress, grpcOpts...)
 	if err != nil {
 		return nil, err
@@ -150,9 +151,10 @@ func (r *CheckRequest) Validate() error {
 }
 
 func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "LegacyClientImpl.Check")
-	defer span.Finish()
-	span.SetTag("stack_id", req.StackID)
+	ctx, span := c.tracer.Start(ctx, "LegacyClientImpl.Check")
+	defer span.End()
+
+	span.SetAttributes(attribute.Int64("stack_id", req.StackID))
 
 	if err := req.Validate(); err != nil {
 		return false, err
@@ -201,9 +203,10 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 }
 
 func (c *LegacyClientImpl) retrievePermissions(ctx context.Context, stackID int64, subject, action string) (*controller, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "LegacyClientImpl.retrievePermissions")
-	defer span.Finish()
-	span.SetTag("stack_id", stackID)
+	ctx, span := c.tracer.Start(ctx, "LegacyClientImpl.retrievePermissions")
+	defer span.End()
+
+	span.SetAttributes(attribute.Int64("stack_id", stackID))
 
 	// Check the cache
 	key := controllerCacheKey(stackID, subject, action)
@@ -236,23 +239,24 @@ func (c *LegacyClientImpl) retrievePermissions(ctx context.Context, stackID int6
 
 // newOutgoingContext creates a new context that will be canceled when the input context is canceled.
 func newOutgoingContext(ctx context.Context) context.Context {
-	out, cancel := context.WithCancel(context.Background())
+	outCtx, cancel := context.WithCancel(context.Background())
 
 	// Propagate the span into the new context
-	if span := opentracing.SpanFromContext(ctx); span != nil {
-		out = opentracing.ContextWithSpan(out, span)
+	spanContext := trace.SpanContextFromContext(ctx)
+	if spanContext.IsValid() {
+		outCtx = trace.ContextWithSpanContext(outCtx, spanContext)
 	}
 
 	go func() {
 		select {
 		case <-ctx.Done():
 			cancel()
-		case <-out.Done():
+		case <-outCtx.Done():
 			// exit
 		}
 	}()
 
-	return out
+	return outCtx
 }
 
 // -----
@@ -328,8 +332,8 @@ func controllerCacheKey(stackID int64, subject, action string) string {
 }
 
 func (c *LegacyClientImpl) cacheController(ctx context.Context, key string, ctrl *controller) error {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "LegacyClientImpl.cacheController")
-	defer span.Finish()
+	ctx, span := c.tracer.Start(ctx, "LegacyClientImpl.cacheController")
+	defer span.End()
 
 	if ctrl == nil {
 		return nil
@@ -346,8 +350,8 @@ func (c *LegacyClientImpl) cacheController(ctx context.Context, key string, ctrl
 }
 
 func (c *LegacyClientImpl) getCachedController(ctx context.Context, key string) (*controller, error) {
-	span, ctx := opentracing.StartSpanFromContext(ctx, "LegacyClientImpl.getCachedController")
-	defer span.Finish()
+	ctx, span := c.tracer.Start(ctx, "LegacyClientImpl.getCachedController")
+	defer span.End()
 
 	data, err := c.cache.Get(ctx, key)
 	if err != nil {
