@@ -7,17 +7,19 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/grafana/authlib/authn"
-	authzv1 "github.com/grafana/authlib/authz/proto/v1"
-	"github.com/grafana/authlib/cache"
+	"github.com/grpc-ecosystem/grpc-opentracing/go/otgrpc"
+	"github.com/opentracing/opentracing-go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/grafana/authlib/authn"
+	authzv1 "github.com/grafana/authlib/authz/proto/v1"
+	"github.com/grafana/authlib/cache"
 )
 
 // TODO (gamab): Namespace validation
 // TODO (gamab): Logs
-// TODO (gamab): Traces
 // TODO (gamab): AccessToken in outgoing context
 // TODO (gamab): Make access token claims optional for dev purposes
 
@@ -49,9 +51,11 @@ var _ MultiTenantClient = (*LegacyClientImpl)(nil)
 type LegacyClientOption func(*LegacyClientImpl) error
 
 type LegacyClientImpl struct {
-	authCfg  *MultiTenantClientConfig
-	clientV1 authzv1.AuthzServiceClient
-	cache    cache.Cache
+	authCfg     *MultiTenantClientConfig
+	clientV1    authzv1.AuthzServiceClient
+	cache       cache.Cache
+	grpcOptions []grpc.DialOption
+	tracer      opentracing.Tracer
 }
 
 // -----
@@ -67,9 +71,15 @@ func WithCacheLCOption(cache cache.Cache) LegacyClientOption {
 
 func WithGrpcClientLCOptions(opts ...grpc.DialOption) LegacyClientOption {
 	return func(c *LegacyClientImpl) error {
-		var err error
-		c.clientV1, err = newGrpcClient(c.authCfg.remoteAddress, opts...)
-		return err
+		c.grpcOptions = opts
+		return nil
+	}
+}
+
+func WithTracerLCOption(tracer opentracing.Tracer) LegacyClientOption {
+	return func(c *LegacyClientImpl) error {
+		c.tracer = tracer
+		return nil
 	}
 }
 
@@ -100,14 +110,19 @@ func NewLegacyClient(cfg *MultiTenantClientConfig, opts ...LegacyClientOption) (
 		})
 	}
 
-	// Instantiate the client
-	if client.clientV1 == nil {
-		clientV1, err := newGrpcClient(cfg.remoteAddress)
-		if err != nil {
-			return nil, err
-		}
-		client.clientV1 = clientV1
+	// Set default tracer if not provided
+	if client.tracer == nil {
+		client.tracer = opentracing.GlobalTracer()
 	}
+
+	// Instantiate the client
+	grpcOpts := client.grpcOptions
+	grpcOpts = append(grpcOpts, grpc.WithUnaryInterceptor(otgrpc.OpenTracingClientInterceptor(client.tracer)))
+	clientV1, err := newGrpcClient(cfg.remoteAddress, grpcOpts...)
+	if err != nil {
+		return nil, err
+	}
+	client.clientV1 = clientV1
 
 	return client, nil
 }
@@ -135,6 +150,10 @@ func (r *CheckRequest) Validate() error {
 }
 
 func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "LegacyClientImpl.Check")
+	defer span.Finish()
+	span.SetTag("stack_id", req.StackID)
+
 	if err := req.Validate(); err != nil {
 		return false, err
 	}
@@ -182,6 +201,10 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 }
 
 func (c *LegacyClientImpl) retrievePermissions(ctx context.Context, stackID int64, subject, action string) (*controller, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "LegacyClientImpl.retrievePermissions")
+	defer span.Finish()
+	span.SetTag("stack_id", stackID)
+
 	// Check the cache
 	key := controllerCacheKey(stackID, subject, action)
 	ctrl, err := c.getCachedController(ctx, key)
@@ -215,9 +238,18 @@ func (c *LegacyClientImpl) retrievePermissions(ctx context.Context, stackID int6
 func newOutgoingContext(ctx context.Context) context.Context {
 	out, cancel := context.WithCancel(context.Background())
 
+	// Propagate the span into the new context
+	if span := opentracing.SpanFromContext(ctx); span != nil {
+		out = opentracing.ContextWithSpan(out, span)
+	}
+
 	go func() {
-		<-ctx.Done()
-		cancel()
+		select {
+		case <-ctx.Done():
+			cancel()
+		case <-out.Done():
+			// exit
+		}
 	}()
 
 	return out
@@ -296,6 +328,9 @@ func controllerCacheKey(stackID int64, subject, action string) string {
 }
 
 func (c *LegacyClientImpl) cacheController(ctx context.Context, key string, ctrl *controller) error {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "LegacyClientImpl.cacheController")
+	defer span.Finish()
+
 	if ctrl == nil {
 		return nil
 	}
@@ -311,6 +346,9 @@ func (c *LegacyClientImpl) cacheController(ctx context.Context, key string, ctrl
 }
 
 func (c *LegacyClientImpl) getCachedController(ctx context.Context, key string) (*controller, error) {
+	span, ctx := opentracing.StartSpanFromContext(ctx, "LegacyClientImpl.getCachedController")
+	defer span.Finish()
+
 	data, err := c.cache.Get(ctx, key)
 	if err != nil {
 		return nil, err
