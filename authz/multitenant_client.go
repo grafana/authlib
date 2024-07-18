@@ -60,6 +60,15 @@ type LegacyClientImpl struct {
 	tracer      trace.Tracer
 }
 
+type tracerProvider struct {
+	trace.TracerProvider
+	tracer trace.Tracer
+}
+
+func (tp *tracerProvider) Tracer(name string, options ...trace.TracerOption) trace.Tracer {
+	return tp.tracer
+}
+
 // -----
 // Options
 // -----
@@ -117,8 +126,9 @@ func NewLegacyClient(cfg *MultiTenantClientConfig, opts ...LegacyClientOption) (
 	}
 
 	// Instantiate the client
+	tp := tracerProvider{tracer: client.tracer}
 	grpcOpts := client.grpcOptions
-	grpcOpts = append(grpcOpts, grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
+	grpcOpts = append(grpcOpts, grpc.WithStatsHandler(otelgrpc.NewClientHandler(otelgrpc.WithTracerProvider(&tp))))
 	clientV1, err := newGrpcClient(cfg.remoteAddress, grpcOpts...)
 	if err != nil {
 		return nil, err
