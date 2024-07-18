@@ -16,6 +16,8 @@ var (
 
 	ErrExpiredToken    = fmt.Errorf("%w: expired token", errInvalidToken)
 	ErrInvalidAudience = fmt.Errorf("%w: invalid audience", errInvalidToken)
+
+	ErrMissingConfig = errors.New("missing config")
 )
 
 func IsInvalidTokenErr(err error) bool {
