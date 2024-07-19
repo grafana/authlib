@@ -35,12 +35,12 @@ type GrpcClientConfig struct {
 
 // GrpcClientInterceptor is a gRPC client interceptor that adds an access token to the outgoing context metadata.
 type GrpcClientInterceptor struct {
-	cfg         *GrpcClientConfig
-	tokenClient TokenExchanger
-	mdFns       []MetadataDecorator
+	cfg                *GrpcClientConfig
+	tokenClient        TokenExchanger
+	metadataExtractors []ContextMetadataExtractor
 }
 
-type MetadataDecorator func(metadata.MD) (metadata.MD, error)
+type ContextMetadataExtractor func(context.Context) (key string, values []string, err error)
 
 type GrpcClientInterceptorOption func(*GrpcClientInterceptor)
 
@@ -52,20 +52,19 @@ func WithTokenClientOption(tokenClient TokenExchanger) GrpcClientInterceptorOpti
 
 func WithIDTokenExtractorOption(extractor func(context.Context) (string, error)) GrpcClientInterceptorOption {
 	return func(gci *GrpcClientInterceptor) {
-		WithMetadataDecoratorOption(func(md metadata.MD) (metadata.MD, error) {
-			idToken, err := extractor(context.Background())
+		WithMetadataExtractorOption(func(ctx context.Context) (key string, values []string, err error) {
+			idToken, err := extractor(ctx)
 			if err != nil {
-				return nil, err
+				return "", nil, err
 			}
-			md.Set(gci.cfg.IDTokenMetadataKey, idToken)
-			return md, nil
+			return gci.cfg.IDTokenMetadataKey, []string{idToken}, nil
 		})(gci)
 	}
 }
 
-func WithMetadataDecoratorOption(decorators ...MetadataDecorator) GrpcClientInterceptorOption {
+func WithMetadataExtractorOption(extractors ...ContextMetadataExtractor) GrpcClientInterceptorOption {
 	return func(gci *GrpcClientInterceptor) {
-		gci.mdFns = append(gci.mdFns, decorators...)
+		gci.metadataExtractors = append(gci.metadataExtractors, extractors...)
 	}
 }
 
@@ -130,11 +129,12 @@ func (gci *GrpcClientInterceptor) wrapContext(ctx context.Context) (context.Cont
 
 	md.Set(gci.cfg.AccessTokenMetadataKey, token.Token)
 
-	for _, fn := range gci.mdFns {
-		md, err = fn(md)
+	for _, extract := range gci.metadataExtractors {
+		k, v, err := extract(ctx)
 		if err != nil {
 			return ctx, err
 		}
+		md.Set(k, v...)
 	}
 
 	return metadata.NewOutgoingContext(ctx, md), nil

@@ -2,6 +2,7 @@ package authn
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -31,12 +32,21 @@ func setupGrpcClientInterceptor(t *testing.T) (*GrpcClientInterceptor, *FakeToke
 func TestGrpcClientInterceptor_wrapContext(t *testing.T) {
 	gci, _ := setupGrpcClientInterceptor(t)
 
+	type idKey struct{}
+
 	// Decorate client with IDTokenExtractorOption
 	WithIDTokenExtractorOption(func(ctx context.Context) (string, error) {
-		return "some-id-token", nil
+		idToken, ok := ctx.Value(idKey{}).(string)
+		if !ok {
+			return "", errors.New("id_token not found in context")
+		}
+		return idToken, nil
 	})(gci)
 
-	ctx, err := gci.wrapContext(context.Background())
+	// Add id_token to context
+	ctx := context.WithValue(context.Background(), idKey{}, "some-id-token")
+
+	ctx, err := gci.wrapContext(ctx)
 	require.NoError(t, err)
 
 	md, ok := metadata.FromOutgoingContext(ctx)
