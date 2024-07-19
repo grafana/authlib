@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-var (
+const (
 	DefaultAccessTokenMetadataKey = "X-Access-Token"
 	DefaultIdTokenMetadataKey     = "X-Id-Token"
 )
