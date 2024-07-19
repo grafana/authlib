@@ -31,15 +31,24 @@ func setupGrpcClientInterceptor(t *testing.T) (*GrpcClientInterceptor, *FakeToke
 func TestGrpcClientInterceptor_wrapContext(t *testing.T) {
 	gci, _ := setupGrpcClientInterceptor(t)
 
+	// Decorate client with IDTokenExtractorOption
+	WithIDTokenExtractorOption(func(ctx context.Context) (string, error) {
+		return "some-id-token", nil
+	})(gci)
+
 	ctx, err := gci.wrapContext(context.Background())
 	require.NoError(t, err)
 
 	md, ok := metadata.FromOutgoingContext(ctx)
 	require.True(t, ok)
-	require.Len(t, md, 1)
+	require.Len(t, md, 2)
 	mdAtKey := md.Get(DefaultAccessTokenMetadataKey)
 	require.Len(t, mdAtKey, 1)
 	token := mdAtKey[0]
-
 	require.Equal(t, token, "some-token")
+
+	mdIdKey := md.Get(DefaultIdTokenMetadataKey)
+	require.Len(t, mdIdKey, 1)
+	idToken := mdIdKey[0]
+	require.Equal(t, idToken, "some-id-token")
 }

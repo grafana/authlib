@@ -8,9 +8,11 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-var DefaultAccessTokenMetadataKey = "X-Access-Token"
+var (
+	DefaultAccessTokenMetadataKey = "X-Access-Token"
+	DefaultIdTokenMetadataKey     = "X-Id-Token"
+)
 
-// TODO (gamab): ID Token
 // TODO (gamab): Make Access Token optional?
 // TODO (gamab): Organization/Stack ID
 // TODO (gamab): Readme
@@ -26,6 +28,13 @@ type GrpcClientConfig struct {
 	// TokenRequest is the token request to be used for token exchange.
 	// This assumes the token request is static and does not change.
 	TokenRequest *TokenExchangeRequest
+
+	// IDTokenMetadataKey is the key used to store the ID token in the outgoing context metadata.
+	// Defaults to "X-Id-Token".
+	IDTokenMetadataKey string
+	// IDTokenExtractor is a function that extracts the ID token from the context.
+	// This is optional and defaults to nil.
+	IDTokenExtractor func(context.Context) (string, error)
 }
 
 // GrpcClientInterceptor is a gRPC client interceptor that adds an access token to the outgoing context metadata.
@@ -42,11 +51,20 @@ func WithTokenClientOption(tokenClient TokenExchanger) GrpcClientInterceptorOpti
 	}
 }
 
+func WithIDTokenExtractorOption(extractor func(context.Context) (string, error)) GrpcClientInterceptorOption {
+	return func(gci *GrpcClientInterceptor) {
+		gci.cfg.IDTokenExtractor = extractor
+	}
+}
+
 func NewGrpcClientInterceptor(cfg *GrpcClientConfig, opts ...GrpcClientInterceptorOption) (*GrpcClientInterceptor, error) {
 	gci := &GrpcClientInterceptor{cfg: cfg}
 
 	if gci.cfg.AccessTokenMetadataKey == "" {
 		gci.cfg.AccessTokenMetadataKey = DefaultAccessTokenMetadataKey
+	}
+	if gci.cfg.IDTokenMetadataKey == "" {
+		gci.cfg.IDTokenMetadataKey = DefaultIdTokenMetadataKey
 	}
 
 	if gci.cfg.TokenRequest == nil {
@@ -99,6 +117,14 @@ func (gci *GrpcClientInterceptor) wrapContext(ctx context.Context) (context.Cont
 	}
 
 	md.Set(gci.cfg.AccessTokenMetadataKey, token.Token)
+
+	if gci.cfg.IDTokenExtractor != nil {
+		idToken, err := gci.cfg.IDTokenExtractor(ctx)
+		if err != nil {
+			return ctx, err
+		}
+		md.Set(gci.cfg.IDTokenMetadataKey, idToken)
+	}
 
 	return metadata.NewOutgoingContext(ctx, md), nil
 }
