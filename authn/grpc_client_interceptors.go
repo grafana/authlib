@@ -130,12 +130,10 @@ func (gci *GrpcClientInterceptor) wrapContext(ctx context.Context) (context.Cont
 
 	md.Set(gci.cfg.AccessTokenMetadataKey, token.Token)
 
-	if len(gci.mdFns) > 0 {
-		for _, fn := range gci.mdFns {
-			md, err = fn(md)
-			if err != nil {
-				return ctx, err
-			}
+	for _, fn := range gci.mdFns {
+		md, err = fn(md)
+		if err != nil {
+			return ctx, err
 		}
 	}
 
