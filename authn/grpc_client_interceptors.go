@@ -22,16 +22,15 @@ type GrpcClientConfig struct {
 	// AccessTokenMetadataKey is the key used to store the access token in the outgoing context metadata.
 	// Defaults to "X-Access-Token".
 	AccessTokenMetadataKey string
+	// IDTokenMetadataKey is the key used to store the ID token in the outgoing context metadata.
+	// Not required if IDTokenExtractor is provided. Defaults to "X-Id-Token".
+	IDTokenMetadataKey string
 	// TokenClientConfig holds the configuration for the token exchange client.
 	// Not required if TokenClient is provided.
 	TokenClientConfig *TokenExchangeConfig
 	// TokenRequest is the token request to be used for token exchange.
 	// This assumes the token request is static and does not change.
 	TokenRequest *TokenExchangeRequest
-
-	// IDTokenMetadataKey is the key used to store the ID token in the outgoing context metadata.
-	// Defaults to "X-Id-Token".
-	IDTokenMetadataKey string
 }
 
 // GrpcClientInterceptor is a gRPC client interceptor that adds an access token to the outgoing context metadata.
