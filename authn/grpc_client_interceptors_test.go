@@ -2,6 +2,7 @@ package authn
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -31,15 +32,33 @@ func setupGrpcClientInterceptor(t *testing.T) (*GrpcClientInterceptor, *FakeToke
 func TestGrpcClientInterceptor_wrapContext(t *testing.T) {
 	gci, _ := setupGrpcClientInterceptor(t)
 
-	ctx, err := gci.wrapContext(context.Background())
+	type idKey struct{}
+
+	// Decorate client with IDTokenExtractorOption
+	WithIDTokenExtractorOption(func(ctx context.Context) (string, error) {
+		idToken, ok := ctx.Value(idKey{}).(string)
+		if !ok {
+			return "", errors.New("id_token not found in context")
+		}
+		return idToken, nil
+	})(gci)
+
+	// Add id_token to context
+	ctx := context.WithValue(context.Background(), idKey{}, "some-id-token")
+
+	ctx, err := gci.wrapContext(ctx)
 	require.NoError(t, err)
 
 	md, ok := metadata.FromOutgoingContext(ctx)
 	require.True(t, ok)
-	require.Len(t, md, 1)
+	require.Len(t, md, 2)
 	mdAtKey := md.Get(DefaultAccessTokenMetadataKey)
 	require.Len(t, mdAtKey, 1)
 	token := mdAtKey[0]
-
 	require.Equal(t, token, "some-token")
+
+	mdIdKey := md.Get(DefaultIdTokenMetadataKey)
+	require.Len(t, mdIdKey, 1)
+	idToken := mdIdKey[0]
+	require.Equal(t, idToken, "some-id-token")
 }
