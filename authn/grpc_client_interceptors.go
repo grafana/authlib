@@ -32,16 +32,16 @@ type GrpcClientConfig struct {
 	// IDTokenMetadataKey is the key used to store the ID token in the outgoing context metadata.
 	// Defaults to "X-Id-Token".
 	IDTokenMetadataKey string
-	// IDTokenExtractor is a function that extracts the ID token from the context.
-	// This is optional and defaults to nil.
-	IDTokenExtractor func(context.Context) (string, error)
 }
 
 // GrpcClientInterceptor is a gRPC client interceptor that adds an access token to the outgoing context metadata.
 type GrpcClientInterceptor struct {
 	cfg         *GrpcClientConfig
 	tokenClient TokenExchanger
+	mdFns       []MetadataDecorator
 }
+
+type MetadataDecorator func(metadata.MD) (metadata.MD, error)
 
 type GrpcClientInterceptorOption func(*GrpcClientInterceptor)
 
@@ -53,7 +53,20 @@ func WithTokenClientOption(tokenClient TokenExchanger) GrpcClientInterceptorOpti
 
 func WithIDTokenExtractorOption(extractor func(context.Context) (string, error)) GrpcClientInterceptorOption {
 	return func(gci *GrpcClientInterceptor) {
-		gci.cfg.IDTokenExtractor = extractor
+		WithMetadataDecoratorOption(func(md metadata.MD) (metadata.MD, error) {
+			idToken, err := extractor(context.Background())
+			if err != nil {
+				return nil, err
+			}
+			md.Set(gci.cfg.IDTokenMetadataKey, idToken)
+			return md, nil
+		})(gci)
+	}
+}
+
+func WithMetadataDecoratorOption(decorators ...MetadataDecorator) GrpcClientInterceptorOption {
+	return func(gci *GrpcClientInterceptor) {
+		gci.mdFns = append(gci.mdFns, decorators...)
 	}
 }
 
@@ -118,12 +131,13 @@ func (gci *GrpcClientInterceptor) wrapContext(ctx context.Context) (context.Cont
 
 	md.Set(gci.cfg.AccessTokenMetadataKey, token.Token)
 
-	if gci.cfg.IDTokenExtractor != nil {
-		idToken, err := gci.cfg.IDTokenExtractor(ctx)
-		if err != nil {
-			return ctx, err
+	if len(gci.mdFns) > 0 {
+		for _, fn := range gci.mdFns {
+			md, err = fn(md)
+			if err != nil {
+				return ctx, err
+			}
 		}
-		md.Set(gci.cfg.IDTokenMetadataKey, idToken)
 	}
 
 	return metadata.NewOutgoingContext(ctx, md), nil
