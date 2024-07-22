@@ -175,6 +175,7 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 		return false, err
 	}
 
+	span.SetAttributes(attribute.String("service", req.Caller.AccessTokenClaims.Subject))
 	span.SetAttributes(attribute.Int64("stack_id", req.StackID))
 	span.SetAttributes(attribute.String("action", req.Action))
 	if req.Resource != nil {
