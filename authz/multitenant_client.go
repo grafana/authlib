@@ -177,15 +177,14 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 
 	span.SetAttributes(attribute.Int64("stack_id", req.StackID))
 	span.SetAttributes(attribute.String("action", req.Action))
-
 	if req.Resource != nil {
 		span.SetAttributes(attribute.String("resource", req.Resource.Scope()))
 		span.SetAttributes(attribute.Int("contextual", len(req.Contextual)))
 	}
+	span.SetAttributes(attribute.Bool("with_user", req.Caller.IDTokenClaims != nil))
 
 	// No user => check on the service permissions
 	if req.Caller.IDTokenClaims == nil {
-		span.SetAttributes(attribute.String("type", "service"))
 		perms := req.Caller.AccessTokenClaims.Rest.Permissions
 		for _, p := range perms {
 			if p == req.Action {
@@ -195,7 +194,6 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 		return false, nil
 	}
 
-	span.SetAttributes(attribute.String("type", "on-behalf"))
 	span.SetAttributes(attribute.String("subject", req.Caller.IDTokenClaims.Subject))
 
 	// Make sure the service is allowed to perform the requested action
