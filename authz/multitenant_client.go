@@ -20,7 +20,6 @@ import (
 	"github.com/grafana/authlib/cache"
 )
 
-// TODO (gamab): Namespace validation
 // TODO (gamab): Make access token claims optional for dev purposes
 
 var (
@@ -31,8 +30,6 @@ var (
 	ErrMissingSubject = status.Errorf(codes.Unauthenticated, "missing subject")
 	ErrReadPermission = status.Errorf(codes.PermissionDenied, "read permission failed")
 )
-
-const NamespaceStack = "stack"
 
 type CheckRequest struct {
 	Caller     authn.CallerAuthInfo
@@ -55,11 +52,12 @@ var _ MultiTenantClient = (*LegacyClientImpl)(nil)
 type LegacyClientOption func(*LegacyClientImpl) error
 
 type LegacyClientImpl struct {
-	authCfg     *MultiTenantClientConfig
-	clientV1    authzv1.AuthzServiceClient
-	cache       cache.Cache
-	grpcOptions []grpc.DialOption
-	tracer      trace.Tracer
+	authCfg      *MultiTenantClientConfig
+	clientV1     authzv1.AuthzServiceClient
+	cache        cache.Cache
+	grpcOptions  []grpc.DialOption
+	namespaceFmt authn.NamespaceFormatter
+	tracer       trace.Tracer
 }
 
 type tracerProvider struct {
@@ -92,6 +90,13 @@ func WithGrpcClientLCOptions(opts ...grpc.DialOption) LegacyClientOption {
 func WithTracerLCOption(tracer trace.Tracer) LegacyClientOption {
 	return func(c *LegacyClientImpl) error {
 		c.tracer = tracer
+		return nil
+	}
+}
+
+func WithNamespaceFormatterLCOption(fmt authn.NamespaceFormatter) LegacyClientOption {
+	return func(c *LegacyClientImpl) error {
+		c.namespaceFmt = fmt
 		return nil
 	}
 }
@@ -137,6 +142,10 @@ func NewLegacyClient(cfg *MultiTenantClientConfig, opts ...LegacyClientOption) (
 	}
 	client.clientV1 = clientV1
 
+	if client.namespaceFmt == nil {
+		client.namespaceFmt = authn.CloudNamespaceFormatter
+	}
+
 	return client, nil
 }
 
@@ -178,7 +187,8 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 	}
 
 	// Validate the namespace
-	if !req.Caller.AccessTokenClaims.Rest.NamespaceMatches(fmt.Sprintf("%s-%d", NamespaceStack, req.StackID)) {
+	ok := c.validateNamespace(req.Caller, req.StackID)
+	if !ok {
 		return false, nil
 	}
 
@@ -234,6 +244,16 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 
 	// Check if the user has access to any of the requested resources
 	return res.Check(append(req.Contextual, *req.Resource)...), nil
+}
+
+func (c *LegacyClientImpl) validateNamespace(caller authn.CallerAuthInfo, stackID int64) bool {
+	expectedNamespace := c.namespaceFmt(stackID)
+
+	// Check both AccessToken and IDToken (if present) for namespace match
+	accessTokenMatch := caller.AccessTokenClaims.Rest.NamespaceMatches(expectedNamespace)
+	idTokenMatch := caller.IDTokenClaims == nil || caller.IDTokenClaims.Rest.NamespaceMatches(expectedNamespace)
+
+	return accessTokenMatch && idTokenMatch
 }
 
 func (c *LegacyClientImpl) retrievePermissions(ctx context.Context, stackID int64, subject, action string) (*controller, error) {
