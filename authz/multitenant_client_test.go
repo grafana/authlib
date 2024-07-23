@@ -264,7 +264,10 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 			name: "Service does not have the action",
 			req: CheckRequest{
 				Caller: authn.CallerAuthInfo{
-					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{Claims: &jwt.Claims{Subject: "service"}},
+					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
+						Claims: &jwt.Claims{Subject: "service"},
+						Rest:   authn.AccessTokenClaims{Namespace: "stack-12"},
+					},
 				},
 				StackID: 12,
 				Action:  "dashboards:read",
@@ -272,12 +275,12 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 			want: false,
 		},
 		{
-			name: "Service does not has the action",
+			name: "Service has the action",
 			req: CheckRequest{
 				Caller: authn.CallerAuthInfo{
 					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
-						Rest:   authn.AccessTokenClaims{Permissions: []string{"dashboards:read"}},
+						Rest:   authn.AccessTokenClaims{Namespace: "stack-12", Permissions: []string{"dashboards:read"}},
 					},
 				},
 				StackID: 12,
@@ -286,11 +289,31 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "Service has the action but in the wrong namespace",
+			req: CheckRequest{
+				Caller: authn.CallerAuthInfo{
+					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
+						Claims: &jwt.Claims{Subject: "service"},
+						Rest:   authn.AccessTokenClaims{Namespace: "stack-13", Permissions: []string{"dashboards:read"}},
+					},
+				},
+				StackID: 12,
+				Action:  "dashboards:read",
+			},
+			want: false,
+		},
+		{
 			name: "On behalf of, service does not have the action",
 			req: CheckRequest{
 				Caller: authn.CallerAuthInfo{
-					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{Claims: &jwt.Claims{Subject: "service"}},
-					IDTokenClaims:     &authn.Claims[authn.IDTokenClaims]{Claims: &jwt.Claims{Subject: "user:1"}},
+					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
+						Claims: &jwt.Claims{Subject: "service"},
+						Rest:   authn.AccessTokenClaims{Namespace: "stack-12"},
+					},
+					IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{
+						Claims: &jwt.Claims{Subject: "user:1"},
+						Rest:   authn.IDTokenClaims{Namespace: "stack-12"},
+					},
 				},
 				StackID: 12,
 				Action:  "dashboards:read",
@@ -303,9 +326,12 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 				Caller: authn.CallerAuthInfo{
 					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
-						Rest:   authn.AccessTokenClaims{DelegatedPermissions: []string{"dashboards:read"}},
+						Rest:   authn.AccessTokenClaims{Namespace: "stack-12", DelegatedPermissions: []string{"dashboards:read"}},
 					},
-					IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{Claims: &jwt.Claims{Subject: "user:1"}},
+					IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{
+						Claims: &jwt.Claims{Subject: "user:1"},
+						Rest:   authn.IDTokenClaims{Namespace: "stack-12"},
+					},
 				},
 				StackID: 12,
 				Action:  "dashboards:read",
@@ -318,9 +344,12 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 				Caller: authn.CallerAuthInfo{
 					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
-						Rest:   authn.AccessTokenClaims{DelegatedPermissions: []string{"dashboards:read"}},
+						Rest:   authn.AccessTokenClaims{Namespace: "stack-12", DelegatedPermissions: []string{"dashboards:read"}},
 					},
-					IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{Claims: &jwt.Claims{Subject: "user:1"}},
+					IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{
+						Claims: &jwt.Claims{Subject: "user:1"},
+						Rest:   authn.IDTokenClaims{Namespace: "stack-12"},
+					},
 				},
 				StackID: 12,
 				Action:  "dashboards:read",
@@ -329,14 +358,35 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "On behalf of, action check only, user is in another namespaces",
+			req: CheckRequest{
+				Caller: authn.CallerAuthInfo{
+					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
+						Claims: &jwt.Claims{Subject: "service"},
+						Rest:   authn.AccessTokenClaims{Namespace: "*", DelegatedPermissions: []string{"dashboards:read"}},
+					},
+					IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{
+						Claims: &jwt.Claims{Subject: "user:1"},
+						Rest:   authn.IDTokenClaims{Namespace: "stack-13"},
+					},
+				},
+				StackID: 12,
+				Action:  "dashboards:read",
+			},
+			want: false,
+		},
+		{
 			name: "On behalf of, user has the action on another resource",
 			req: CheckRequest{
 				Caller: authn.CallerAuthInfo{
 					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
-						Rest:   authn.AccessTokenClaims{DelegatedPermissions: []string{"dashboards:read"}},
+						Rest:   authn.AccessTokenClaims{Namespace: "stack-12", DelegatedPermissions: []string{"dashboards:read"}},
 					},
-					IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{Claims: &jwt.Claims{Subject: "user:1"}},
+					IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{
+						Claims: &jwt.Claims{Subject: "user:1"},
+						Rest:   authn.IDTokenClaims{Namespace: "stack-12"},
+					},
 				},
 				StackID:  12,
 				Action:   "dashboards:read",
@@ -351,9 +401,12 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 				Caller: authn.CallerAuthInfo{
 					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
-						Rest:   authn.AccessTokenClaims{DelegatedPermissions: []string{"dashboards:read"}},
+						Rest:   authn.AccessTokenClaims{Namespace: "stack-12", DelegatedPermissions: []string{"dashboards:read"}},
 					},
-					IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{Claims: &jwt.Claims{Subject: "user:1"}},
+					IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{
+						Claims: &jwt.Claims{Subject: "user:1"},
+						Rest:   authn.IDTokenClaims{Namespace: "stack-12"},
+					},
 				},
 				StackID:  12,
 				Action:   "dashboards:read",
@@ -368,9 +421,12 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 				Caller: authn.CallerAuthInfo{
 					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
-						Rest:   authn.AccessTokenClaims{DelegatedPermissions: []string{"dashboards:read"}},
+						Rest:   authn.AccessTokenClaims{Namespace: "stack-12", DelegatedPermissions: []string{"dashboards:read"}},
 					},
-					IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{Claims: &jwt.Claims{Subject: "user:1"}},
+					IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{
+						Claims: &jwt.Claims{Subject: "user:1"},
+						Rest:   authn.IDTokenClaims{Namespace: "stack-12"},
+					},
 				},
 				StackID:    12,
 				Action:     "dashboards:read",
@@ -397,6 +453,33 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 	}
 }
 
+func TestLegacyClientImpl_Check_OnPremFmt(t *testing.T) {
+	client, authz := setupLegacyClient()
+	client.namespaceFmt = authn.OnPremNamespaceFormatter
+
+	authz.res = &authzv1.ReadResponse{Found: true, Data: []*authzv1.ReadResponse_Data{{Object: "dashboards:uid:1"}}}
+
+	req := CheckRequest{
+		Caller: authn.CallerAuthInfo{
+			AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
+				Claims: &jwt.Claims{Subject: "service"},
+				Rest:   authn.AccessTokenClaims{Namespace: "default", DelegatedPermissions: []string{"dashboards:read"}},
+			},
+			IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{
+				Claims: &jwt.Claims{Subject: "user:1"},
+				Rest:   authn.IDTokenClaims{Namespace: "default"},
+			},
+		},
+		StackID:  1,
+		Action:   "dashboards:read",
+		Resource: &Resource{Kind: "dashboards", Attr: "uid", ID: "1"},
+	}
+
+	got, err := client.Check(context.Background(), &req)
+	require.NoError(t, err)
+	require.True(t, got)
+}
+
 func TestLegacyClientImpl_Check_Cache(t *testing.T) {
 	client, authz := setupLegacyClient()
 	authz.res = &authzv1.ReadResponse{Found: true, Data: []*authzv1.ReadResponse_Data{{Object: "dashboards:uid:1"}}}
@@ -405,9 +488,12 @@ func TestLegacyClientImpl_Check_Cache(t *testing.T) {
 		Caller: authn.CallerAuthInfo{
 			AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
 				Claims: &jwt.Claims{Subject: "service"},
-				Rest:   authn.AccessTokenClaims{DelegatedPermissions: []string{"dashboards:read"}},
+				Rest:   authn.AccessTokenClaims{Namespace: "stack-12", DelegatedPermissions: []string{"dashboards:read"}},
 			},
-			IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{Claims: &jwt.Claims{Subject: "user:1"}},
+			IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{
+				Claims: &jwt.Claims{Subject: "user:1"},
+				Rest:   authn.IDTokenClaims{Namespace: "stack-12"},
+			},
 		},
 		StackID:  12,
 		Action:   "dashboards:read",
@@ -442,9 +528,10 @@ func TestLegacyClientImpl_Check_Cache(t *testing.T) {
 func setupLegacyClient() (*LegacyClientImpl, *FakeAuthzServiceClient) {
 	fakeClient := &FakeAuthzServiceClient{}
 	return &LegacyClientImpl{
-		clientV1: fakeClient,
-		cache:    cache.NewLocalCache(cache.Config{}),
-		tracer:   noop.NewTracerProvider().Tracer("noopTracer"),
+		clientV1:     fakeClient,
+		cache:        cache.NewLocalCache(cache.Config{}),
+		namespaceFmt: authn.CloudNamespaceFormatter,
+		tracer:       noop.NewTracerProvider().Tracer("noopTracer"),
 	}, fakeClient
 }
 
