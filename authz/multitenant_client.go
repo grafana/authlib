@@ -32,6 +32,8 @@ var (
 	ErrReadPermission = status.Errorf(codes.PermissionDenied, "read permission failed")
 )
 
+const NamespaceStack = "stack"
+
 type CheckRequest struct {
 	Caller     authn.CallerAuthInfo
 	StackID    int64
@@ -173,6 +175,11 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 	if err := req.Validate(); err != nil {
 		span.RecordError(err)
 		return false, err
+	}
+
+	// Validate the namespace
+	if !req.Caller.AccessTokenClaims.Rest.NamespaceMatches(fmt.Sprintf("%s-%d", NamespaceStack, req.StackID)) {
+		return false, nil
 	}
 
 	span.SetAttributes(attribute.String("service", req.Caller.AccessTokenClaims.Subject))
