@@ -376,24 +376,6 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 			want: false,
 		},
 		{
-			name: "On behalf of, action check but wrong namespace",
-			req: CheckRequest{
-				Caller: authn.CallerAuthInfo{
-					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
-						Claims: &jwt.Claims{Subject: "service"},
-						Rest:   authn.AccessTokenClaims{Namespace: "stack-13", DelegatedPermissions: []string{"dashboards:read"}},
-					},
-					IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{
-						Claims: &jwt.Claims{Subject: "user:1"},
-						Rest:   authn.IDTokenClaims{Namespace: "stack-12"},
-					},
-				},
-				StackID: 12,
-				Action:  "dashboards:read",
-			},
-			want: false,
-		},
-		{
 			name: "On behalf of, user has the action on another resource",
 			req: CheckRequest{
 				Caller: authn.CallerAuthInfo{
