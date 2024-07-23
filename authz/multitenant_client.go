@@ -186,9 +186,7 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 		return false, err
 	}
 
-	// Validate the namespace
-	ok := c.validateNamespace(req.Caller, req.StackID)
-	if !ok {
+	if !c.validateNamespace(req.Caller, req.StackID) {
 		return false, nil
 	}
 
