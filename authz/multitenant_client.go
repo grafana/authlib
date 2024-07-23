@@ -21,14 +21,14 @@ import (
 )
 
 // TODO (gamab): Namespace validation
-// TODO (gamab): Logs
-// TODO (gamab): AccessToken in outgoing context
 // TODO (gamab): Make access token claims optional for dev purposes
 
 var (
 	ErrMissingConfig  = errors.New("missing config")
+	ErrMissingStackID = status.Errorf(codes.InvalidArgument, "missing stack ID")
 	ErrMissingAction  = status.Errorf(codes.InvalidArgument, "missing action")
 	ErrMissingCaller  = status.Errorf(codes.Unauthenticated, "missing caller")
+	ErrMissingSubject = status.Errorf(codes.Unauthenticated, "missing subject")
 	ErrReadPermission = status.Errorf(codes.PermissionDenied, "read permission failed")
 )
 
@@ -151,11 +151,17 @@ func newGrpcClient(remoteAddress string, dialOpts ...grpc.DialOption) (authzv1.A
 // -----
 
 func (r *CheckRequest) Validate() error {
+	if r.StackID <= 0 {
+		return ErrMissingStackID
+	}
 	if r.Action == "" {
 		return ErrMissingAction
 	}
 	if r.Caller.AccessTokenClaims.Claims == nil {
 		return ErrMissingCaller
+	}
+	if r.Caller.IDTokenClaims != nil && r.Caller.IDTokenClaims.Subject == "" {
+		return ErrMissingSubject
 	}
 	return nil
 }
@@ -164,11 +170,19 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 	ctx, span := c.tracer.Start(ctx, "LegacyClientImpl.Check")
 	defer span.End()
 
-	span.SetAttributes(attribute.Int64("stack_id", req.StackID))
-
 	if err := req.Validate(); err != nil {
+		span.RecordError(err)
 		return false, err
 	}
+
+	span.SetAttributes(attribute.String("service", req.Caller.AccessTokenClaims.Subject))
+	span.SetAttributes(attribute.Int64("stack_id", req.StackID))
+	span.SetAttributes(attribute.String("action", req.Action))
+	if req.Resource != nil {
+		span.SetAttributes(attribute.String("resource", req.Resource.Scope()))
+		span.SetAttributes(attribute.Int("contextual", len(req.Contextual)))
+	}
+	span.SetAttributes(attribute.Bool("with_user", req.Caller.IDTokenClaims != nil))
 
 	// No user => check on the service permissions
 	if req.Caller.IDTokenClaims == nil {
@@ -180,6 +194,8 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 		}
 		return false, nil
 	}
+
+	span.SetAttributes(attribute.String("subject", req.Caller.IDTokenClaims.Subject))
 
 	// Make sure the service is allowed to perform the requested action
 	serviceIsAllowedAction := false
@@ -195,6 +211,7 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 
 	res, err := c.retrievePermissions(ctx, req.StackID, req.Caller.IDTokenClaims.Subject, req.Action)
 	if err != nil {
+		span.RecordError(err)
 		return false, err
 	}
 
