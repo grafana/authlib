@@ -83,18 +83,18 @@ func WithCacheLCOption(cache cache.Cache) LegacyClientOption {
 	}
 }
 
-// WithGrpcConnLCOption sets the gRPC client connection.
-// Use this option to run the client in the same process as the authz service (e.g., grpchan.InterceptClientConn).
-func WithGrpcConnLCOption(conn grpc.ClientConnInterface) LegacyClientOption {
+// WithGrpcConnectionLCOption sets the gRPC client connection directly.
+// Useful for running the client in the same process as the authorization service.
+func WithGrpcConnectionLCOption(conn grpc.ClientConnInterface) LegacyClientOption {
 	return func(c *LegacyClientImpl) error {
 		c.grpcConn = conn
 		return nil
 	}
 }
 
-// WithGrpcClientLCOptions sets the gRPC client options (e.g., access token interceptor).
-// When WithGrpcConnLCOption is used, this option is ignored.
-func WithGrpcClientLCOptions(opts ...grpc.DialOption) LegacyClientOption {
+// WithGrpcDialOptionsLCOption sets the gRPC dial options for client connection setup.
+// Useful for adding client interceptors. These options are ignored if WithGrpcConnection is used.
+func WithGrpcDialOptionsLCOption(opts ...grpc.DialOption) LegacyClientOption {
 	return func(c *LegacyClientImpl) error {
 		c.grpcOptions = opts
 		return nil
