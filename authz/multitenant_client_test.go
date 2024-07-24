@@ -525,9 +525,99 @@ func TestLegacyClientImpl_Check_Cache(t *testing.T) {
 	require.True(t, got)
 }
 
+func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
+	type readRes struct {
+		found           bool
+		userPermissions []string
+	}
+
+	makeReadResponse := func(res readRes) *authzv1.ReadResponse {
+		if !res.found {
+			return &authzv1.ReadResponse{Found: false}
+		}
+
+		data := make([]*authzv1.ReadResponse_Data, 0, len(res.userPermissions))
+		for _, p := range res.userPermissions {
+			data = append(data, &authzv1.ReadResponse_Data{Object: p})
+		}
+
+		return &authzv1.ReadResponse{
+			Found: true,
+			Data:  data,
+		}
+	}
+
+	tests := []struct {
+		name    string
+		req     CheckRequest
+		res     readRes
+		want    bool
+		wantErr bool
+	}{
+		{
+			name: "No user assume the service is allowed",
+			req: CheckRequest{
+				Caller:  authn.CallerAuthInfo{},
+				StackID: 12,
+				Action:  "dashboards:read",
+			},
+			want: true,
+		},
+		{
+			name: "User has the action on the resource",
+			req: CheckRequest{
+				Caller: authn.CallerAuthInfo{
+					IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{
+						Claims: &jwt.Claims{Subject: "user:1"},
+						Rest:   authn.IDTokenClaims{Namespace: "stack-12"},
+					},
+				},
+				StackID:  12,
+				Action:   "dashboards:read",
+				Resource: &Resource{Kind: "dashboards", Attr: "uid", ID: "1"},
+			},
+			res:  readRes{found: true, userPermissions: []string{"dashboards:uid:1"}},
+			want: true,
+		},
+		{
+			name: "User has the action on another resource",
+			req: CheckRequest{
+				Caller: authn.CallerAuthInfo{
+					IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{
+						Claims: &jwt.Claims{Subject: "user:1"},
+						Rest:   authn.IDTokenClaims{Namespace: "stack-12"},
+					},
+				},
+				StackID:  12,
+				Action:   "dashboards:read",
+				Resource: &Resource{Kind: "dashboards", Attr: "uid", ID: "1"},
+			},
+			res:  readRes{found: true, userPermissions: []string{"dashboards:uid:2"}},
+			want: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, authz := setupLegacyClient()
+			client.authCfg.DisableAccessToken = true
+
+			authz.res = makeReadResponse(tt.res)
+
+			got, err := client.Check(context.Background(), &tt.req)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func setupLegacyClient() (*LegacyClientImpl, *FakeAuthzServiceClient) {
 	fakeClient := &FakeAuthzServiceClient{}
 	return &LegacyClientImpl{
+		authCfg:      &MultiTenantClientConfig{},
 		clientV1:     fakeClient,
 		cache:        cache.NewLocalCache(cache.Config{}),
 		namespaceFmt: authn.CloudNamespaceFormatter,

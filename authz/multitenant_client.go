@@ -20,8 +20,6 @@ import (
 	"github.com/grafana/authlib/cache"
 )
 
-// TODO (gamab): Make access token claims optional for dev purposes
-
 var (
 	ErrMissingConfig  = errors.New("missing config")
 	ErrMissingStackID = status.Errorf(codes.InvalidArgument, "missing stack ID")
@@ -44,7 +42,11 @@ type MultiTenantClient interface {
 }
 
 type MultiTenantClientConfig struct {
-	remoteAddress string
+	// RemoteAddress is the address of the authz service. It should be in the format "host:port".
+	RemoteAddress string
+	// DisableAccessToken will disable the access token check.
+	// Warning: Using this option means there won't be any service authentication.
+	DisableAccessToken bool
 }
 
 var _ MultiTenantClient = (*LegacyClientImpl)(nil)
@@ -109,7 +111,7 @@ func NewLegacyClient(cfg *MultiTenantClientConfig, opts ...LegacyClientOption) (
 	if cfg == nil {
 		return nil, ErrMissingConfig
 	}
-	if cfg.remoteAddress == "" {
+	if cfg.RemoteAddress == "" {
 		return nil, fmt.Errorf("missing remote address: %w", ErrMissingConfig)
 	}
 
@@ -136,7 +138,7 @@ func NewLegacyClient(cfg *MultiTenantClientConfig, opts ...LegacyClientOption) (
 	tp := tracerProvider{tracer: client.tracer}
 	grpcOpts := client.grpcOptions
 	grpcOpts = append(grpcOpts, grpc.WithStatsHandler(otelgrpc.NewClientHandler(otelgrpc.WithTracerProvider(&tp))))
-	clientV1, err := newGrpcClient(cfg.remoteAddress, grpcOpts...)
+	clientV1, err := newGrpcClient(cfg.RemoteAddress, grpcOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -161,14 +163,14 @@ func newGrpcClient(remoteAddress string, dialOpts ...grpc.DialOption) (authzv1.A
 // Implementation
 // -----
 
-func (r *CheckRequest) Validate() error {
+func (r *CheckRequest) Validate(accessTokenEnabled bool) error {
 	if r.StackID <= 0 {
 		return ErrMissingStackID
 	}
 	if r.Action == "" {
 		return ErrMissingAction
 	}
-	if r.Caller.AccessTokenClaims.Claims == nil {
+	if accessTokenEnabled && r.Caller.AccessTokenClaims.Claims == nil {
 		return ErrMissingCaller
 	}
 	if r.Caller.IDTokenClaims != nil && r.Caller.IDTokenClaims.Subject == "" {
@@ -181,7 +183,7 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 	ctx, span := c.tracer.Start(ctx, "LegacyClientImpl.Check")
 	defer span.End()
 
-	if err := req.Validate(); err != nil {
+	if err := req.Validate(!c.authCfg.DisableAccessToken); err != nil {
 		span.RecordError(err)
 		return false, err
 	}
@@ -190,7 +192,9 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 		return false, nil
 	}
 
-	span.SetAttributes(attribute.String("service", req.Caller.AccessTokenClaims.Subject))
+	if !c.authCfg.DisableAccessToken {
+		span.SetAttributes(attribute.String("service", req.Caller.AccessTokenClaims.Subject))
+	}
 	span.SetAttributes(attribute.Int64("stack_id", req.StackID))
 	span.SetAttributes(attribute.String("action", req.Action))
 	if req.Resource != nil {
@@ -201,6 +205,11 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 
 	// No user => check on the service permissions
 	if req.Caller.IDTokenClaims == nil {
+		// access token check is disabled => we can skip the authz service
+		if c.authCfg.DisableAccessToken {
+			return true, nil
+		}
+
 		perms := req.Caller.AccessTokenClaims.Rest.Permissions
 		for _, p := range perms {
 			if p == req.Action {
@@ -212,16 +221,19 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 
 	span.SetAttributes(attribute.String("subject", req.Caller.IDTokenClaims.Subject))
 
-	// Make sure the service is allowed to perform the requested action
-	serviceIsAllowedAction := false
-	for _, p := range req.Caller.AccessTokenClaims.Rest.DelegatedPermissions {
-		if p == req.Action {
-			serviceIsAllowedAction = true
-			break
+	// Only check the service permissions if the access token check is enabled
+	if !c.authCfg.DisableAccessToken {
+		// Make sure the service is allowed to perform the requested action
+		serviceIsAllowedAction := false
+		for _, p := range req.Caller.AccessTokenClaims.Rest.DelegatedPermissions {
+			if p == req.Action {
+				serviceIsAllowedAction = true
+				break
+			}
 		}
-	}
-	if !serviceIsAllowedAction {
-		return false, nil
+		if !serviceIsAllowedAction {
+			return false, nil
+		}
 	}
 
 	res, err := c.retrievePermissions(ctx, req.StackID, req.Caller.IDTokenClaims.Subject, req.Action)
@@ -248,7 +260,7 @@ func (c *LegacyClientImpl) validateNamespace(caller authn.CallerAuthInfo, stackI
 	expectedNamespace := c.namespaceFmt(stackID)
 
 	// Check both AccessToken and IDToken (if present) for namespace match
-	accessTokenMatch := caller.AccessTokenClaims.Rest.NamespaceMatches(expectedNamespace)
+	accessTokenMatch := c.authCfg.DisableAccessToken || caller.AccessTokenClaims.Rest.NamespaceMatches(expectedNamespace)
 	idTokenMatch := caller.IDTokenClaims == nil || caller.IDTokenClaims.Rest.NamespaceMatches(expectedNamespace)
 
 	return accessTokenMatch && idTokenMatch
