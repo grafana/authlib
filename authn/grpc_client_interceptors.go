@@ -13,12 +13,11 @@ const (
 	DefaultIdTokenMetadataKey     = "X-Id-Token"
 )
 
-// TODO (gamab): Make Access Token optional?
-// TODO (gamab): Organization/Stack ID
-// TODO (gamab): Readme
-
 // GrpcClientConfig holds the configuration for the gRPC client interceptor.
 type GrpcClientConfig struct {
+	// DisableAccessToken is a flag to disable the access token.
+	// Warning: Using this options means there won't be any servie authentication.
+	DisableAccessToken bool
 	// AccessTokenMetadataKey is the key used to store the access token in the outgoing context metadata.
 	// Defaults to "X-Access-Token".
 	AccessTokenMetadataKey string
@@ -122,12 +121,14 @@ func (gci *GrpcClientInterceptor) StreamClientInterceptor(ctx context.Context, d
 func (gci *GrpcClientInterceptor) wrapContext(ctx context.Context) (context.Context, error) {
 	md := metadata.Pairs()
 
-	token, err := gci.tokenClient.Exchange(ctx, *gci.cfg.TokenRequest)
-	if err != nil {
-		return ctx, err
-	}
+	if !gci.cfg.DisableAccessToken {
+		token, err := gci.tokenClient.Exchange(ctx, *gci.cfg.TokenRequest)
+		if err != nil {
+			return ctx, err
+		}
 
-	md.Set(gci.cfg.AccessTokenMetadataKey, token.Token)
+		md.Set(gci.cfg.AccessTokenMetadataKey, token.Token)
+	}
 
 	for _, extract := range gci.metadataExtractors {
 		k, v, err := extract(ctx)

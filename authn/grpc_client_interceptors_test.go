@@ -62,3 +62,34 @@ func TestGrpcClientInterceptor_wrapContext(t *testing.T) {
 	idToken := mdIdKey[0]
 	require.Equal(t, idToken, "some-id-token")
 }
+
+func TestGrpcClientInterceptor_wrapContextNoAccessToken(t *testing.T) {
+	gci, _ := setupGrpcClientInterceptor(t)
+	// Disable access token
+	gci.cfg.DisableAccessToken = true
+
+	type idKey struct{}
+
+	// Decorate client with IDTokenExtractorOption
+	WithIDTokenExtractorOption(func(ctx context.Context) (string, error) {
+		idToken, ok := ctx.Value(idKey{}).(string)
+		if !ok {
+			return "", errors.New("id_token not found in context")
+		}
+		return idToken, nil
+	})(gci)
+
+	// Add id_token to context
+	ctx := context.WithValue(context.Background(), idKey{}, "some-id-token")
+
+	ctx, err := gci.wrapContext(ctx)
+	require.NoError(t, err)
+
+	md, ok := metadata.FromOutgoingContext(ctx)
+	require.True(t, ok)
+	require.Len(t, md, 1)
+	mdIdKey := md.Get(DefaultIdTokenMetadataKey)
+	require.Len(t, mdIdKey, 1)
+	idToken := mdIdKey[0]
+	require.Equal(t, idToken, "some-id-token")
+}
