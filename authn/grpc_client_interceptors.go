@@ -16,7 +16,7 @@ const (
 // GrpcClientConfig holds the configuration for the gRPC client interceptor.
 type GrpcClientConfig struct {
 	// DisableAccessToken is a flag to disable the access token.
-	// Warning: Using this options means there won't be any servie authentication.
+	// Warning: Using this option means there won't be any service authentication.
 	DisableAccessToken bool
 	// AccessTokenMetadataKey is the key used to store the access token in the outgoing context metadata.
 	// Defaults to "X-Access-Token".
