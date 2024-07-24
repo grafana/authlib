@@ -64,9 +64,8 @@ func TestGrpcClientInterceptor_wrapContext(t *testing.T) {
 }
 
 func TestGrpcClientInterceptor_wrapContextNoAccessToken(t *testing.T) {
-	gci, _ := setupGrpcClientInterceptor(t)
-	// Disable access token
-	gci.cfg.DisableAccessToken = true
+	gci, err := NewGrpcClientInterceptor(&GrpcClientConfig{DisableAccessToken: true})
+	require.NoError(t, err)
 
 	type idKey struct{}
 
@@ -82,7 +81,7 @@ func TestGrpcClientInterceptor_wrapContextNoAccessToken(t *testing.T) {
 	// Add id_token to context
 	ctx := context.WithValue(context.Background(), idKey{}, "some-id-token")
 
-	ctx, err := gci.wrapContext(ctx)
+	ctx, err = gci.wrapContext(ctx)
 	require.NoError(t, err)
 
 	md, ok := metadata.FromOutgoingContext(ctx)

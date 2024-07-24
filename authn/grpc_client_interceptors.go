@@ -77,7 +77,7 @@ func NewGrpcClientInterceptor(cfg *GrpcClientConfig, opts ...GrpcClientIntercept
 		gci.cfg.IDTokenMetadataKey = DefaultIdTokenMetadataKey
 	}
 
-	if gci.cfg.TokenRequest == nil {
+	if gci.cfg.TokenRequest == nil && !gci.cfg.DisableAccessToken {
 		return nil, fmt.Errorf("missing required token request: %w", ErrMissingConfig)
 	}
 
@@ -85,7 +85,7 @@ func NewGrpcClientInterceptor(cfg *GrpcClientConfig, opts ...GrpcClientIntercept
 		opt(gci)
 	}
 
-	if gci.tokenClient == nil {
+	if gci.tokenClient == nil && !gci.cfg.DisableAccessToken {
 		if gci.cfg.TokenClientConfig == nil {
 			return nil, fmt.Errorf("missing required token client config: %w", ErrMissingConfig)
 		}
