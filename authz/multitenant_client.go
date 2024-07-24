@@ -45,7 +45,7 @@ type MultiTenantClientConfig struct {
 	// RemoteAddress is the address of the authz service. It should be in the format "host:port".
 	RemoteAddress string
 	// DisableAccessToken will disable the access token check.
-	// Warning: Using this option means there won't be any service authentication.
+	// Warning: Using this option means there won't be any service authorization.
 	DisableAccessToken bool
 }
 
