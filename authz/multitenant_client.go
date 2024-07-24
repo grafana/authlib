@@ -57,6 +57,7 @@ type LegacyClientImpl struct {
 	authCfg      *MultiTenantClientConfig
 	clientV1     authzv1.AuthzServiceClient
 	cache        cache.Cache
+	grpcConn     grpc.ClientConnInterface
 	grpcOptions  []grpc.DialOption
 	namespaceFmt authn.NamespaceFormatter
 	tracer       trace.Tracer
@@ -82,6 +83,17 @@ func WithCacheLCOption(cache cache.Cache) LegacyClientOption {
 	}
 }
 
+// WithGrpcConnLCOption sets the gRPC client connection.
+// Use this option to run the client in the same process as the authz service (e.g., grpchan.InterceptClientConn).
+func WithGrpcConnLCOption(conn grpc.ClientConnInterface) LegacyClientOption {
+	return func(c *LegacyClientImpl) error {
+		c.grpcConn = conn
+		return nil
+	}
+}
+
+// WithGrpcClientLCOptions sets the gRPC client options (e.g., access token interceptor).
+// When WithGrpcConnLCOption is used, this option is ignored.
 func WithGrpcClientLCOptions(opts ...grpc.DialOption) LegacyClientOption {
 	return func(c *LegacyClientImpl) error {
 		c.grpcOptions = opts
@@ -135,28 +147,28 @@ func NewLegacyClient(cfg *MultiTenantClientConfig, opts ...LegacyClientOption) (
 	}
 
 	// Instantiate the client
-	tp := tracerProvider{tracer: client.tracer}
-	grpcOpts := client.grpcOptions
-	grpcOpts = append(grpcOpts, grpc.WithStatsHandler(otelgrpc.NewClientHandler(otelgrpc.WithTracerProvider(&tp))))
-	clientV1, err := newGrpcClient(cfg.RemoteAddress, grpcOpts...)
-	if err != nil {
-		return nil, err
+	if client.grpcConn == nil {
+		if cfg.RemoteAddress == "" {
+			return nil, fmt.Errorf("missing remote address: %w", ErrMissingConfig)
+		}
+
+		tp := tracerProvider{tracer: client.tracer}
+		grpcOpts := client.grpcOptions
+		grpcOpts = append(grpcOpts, grpc.WithStatsHandler(otelgrpc.NewClientHandler(otelgrpc.WithTracerProvider(&tp))))
+
+		conn, err := grpc.NewClient(cfg.RemoteAddress, grpcOpts...)
+		if err != nil {
+			return nil, err
+		}
+		client.grpcConn = conn
 	}
-	client.clientV1 = clientV1
+	client.clientV1 = authzv1.NewAuthzServiceClient(client.grpcConn)
 
 	if client.namespaceFmt == nil {
 		client.namespaceFmt = authn.CloudNamespaceFormatter
 	}
 
 	return client, nil
-}
-
-func newGrpcClient(remoteAddress string, dialOpts ...grpc.DialOption) (authzv1.AuthzServiceClient, error) {
-	conn, err := grpc.NewClient(remoteAddress, dialOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return authzv1.NewAuthzServiceClient(conn), nil
 }
 
 // -----
