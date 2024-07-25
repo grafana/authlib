@@ -160,8 +160,8 @@ const (
 )
 
 var (
-	ErrorInvalidSubject   = status.Error(codes.PermissionDenied, "unauthorized: invalid subject")
-	ErrorInvalidNamespace = status.Error(codes.PermissionDenied, "unauthorized: invalid namespace")
+	ErrorInvalidSubject     = status.Error(codes.PermissionDenied, "unauthorized: invalid subject")
+	ErrorInvalidSubjectType = status.Error(codes.PermissionDenied, "unauthorized: invalid subject type")
 )
 
 type subjectType string
@@ -171,7 +171,7 @@ func (n subjectType) isValid() error {
 	case typeUser, typeAPIKey, typeServiceAccount, typeAnonymous, typeRenderService, typeAccessPolicy, typeProvisioning, typeEmpty:
 		return nil
 	default:
-		return fmt.Errorf("invalid namespace %s: %w", n, ErrorInvalidNamespace)
+		return fmt.Errorf("invalid type %s: %w", n, ErrorInvalidSubjectType)
 	}
 }
 
@@ -185,7 +185,7 @@ func parseSubject(str string) (subject, error) {
 
 	parts := strings.Split(str, ":")
 	if len(parts) != 2 {
-		return subject, fmt.Errorf("expected namespace id to have 2 parts: %w", ErrorInvalidSubject)
+		return subject, fmt.Errorf("expected subject to have 2 parts: %w", ErrorInvalidSubject)
 	}
 
 	subject.ID = parts[1]
