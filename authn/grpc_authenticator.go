@@ -19,6 +19,10 @@ var (
 	ErrorInvalidAccessToken = status.Error(codes.PermissionDenied, "unauthorized: invalid access token")
 )
 
+// TODO (gamab) - ID token should be optional
+// TODO (gamab) - Metadata key should be configurable
+// TODO (gamab) - StackID should extract should be configurable - could come from the metadata, path, id token.
+
 // GrpcAuthenticatorConfig holds the configuration for the gRPC authenticator.
 type GrpcAuthenticatorConfig struct {
 }
@@ -38,7 +42,7 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 		return nil, ErrorMissingMetadata
 	}
 
-	// TODO: Make this configurable: stackID could come from the metadata or the path.
+	// TODO (gamab) - StackID should extract should be configurable - could come from the metadata, path, id token.
 	stackID, ok := getFirstMetadataValue(md, DefaultStackIDMetadataKey)
 	if !ok {
 		return nil, fmt.Errorf("missing stack ID: %w", ErrorMissingMetadata)
@@ -47,13 +51,25 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse stack ID: %w", ErrorMissingMetadata)
 	}
+	callerInfo.StackID = stackIDInt
 
 	atClaims, err := ga.authenticateService(ctx, stackIDInt, md)
 	if err != nil {
 		return nil, err
 	}
-
 	callerInfo.AccessTokenClaims = *atClaims
+
+	idClaims, err := ga.authenticateUser(ctx, stackIDInt, md)
+	if err != nil {
+		// TODO (gamab): Handle id token optionality
+		return nil, err
+	}
+	callerInfo.IDTokenClaims = idClaims
+
+	// Allow access tokens with either the same namespace as the validated id token namespace or wildcard (`*`).
+	if !atClaims.Rest.NamespaceMatches(idClaims.Rest.Namespace) {
+		return nil, fmt.Errorf("unexpected access token namespace: %s", atClaims.Rest.Namespace)
+	}
 
 	return AddCallerAuthInfoToContext(ctx, callerInfo), nil
 }
@@ -83,6 +99,35 @@ func (ga *GrpcAuthenticator) authenticateService(ctx context.Context, stackID in
 
 	if subject.namespace == namespaceAccessPolicy {
 		return nil, fmt.Errorf("access token subject '%s' namespace is not allowed: %w", subject.namespace, ErrorInvalidAccessToken)
+	}
+
+	return claims, nil
+}
+
+func (ga *GrpcAuthenticator) authenticateUser(ctx context.Context, stackID int64, md metadata.MD) (*Claims[IDTokenClaims], error) {
+	id, ok := getFirstMetadataValue(md, DefaultIdTokenMetadataKey)
+	if !ok {
+		return nil, ErrorMissingIDToken
+	}
+
+	claims, err := ga.idVerifier.Verify(ctx, id)
+	if err != nil {
+		return nil, fmt.Errorf("%v: %w", err, ErrorInvalidIDToken)
+	}
+
+	expectedNamespace := ga.namespaceFmt(stackID)
+
+	if claims.Rest.Namespace != expectedNamespace {
+		return nil, fmt.Errorf("unexpected id token namespace '%s': %w", claims.Rest.Namespace, ErrorInvalidIDToken)
+	}
+
+	subject, err := parseSubject(claims.Subject)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse id token subject - %v: %w", err, ErrorInvalidIDToken)
+	}
+
+	if subject.namespace != namespaceUser && subject.namespace != namespaceServiceAccount {
+		return nil, fmt.Errorf("id token subject '%s' namespace is not allowed: %w", subject.namespace, ErrorInvalidIDToken)
 	}
 
 	return claims, nil
