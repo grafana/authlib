@@ -16,8 +16,8 @@ type IDTokenClaims struct {
 	Username string `json:"username"`
 	// UID is the unique ID of the user (UID attribute)
 	UID string `json:"uid"`
-	// Name of the user (name attribute)
-	Name string `json:"name"`
+	// Display Name of the user (name attribute if it is set, otherwise the login or email)
+	DisplayName string `json:"name"`
 }
 
 func (c IDTokenClaims) NamespaceMatches(namespace string) bool {
