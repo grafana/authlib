@@ -97,7 +97,7 @@ func (ga *GrpcAuthenticator) authenticateService(ctx context.Context, stackID in
 	}
 
 	if subject.Type != typeAccessPolicy {
-		return nil, fmt.Errorf("access token subject '%s' namespace is not allowed: %w", subject.Type, ErrorInvalidAccessToken)
+		return nil, fmt.Errorf("access token subject '%s' type is not allowed: %w", subject.Type, ErrorInvalidAccessToken)
 	}
 
 	return claims, nil
@@ -126,7 +126,7 @@ func (ga *GrpcAuthenticator) authenticateUser(ctx context.Context, stackID int64
 	}
 
 	if subject.Type != typeUser && subject.Type != typeServiceAccount {
-		return nil, fmt.Errorf("id token subject '%s' namespace is not allowed: %w", subject.Type, ErrorInvalidIDToken)
+		return nil, fmt.Errorf("id token subject '%s' type is not allowed: %w", subject.Type, ErrorInvalidIDToken)
 	}
 
 	return claims, nil
