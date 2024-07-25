@@ -20,7 +20,7 @@ var (
 	ErrorInvalidAccessToken = status.Error(codes.PermissionDenied, "unauthorized: invalid access token")
 )
 
-// TODO (gamab) - Constructor
+// TODO (gamab) - Constructor w/ config options
 // TODO (gamab) - ID token should be optional
 // TODO (gamab) - Add unsafe option to make access tokens optional as well (on-prem support)
 // TODO (gamab) - Metadata key should be configurable
