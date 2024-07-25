@@ -19,9 +19,10 @@ var (
 	ErrorInvalidAccessToken = status.Error(codes.PermissionDenied, "unauthorized: invalid access token")
 )
 
+// TODO (gamab) - Constructor
 // TODO (gamab) - ID token should be optional
 // TODO (gamab) - Metadata key should be configurable
-// TODO (gamab) - StackID should extract should be configurable - could come from the metadata, path, id token.
+// TODO (gamab) - StackID extract should be configurable - could come from the metadata, path, id token.
 
 // GrpcAuthenticatorConfig holds the configuration for the gRPC authenticator.
 type GrpcAuthenticatorConfig struct {
@@ -42,7 +43,7 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 		return nil, ErrorMissingMetadata
 	}
 
-	// TODO (gamab) - StackID should extract should be configurable - could come from the metadata, path, id token.
+	// TODO (gamab) - StackID extract should be configurable - could come from the metadata, path, id token.
 	stackID, ok := getFirstMetadataValue(md, DefaultStackIDMetadataKey)
 	if !ok {
 		return nil, fmt.Errorf("missing stack ID: %w", ErrorMissingMetadata)
@@ -97,7 +98,7 @@ func (ga *GrpcAuthenticator) authenticateService(ctx context.Context, stackID in
 		return nil, fmt.Errorf("failed to parse access token subject - %v: %w", err, ErrorInvalidAccessToken)
 	}
 
-	if subject.namespace == namespaceAccessPolicy {
+	if subject.namespace != namespaceAccessPolicy {
 		return nil, fmt.Errorf("access token subject '%s' namespace is not allowed: %w", subject.namespace, ErrorInvalidAccessToken)
 	}
 
