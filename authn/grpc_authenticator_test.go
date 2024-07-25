@@ -74,7 +74,7 @@ func TestGrpcAuthenticator_authenticateServie(t *testing.T) {
 			md:   metadata.Pairs(DefaultAccessTokenMetadataKey, "access-token"),
 			initAccessToken: func(env *testEnv) {
 				env.atVerifier.expectedClaims = &Claims[AccessTokenClaims]{
-					Claims: &jwt.Claims{Subject: string(namespaceAPIKey) + ":3"},
+					Claims: &jwt.Claims{Subject: string(typeAPIKey) + ":3"},
 					Rest:   AccessTokenClaims{Namespace: "stack-12"},
 				}
 			},
@@ -85,12 +85,12 @@ func TestGrpcAuthenticator_authenticateServie(t *testing.T) {
 			md:   metadata.Pairs(DefaultAccessTokenMetadataKey, "access-token"),
 			initAccessToken: func(env *testEnv) {
 				env.atVerifier.expectedClaims = &Claims[AccessTokenClaims]{
-					Claims: &jwt.Claims{Subject: string(namespaceAccessPolicy) + ":3"},
+					Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
 					Rest:   AccessTokenClaims{Namespace: "stack-12"},
 				}
 			},
 			want: &Claims[AccessTokenClaims]{
-				Claims: &jwt.Claims{Subject: string(namespaceAccessPolicy) + ":3"},
+				Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
 				Rest:   AccessTokenClaims{Namespace: "stack-12"},
 			},
 		},
@@ -99,12 +99,12 @@ func TestGrpcAuthenticator_authenticateServie(t *testing.T) {
 			md:   metadata.Pairs(DefaultAccessTokenMetadataKey, "access-token"),
 			initAccessToken: func(env *testEnv) {
 				env.atVerifier.expectedClaims = &Claims[AccessTokenClaims]{
-					Claims: &jwt.Claims{Subject: string(namespaceAccessPolicy) + ":3"},
+					Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
 					Rest:   AccessTokenClaims{Namespace: "*"},
 				}
 			},
 			want: &Claims[AccessTokenClaims]{
-				Claims: &jwt.Claims{Subject: string(namespaceAccessPolicy) + ":3"},
+				Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
 				Rest:   AccessTokenClaims{Namespace: "*"},
 			},
 		},
@@ -174,7 +174,7 @@ func TestGrpcAuthenticator_authenticateUser(t *testing.T) {
 			md:   metadata.Pairs(DefaultIdTokenMetadataKey, "id-token"),
 			initIDToken: func(env *testEnv) {
 				env.idVerifier.expectedClaims = &Claims[IDTokenClaims]{
-					Claims: &jwt.Claims{Subject: string(namespaceAPIKey) + ":3"},
+					Claims: &jwt.Claims{Subject: string(typeAPIKey) + ":3"},
 					Rest:   IDTokenClaims{Namespace: "stack-12"},
 				}
 			},
@@ -185,12 +185,12 @@ func TestGrpcAuthenticator_authenticateUser(t *testing.T) {
 			md:   metadata.Pairs(DefaultIdTokenMetadataKey, "id-token"),
 			initIDToken: func(env *testEnv) {
 				env.idVerifier.expectedClaims = &Claims[IDTokenClaims]{
-					Claims: &jwt.Claims{Subject: string(namespaceUser) + ":3"},
+					Claims: &jwt.Claims{Subject: string(typeUser) + ":3"},
 					Rest:   IDTokenClaims{Namespace: "stack-12"},
 				}
 			},
 			want: &Claims[IDTokenClaims]{
-				Claims: &jwt.Claims{Subject: string(namespaceUser) + ":3"},
+				Claims: &jwt.Claims{Subject: string(typeUser) + ":3"},
 				Rest:   IDTokenClaims{Namespace: "stack-12"},
 			},
 		},

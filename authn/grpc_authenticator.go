@@ -98,8 +98,8 @@ func (ga *GrpcAuthenticator) authenticateService(ctx context.Context, stackID in
 		return nil, fmt.Errorf("failed to parse access token subject - %v: %w", err, ErrorInvalidAccessToken)
 	}
 
-	if subject.namespace != namespaceAccessPolicy {
-		return nil, fmt.Errorf("access token subject '%s' namespace is not allowed: %w", subject.namespace, ErrorInvalidAccessToken)
+	if subject.Type != typeAccessPolicy {
+		return nil, fmt.Errorf("access token subject '%s' namespace is not allowed: %w", subject.Type, ErrorInvalidAccessToken)
 	}
 
 	return claims, nil
@@ -127,8 +127,8 @@ func (ga *GrpcAuthenticator) authenticateUser(ctx context.Context, stackID int64
 		return nil, fmt.Errorf("failed to parse id token subject - %v: %w", err, ErrorInvalidIDToken)
 	}
 
-	if subject.namespace != namespaceUser && subject.namespace != namespaceServiceAccount {
-		return nil, fmt.Errorf("id token subject '%s' namespace is not allowed: %w", subject.namespace, ErrorInvalidIDToken)
+	if subject.Type != typeUser && subject.Type != typeServiceAccount {
+		return nil, fmt.Errorf("id token subject '%s' namespace is not allowed: %w", subject.Type, ErrorInvalidIDToken)
 	}
 
 	return claims, nil
@@ -151,14 +151,14 @@ func getFirstMetadataValue(md metadata.MD, key string) (string, bool) {
 // FIXME: This is a duplicate of Grafana's identity namespaces and namespacedID. It should be moved to a shared package.
 // ------
 const (
-	namespaceUser           subjectNamespace = "user"
-	namespaceAPIKey         subjectNamespace = "api-key"
-	namespaceServiceAccount subjectNamespace = "service-account"
-	namespaceAnonymous      subjectNamespace = "anonymous"
-	namespaceRenderService  subjectNamespace = "render"
-	namespaceAccessPolicy   subjectNamespace = "access-policy"
-	namespaceProvisioning   subjectNamespace = "provisioning"
-	namespaceEmpty          subjectNamespace = ""
+	typeUser           subjectType = "user"
+	typeAPIKey         subjectType = "api-key"
+	typeServiceAccount subjectType = "service-account"
+	typeAnonymous      subjectType = "anonymous"
+	typeRenderService  subjectType = "render"
+	typeAccessPolicy   subjectType = "access-policy"
+	typeProvisioning   subjectType = "provisioning"
+	typeEmpty          subjectType = ""
 )
 
 var (
@@ -166,11 +166,11 @@ var (
 	ErrorInvalidNamespace = status.Error(codes.PermissionDenied, "unauthorized: invalid namespace")
 )
 
-type subjectNamespace string
+type subjectType string
 
-func (n subjectNamespace) isValid() error {
+func (n subjectType) isValid() error {
 	switch n {
-	case namespaceUser, namespaceAPIKey, namespaceServiceAccount, namespaceAnonymous, namespaceRenderService, namespaceAccessPolicy, namespaceProvisioning, namespaceEmpty:
+	case typeUser, typeAPIKey, typeServiceAccount, typeAnonymous, typeRenderService, typeAccessPolicy, typeProvisioning, typeEmpty:
 		return nil
 	default:
 		return fmt.Errorf("invalid namespace %s: %w", n, ErrorInvalidNamespace)
@@ -178,8 +178,8 @@ func (n subjectNamespace) isValid() error {
 }
 
 type subject struct {
-	id        string           // Ex: 1234567890
-	namespace subjectNamespace // Ex: user, service-account, api-key
+	ID   string      // Ex: 1234567890
+	Type subjectType // Ex: user, service-account, api-key
 }
 
 func parseSubject(str string) (subject, error) {
@@ -190,10 +190,10 @@ func parseSubject(str string) (subject, error) {
 		return subject, fmt.Errorf("expected namespace id to have 2 parts: %w", ErrorInvalidSubject)
 	}
 
-	subject.id = parts[1]
-	subject.namespace = subjectNamespace(parts[0])
+	subject.ID = parts[1]
+	subject.Type = subjectType(parts[0])
 
-	err := subject.namespace.isValid()
+	err := subject.Type.isValid()
 	if err != nil {
 		return subject, err
 	}
