@@ -3,11 +3,12 @@ package authn
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
-	"github.com/gogo/status"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 )
 
 var (
@@ -37,14 +38,19 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 		return nil, ErrorMissingMetadata
 	}
 
-	at, ok := getFirstMetadataValue(md, DefaultAccessTokenMetadataKey)
+	// TODO: Make this configurable: stackID could come from the metadata or the path.
+	stackID, ok := getFirstMetadataValue(md, DefaultStackIDMetadataKey)
 	if !ok {
-		return nil, ErrorMissingAccessToken
+		return nil, fmt.Errorf("missing stack ID: %w", ErrorMissingMetadata)
+	}
+	stackIDInt, err := strconv.ParseInt(stackID, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse stack ID: %w", ErrorMissingMetadata)
 	}
 
-	atClaims, err := ga.atVerifier.Verify(ctx, at)
+	atClaims, err := ga.authenticateService(ctx, stackIDInt, md)
 	if err != nil {
-		return nil, fmt.Errorf("%v: %w", err, ErrorInvalidAccessToken)
+		return nil, err
 	}
 
 	callerInfo.AccessTokenClaims = *atClaims
@@ -52,24 +58,34 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 	return AddCallerAuthInfoToContext(ctx, callerInfo), nil
 }
 
-func (ga *GrpcAuthenticator) authenticateService(stackID int64, claims *Claims[AccessTokenClaims]) error {
+func (ga *GrpcAuthenticator) authenticateService(ctx context.Context, stackID int64, md metadata.MD) (*Claims[AccessTokenClaims], error) {
+	at, ok := getFirstMetadataValue(md, DefaultAccessTokenMetadataKey)
+	if !ok {
+		return nil, ErrorMissingAccessToken
+	}
+
+	claims, err := ga.atVerifier.Verify(ctx, at)
+	if err != nil {
+		return nil, fmt.Errorf("%v: %w", err, ErrorInvalidAccessToken)
+	}
+
 	expectedNamespace := ga.namespaceFmt(stackID)
 
 	// Allow access tokens with that has a wildcard namespace or a namespace matching this instance.
 	if !claims.Rest.NamespaceMatches(expectedNamespace) {
-		return fmt.Errorf("unexpected access token namespace: %s", claims.Rest.Namespace, ErrorInvalidAccessToken)
+		return nil, fmt.Errorf("unexpected access token namespace '%s': %w", claims.Rest.Namespace, ErrorInvalidAccessToken)
 	}
 
 	subject, err := parseSubject(claims.Subject)
 	if err != nil {
-		return fmt.Errorf("failed to parse access token subject %v", err, ErrorInvalidAccessToken)
+		return nil, fmt.Errorf("failed to parse access token subject - %v: %w", err, ErrorInvalidAccessToken)
 	}
 
 	if subject.namespace == namespaceAccessPolicy {
-		return fmt.Errorf("access token subject '%s' namespace is not allowed: %w", subject.namespace, ErrorInvalidAccessToken)
+		return nil, fmt.Errorf("access token subject '%s' namespace is not allowed: %w", subject.namespace, ErrorInvalidAccessToken)
 	}
 
-	return nil
+	return claims, nil
 }
 
 func getFirstMetadataValue(md metadata.MD, key string) (string, bool) {
