@@ -5,6 +5,7 @@ import "context"
 type CallerAuthInfo struct {
 	IDTokenClaims     *Claims[IDTokenClaims]
 	AccessTokenClaims Claims[AccessTokenClaims]
+	StackID           int64
 }
 
 type CallerAuthInfoContextKey struct{}
