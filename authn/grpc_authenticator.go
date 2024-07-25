@@ -36,6 +36,7 @@ type GrpcAuthenticator struct {
 	namespaceFmt NamespaceFormatter
 }
 
+// Authenticate authenticates the incoming request based on the access token and ID token, and returns the context with the caller information.
 func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context, error) {
 	callerInfo := CallerAuthInfo{}
 
