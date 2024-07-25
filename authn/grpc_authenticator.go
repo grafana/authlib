@@ -15,6 +15,7 @@ var (
 	ErrorMissingMetadata    = status.Error(codes.Unauthenticated, "unauthenticated: no metadata found")
 	ErrorMissingIDToken     = status.Error(codes.Unauthenticated, "unauthenticated: missing id token")
 	ErrorMissingAccessToken = status.Error(codes.Unauthenticated, "unauthenticated: missing access token")
+	ErrorInvalidStackID     = status.Error(codes.PermissionDenied, "unauthorized: invalid stack ID")
 	ErrorInvalidIDToken     = status.Error(codes.PermissionDenied, "unauthorized: invalid id token")
 	ErrorInvalidAccessToken = status.Error(codes.PermissionDenied, "unauthorized: invalid access token")
 )
@@ -50,7 +51,7 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 	}
 	stackIDInt, err := strconv.ParseInt(stackID, 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse stack ID: %w", ErrorMissingMetadata)
+		return nil, fmt.Errorf("failed to parse stack ID: %w", ErrorInvalidStackID)
 	}
 	callerInfo.StackID = stackIDInt
 
@@ -66,11 +67,6 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 		return nil, err
 	}
 	callerInfo.IDTokenClaims = idClaims
-
-	// Allow access tokens with either the same namespace as the validated id token namespace or wildcard (`*`).
-	if !atClaims.Rest.NamespaceMatches(idClaims.Rest.Namespace) {
-		return nil, fmt.Errorf("unexpected access token namespace: %s", atClaims.Rest.Namespace)
-	}
 
 	return AddCallerAuthInfoToContext(ctx, callerInfo), nil
 }
