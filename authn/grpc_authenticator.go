@@ -93,7 +93,7 @@ func (ga *GrpcAuthenticator) authenticateService(ctx context.Context, stackID in
 
 	subject, err := parseSubject(claims.Subject)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("access token subject '%s' is not valid: %w", claims.Subject, err)
 	}
 
 	if subject.Type != typeAccessPolicy {
@@ -122,7 +122,7 @@ func (ga *GrpcAuthenticator) authenticateUser(ctx context.Context, stackID int64
 
 	subject, err := parseSubject(claims.Subject)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("id token subject '%s' is not valid: %w", claims.Subject, err)
 	}
 
 	if subject.Type != typeUser && subject.Type != typeServiceAccount {
