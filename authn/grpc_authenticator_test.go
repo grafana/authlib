@@ -166,7 +166,7 @@ func TestGrpcAuthenticator_authenticateService(t *testing.T) {
 					Rest:   AccessTokenClaims{Namespace: "stack-12"},
 				}
 			},
-			wantErr: ErrorInvalidAccessToken,
+			wantErr: ErrorInvalidSubject,
 		},
 		{
 			name: "invalid subject type",
@@ -177,7 +177,7 @@ func TestGrpcAuthenticator_authenticateService(t *testing.T) {
 					Rest:   AccessTokenClaims{Namespace: "stack-12"},
 				}
 			},
-			wantErr: ErrorInvalidAccessToken,
+			wantErr: ErrorInvalidSubjectType,
 		},
 		{
 			name: "valid access token",
@@ -266,7 +266,7 @@ func TestGrpcAuthenticator_authenticateUser(t *testing.T) {
 					Rest:   IDTokenClaims{Namespace: "stack-12"},
 				}
 			},
-			wantErr: ErrorInvalidIDToken,
+			wantErr: ErrorInvalidSubject,
 		},
 		{
 			name: "invalid subject type",
@@ -277,7 +277,7 @@ func TestGrpcAuthenticator_authenticateUser(t *testing.T) {
 					Rest:   IDTokenClaims{Namespace: "stack-12"},
 				}
 			},
-			wantErr: ErrorInvalidIDToken,
+			wantErr: ErrorInvalidSubjectType,
 		},
 		{
 			name: "valid id token",

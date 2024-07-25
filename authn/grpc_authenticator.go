@@ -93,11 +93,11 @@ func (ga *GrpcAuthenticator) authenticateService(ctx context.Context, stackID in
 
 	subject, err := parseSubject(claims.Subject)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse access token subject - %v: %w", err, ErrorInvalidAccessToken)
+		return nil, err
 	}
 
 	if subject.Type != typeAccessPolicy {
-		return nil, fmt.Errorf("access token subject '%s' type is not allowed: %w", subject.Type, ErrorInvalidAccessToken)
+		return nil, fmt.Errorf("access token subject '%s' type is not allowed: %w", subject.Type, ErrorInvalidSubjectType)
 	}
 
 	return claims, nil
@@ -122,11 +122,11 @@ func (ga *GrpcAuthenticator) authenticateUser(ctx context.Context, stackID int64
 
 	subject, err := parseSubject(claims.Subject)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse id token subject - %v: %w", err, ErrorInvalidIDToken)
+		return nil, err
 	}
 
 	if subject.Type != typeUser && subject.Type != typeServiceAccount {
-		return nil, fmt.Errorf("id token subject '%s' type is not allowed: %w", subject.Type, ErrorInvalidIDToken)
+		return nil, fmt.Errorf("id token subject '%s' type is not allowed: %w", subject.Type, ErrorInvalidSubjectType)
 	}
 
 	return claims, nil
