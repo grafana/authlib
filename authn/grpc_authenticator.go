@@ -22,6 +22,7 @@ var (
 
 // TODO (gamab) - Constructor
 // TODO (gamab) - ID token should be optional
+// TODO (gamab) - Add unsafe option to make access tokens optional as well (on-prem support)
 // TODO (gamab) - Metadata key should be configurable
 // TODO (gamab) - StackID extract should be configurable - could come from the metadata, path, id token.
 
