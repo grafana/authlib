@@ -29,7 +29,7 @@ func setupGrpcAuthenticator() *testEnv {
 		idVerifier:   env.idVerifier,
 		namespaceFmt: CloudNamespaceFormatter,
 	}
-	setDefaultMetadataKeys(env.authenticator.cfg)
+	setCfgDefaults(env.authenticator.cfg)
 
 	return env
 }
@@ -74,6 +74,13 @@ func TestGrpcAuthenticator_NewGrpcAuthenticator(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, ga)
 		require.Equal(t, kr, ga.keyRetriever)
+	})
+	t.Run("initialize authenticator with disabled access token", func(t *testing.T) {
+		emptyCfg := &GrpcAuthenticatorConfig{}
+		ga, err := NewGrpcAuthenticator(emptyCfg, WithDisableAccessTokenAuthOption())
+		require.NoError(t, err)
+		require.NotNil(t, ga)
+		require.Nil(t, ga.atVerifier)
 	})
 }
 
@@ -178,6 +185,19 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "valid no authentication when both access and id token are disabled",
+			md:   metadata.Pairs(DefaultStackIDMetadataKey, "12", DefaultAccessTokenMetadataKey, "access-token", DefaultIdTokenMetadataKey, "id-token"),
+			initEnv: func(env *testEnv) {
+				env.authenticator.cfg.accessTokenAuthEnabled = false
+				env.authenticator.cfg.idTokenAuthEnabled = false
+				env.authenticator.cfg.idTokenAuthRequired = false
+			},
+			want: CallerAuthInfo{
+				StackID:           12,
+				AccessTokenClaims: Claims[AccessTokenClaims]{},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -204,7 +224,11 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, got)
 			require.Equal(t, tt.want.StackID, got.StackID)
-			require.Equal(t, *tt.want.AccessTokenClaims.Claims, *got.AccessTokenClaims.Claims)
+			if tt.want.AccessTokenClaims.Claims == nil {
+				require.Nil(t, got.AccessTokenClaims.Claims)
+			} else {
+				require.Equal(t, *tt.want.AccessTokenClaims.Claims, *got.AccessTokenClaims.Claims)
+			}
 			require.Equal(t, tt.want.AccessTokenClaims.Rest, got.AccessTokenClaims.Rest)
 
 			if tt.want.IDTokenClaims == nil {
