@@ -34,6 +34,56 @@ func setupGrpcAuthenticator() *testEnv {
 	return env
 }
 
+func TestGrpcAuthenticator_NewGrpcAuthenticator(t *testing.T) {
+	t.Run("should return error when missing signing keys URL", func(t *testing.T) {
+		ga, err := NewGrpcAuthenticator(&GrpcAuthenticatorConfig{})
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrMissingConfig)
+		require.Nil(t, ga)
+	})
+	t.Run("initialize authenticator with no option", func(t *testing.T) {
+		ga, err := NewGrpcAuthenticator(&GrpcAuthenticatorConfig{
+			KeyRetrieverConfig: KeyRetrieverConfig{SigningKeysURL: "http://localhost:3000/api/v1/keys"},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, ga)
+		require.NotNil(t, ga.keyRetriever)
+		require.NotNil(t, ga.atVerifier)
+		// ID token authentication is disabled by default
+		require.Nil(t, ga.idVerifier)
+		// Config has default metadata keys
+		require.Equal(t, DefaultAccessTokenMetadataKey, ga.cfg.AccessTokenMetadataKey)
+		require.Equal(t, DefaultIdTokenMetadataKey, ga.cfg.IDTokenMetadataKey)
+		require.Equal(t, DefaultStackIDMetadataKey, ga.cfg.StackIDMetadataKey)
+	})
+	t.Run("initialize authenticator with id token option", func(t *testing.T) {
+		ga, err := NewGrpcAuthenticator(
+			&GrpcAuthenticatorConfig{KeyRetrieverConfig: KeyRetrieverConfig{SigningKeysURL: "http://localhost:3000/api/v1/keys"}},
+			WithIDTokenAuthOption(true),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, ga)
+		require.NotNil(t, ga.keyRetriever)
+		require.NotNil(t, ga.atVerifier)
+		require.NotNil(t, ga.idVerifier)
+		// Config has default metadata keys
+		require.Equal(t, DefaultAccessTokenMetadataKey, ga.cfg.AccessTokenMetadataKey)
+		require.Equal(t, DefaultIdTokenMetadataKey, ga.cfg.IDTokenMetadataKey)
+		require.Equal(t, DefaultStackIDMetadataKey, ga.cfg.StackIDMetadataKey)
+		// ID token authentication is enabled
+		require.True(t, ga.cfg.idTokenAuthEnabled)
+		require.True(t, ga.cfg.idTokenAuthRequired)
+	})
+	t.Run("should not require KeyRetrieverConfig when key retriever is provided", func(t *testing.T) {
+		kr := &DefaultKeyRetriever{}
+		emptyCfg := &GrpcAuthenticatorConfig{}
+		ga, err := NewGrpcAuthenticator(emptyCfg, WithKeyRetrieverOption(kr))
+		require.NoError(t, err)
+		require.NotNil(t, ga)
+		require.Equal(t, kr, ga.keyRetriever)
+	})
+}
+
 func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 	tests := []struct {
 		name    string
