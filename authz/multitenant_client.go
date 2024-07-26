@@ -111,6 +111,8 @@ func WithNamespaceFormatterLCOption(fmt authn.NamespaceFormatter) LegacyClientOp
 	}
 }
 
+// WithDisableAccessTokenLCOption is an option to disable access token authorization.
+// Warning: Using this option means there won't be any service authorization.
 func WithDisableAccessTokenLCOption() LegacyClientOption {
 	return func(c *LegacyClientImpl) {
 		c.authCfg.accessTokenAuthEnabled = false
