@@ -20,7 +20,6 @@ var (
 	ErrorInvalidAccessToken = status.Error(codes.PermissionDenied, "unauthorized: invalid access token")
 )
 
-// TODO (gamab) - Add unsafe option to make access tokens optional as well (on-prem support)
 // TODO (gamab) - StackID extract should be configurable - could come from the metadata, path, id token.
 
 // GrpcAuthenticatorOptions
@@ -44,6 +43,10 @@ type GrpcAuthenticatorConfig struct {
 	// VerifierConfig holds the configuration for the token verifiers.
 	VerifierConfig VerifierConfig
 
+	// accessTokenAuthEnabled is a flag to enable access token authentication.
+	// If disabled, only ID token authentication is performed.
+	// Warning: Using this option means there won't be any service authentication.
+	accessTokenAuthEnabled bool
 	// idTokenAuthEnabled is a flag to enable ID token authentication.
 	// If disabled, only access token authentication is performed.
 	idTokenAuthEnabled bool
@@ -76,7 +79,15 @@ func WithIDTokenAuthOption(required bool) GrpcAuthenticatorOption {
 	}
 }
 
-func setDefaultMetadataKeys(cfg *GrpcAuthenticatorConfig) {
+// WithDisableAccessTokenAuthOption is a flag to disable access token authentication.
+// Warning: Using this option means there won't be any service authentication.
+func WithDisableAccessTokenAuthOption() GrpcAuthenticatorOption {
+	return func(ga *GrpcAuthenticator) {
+		ga.cfg.accessTokenAuthEnabled = false
+	}
+}
+
+func setCfgDefaults(cfg *GrpcAuthenticatorConfig) {
 	if cfg.AccessTokenMetadataKey == "" {
 		cfg.AccessTokenMetadataKey = DefaultAccessTokenMetadataKey
 	}
@@ -86,17 +97,18 @@ func setDefaultMetadataKeys(cfg *GrpcAuthenticatorConfig) {
 	if cfg.StackIDMetadataKey == "" {
 		cfg.StackIDMetadataKey = DefaultStackIDMetadataKey
 	}
+	cfg.accessTokenAuthEnabled = true
 }
 
 func NewGrpcAuthenticator(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthenticatorOption) (*GrpcAuthenticator, error) {
-	setDefaultMetadataKeys(cfg)
+	setCfgDefaults(cfg)
 
 	ga := &GrpcAuthenticator{cfg: cfg}
 	for _, opt := range opts {
 		opt(ga)
 	}
 
-	if ga.keyRetriever == nil {
+	if ga.keyRetriever == nil && (ga.cfg.accessTokenAuthEnabled || ga.cfg.idTokenAuthEnabled) {
 		if cfg.KeyRetrieverConfig.SigningKeysURL == "" {
 			return nil, fmt.Errorf("missing signing keys URL: %w", ErrMissingConfig)
 		}
@@ -105,7 +117,9 @@ func NewGrpcAuthenticator(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthenticato
 		ga.keyRetriever = kr
 	}
 
-	ga.atVerifier = NewAccessTokenVerifier(cfg.VerifierConfig, ga.keyRetriever)
+	if ga.cfg.accessTokenAuthEnabled {
+		ga.atVerifier = NewAccessTokenVerifier(cfg.VerifierConfig, ga.keyRetriever)
+	}
 
 	if ga.cfg.idTokenAuthEnabled {
 		ga.idVerifier = NewIDTokenVerifier(cfg.VerifierConfig, ga.keyRetriever)
@@ -123,7 +137,6 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 		return nil, ErrorMissingMetadata
 	}
 
-	// TODO (gamab) - StackID extract should be configurable - could come from the metadata, path, id token.
 	stackID, ok := getFirstMetadataValue(md, ga.cfg.StackIDMetadataKey)
 	if !ok {
 		return nil, fmt.Errorf("missing stack ID: %w", ErrorMissingMetadata)
@@ -134,11 +147,13 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 	}
 	callerInfo.StackID = stackIDInt
 
-	atClaims, err := ga.authenticateService(ctx, stackIDInt, md)
-	if err != nil {
-		return nil, err
+	if ga.cfg.accessTokenAuthEnabled {
+		atClaims, err := ga.authenticateService(ctx, stackIDInt, md)
+		if err != nil {
+			return nil, err
+		}
+		callerInfo.AccessTokenClaims = *atClaims
 	}
-	callerInfo.AccessTokenClaims = *atClaims
 
 	if ga.cfg.idTokenAuthEnabled {
 		idClaims, err := ga.authenticateUser(ctx, stackIDInt, md)
