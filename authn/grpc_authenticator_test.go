@@ -24,12 +24,57 @@ func setupGrpcAuthenticator() *testEnv {
 		idVerifier: &fakeIDTokenVerifier{},
 	}
 	env.authenticator = &GrpcAuthenticator{
+		cfg:          &GrpcAuthenticatorConfig{idTokenAuthEnabled: true, idTokenAuthRequired: true},
 		atVerifier:   env.atVerifier,
 		idVerifier:   env.idVerifier,
 		namespaceFmt: CloudNamespaceFormatter,
 	}
+	setDefaultMetadataKeys(env.authenticator.cfg)
 
 	return env
+}
+
+func TestGrpcAuthenticator_NewGrpcAuthenticator(t *testing.T) {
+	t.Run("should return error when missing signing keys URL", func(t *testing.T) {
+		ga, err := NewGrpcAuthenticator(&GrpcAuthenticatorConfig{})
+		require.ErrorIs(t, err, ErrMissingConfig)
+		require.Nil(t, ga)
+	})
+	t.Run("initialize authenticator with no option", func(t *testing.T) {
+		ga, err := NewGrpcAuthenticator(&GrpcAuthenticatorConfig{
+			KeyRetrieverConfig: KeyRetrieverConfig{SigningKeysURL: "http://localhost:3000/api/v1/keys"},
+		})
+		require.NoError(t, err)
+		require.NotNil(t, ga)
+		require.NotNil(t, ga.keyRetriever)
+		require.NotNil(t, ga.atVerifier)
+		// Config has default metadata keys
+		require.Equal(t, DefaultAccessTokenMetadataKey, ga.cfg.AccessTokenMetadataKey)
+		require.Equal(t, DefaultIdTokenMetadataKey, ga.cfg.IDTokenMetadataKey)
+		require.Equal(t, DefaultStackIDMetadataKey, ga.cfg.StackIDMetadataKey)
+		// ID token authentication is disabled by default
+		require.Nil(t, ga.idVerifier)
+	})
+	t.Run("initialize authenticator with id token option", func(t *testing.T) {
+		ga, err := NewGrpcAuthenticator(
+			&GrpcAuthenticatorConfig{KeyRetrieverConfig: KeyRetrieverConfig{SigningKeysURL: "http://localhost:3000/api/v1/keys"}},
+			WithIDTokenAuthOption(true),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, ga)
+		// ID token authentication is enabled
+		require.NotNil(t, ga.idVerifier)
+		require.True(t, ga.cfg.idTokenAuthEnabled)
+		require.True(t, ga.cfg.idTokenAuthRequired)
+	})
+	t.Run("should not require KeyRetrieverConfig when key retriever is provided", func(t *testing.T) {
+		kr := &DefaultKeyRetriever{}
+		emptyCfg := &GrpcAuthenticatorConfig{}
+		ga, err := NewGrpcAuthenticator(emptyCfg, WithKeyRetrieverOption(kr))
+		require.NoError(t, err)
+		require.NotNil(t, ga)
+		require.Equal(t, kr, ga.keyRetriever)
+	})
 }
 
 func TestGrpcAuthenticator_Authenticate(t *testing.T) {
@@ -95,6 +140,44 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "valid service authentication no id token",
+			md:   metadata.Pairs(DefaultStackIDMetadataKey, "12", DefaultAccessTokenMetadataKey, "access-token"),
+			initEnv: func(env *testEnv) {
+				env.authenticator.cfg.idTokenAuthEnabled = true
+				env.authenticator.cfg.idTokenAuthRequired = false
+				env.atVerifier.expectedClaims = &Claims[AccessTokenClaims]{
+					Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
+					Rest:   AccessTokenClaims{Namespace: "*"},
+				}
+			},
+			want: CallerAuthInfo{
+				StackID: 12,
+				AccessTokenClaims: Claims[AccessTokenClaims]{
+					Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
+					Rest:   AccessTokenClaims{Namespace: "*"},
+				},
+			},
+		},
+		{
+			name: "valid service authentication disable id token verification",
+			md:   metadata.Pairs(DefaultStackIDMetadataKey, "12", DefaultAccessTokenMetadataKey, "access-token", DefaultIdTokenMetadataKey, "id-token"),
+			initEnv: func(env *testEnv) {
+				env.authenticator.cfg.idTokenAuthEnabled = false
+				env.authenticator.cfg.idTokenAuthRequired = false
+				env.atVerifier.expectedClaims = &Claims[AccessTokenClaims]{
+					Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
+					Rest:   AccessTokenClaims{Namespace: "*"},
+				}
+			},
+			want: CallerAuthInfo{
+				StackID: 12,
+				AccessTokenClaims: Claims[AccessTokenClaims]{
+					Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
+					Rest:   AccessTokenClaims{Namespace: "*"},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -123,8 +206,13 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 			require.Equal(t, tt.want.StackID, got.StackID)
 			require.Equal(t, *tt.want.AccessTokenClaims.Claims, *got.AccessTokenClaims.Claims)
 			require.Equal(t, tt.want.AccessTokenClaims.Rest, got.AccessTokenClaims.Rest)
-			require.Equal(t, *tt.want.IDTokenClaims.Claims, *got.IDTokenClaims.Claims)
-			require.Equal(t, tt.want.IDTokenClaims.Rest, got.IDTokenClaims.Rest)
+
+			if tt.want.IDTokenClaims == nil {
+				require.Nil(t, got.IDTokenClaims)
+			} else {
+				require.Equal(t, *tt.want.IDTokenClaims.Claims, *got.IDTokenClaims.Claims)
+				require.Equal(t, tt.want.IDTokenClaims.Rest, got.IDTokenClaims.Rest)
+			}
 		})
 	}
 }
