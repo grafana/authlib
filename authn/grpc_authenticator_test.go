@@ -49,12 +49,12 @@ func TestGrpcAuthenticator_NewGrpcAuthenticator(t *testing.T) {
 		require.NotNil(t, ga)
 		require.NotNil(t, ga.keyRetriever)
 		require.NotNil(t, ga.atVerifier)
-		// ID token authentication is disabled by default
-		require.Nil(t, ga.idVerifier)
 		// Config has default metadata keys
 		require.Equal(t, DefaultAccessTokenMetadataKey, ga.cfg.AccessTokenMetadataKey)
 		require.Equal(t, DefaultIdTokenMetadataKey, ga.cfg.IDTokenMetadataKey)
 		require.Equal(t, DefaultStackIDMetadataKey, ga.cfg.StackIDMetadataKey)
+		// ID token authentication is disabled by default
+		require.Nil(t, ga.idVerifier)
 	})
 	t.Run("initialize authenticator with id token option", func(t *testing.T) {
 		ga, err := NewGrpcAuthenticator(
@@ -63,14 +63,8 @@ func TestGrpcAuthenticator_NewGrpcAuthenticator(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, ga)
-		require.NotNil(t, ga.keyRetriever)
-		require.NotNil(t, ga.atVerifier)
-		require.NotNil(t, ga.idVerifier)
-		// Config has default metadata keys
-		require.Equal(t, DefaultAccessTokenMetadataKey, ga.cfg.AccessTokenMetadataKey)
-		require.Equal(t, DefaultIdTokenMetadataKey, ga.cfg.IDTokenMetadataKey)
-		require.Equal(t, DefaultStackIDMetadataKey, ga.cfg.StackIDMetadataKey)
 		// ID token authentication is enabled
+		require.NotNil(t, ga.idVerifier)
 		require.True(t, ga.cfg.idTokenAuthEnabled)
 		require.True(t, ga.cfg.idTokenAuthRequired)
 	})
