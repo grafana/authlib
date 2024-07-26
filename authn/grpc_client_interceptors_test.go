@@ -64,7 +64,7 @@ func TestGrpcClientInterceptor_wrapContext(t *testing.T) {
 }
 
 func TestGrpcClientInterceptor_wrapContextNoAccessToken(t *testing.T) {
-	gci, err := NewGrpcClientInterceptor(&GrpcClientConfig{DisableAccessToken: true})
+	gci, err := NewGrpcClientInterceptor(&GrpcClientConfig{}, WithDisableAccessTokenOption())
 	require.NoError(t, err)
 
 	type idKey struct{}

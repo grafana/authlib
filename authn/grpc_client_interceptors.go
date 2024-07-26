@@ -16,9 +16,6 @@ const (
 
 // GrpcClientConfig holds the configuration for the gRPC client interceptor.
 type GrpcClientConfig struct {
-	// DisableAccessToken is a flag to disable the access token.
-	// Warning: Using this option means there won't be any service authentication.
-	DisableAccessToken bool
 	// AccessTokenMetadataKey is the key used to store the access token in the outgoing context metadata.
 	// Defaults to "X-Access-Token".
 	AccessTokenMetadataKey string
@@ -34,6 +31,10 @@ type GrpcClientConfig struct {
 	// TokenRequest is the token request to be used for token exchange.
 	// This assumes the token request is static and does not change.
 	TokenRequest *TokenExchangeRequest
+
+	// accessTokenAuthEnabled is a flag to enable access token authentication.
+	// If disabled, no service authentication will be performed. Defaults to true.
+	accessTokenAuthEnabled bool
 }
 
 // GrpcClientInterceptor is a gRPC client interceptor that adds an access token to the outgoing context metadata.
@@ -83,28 +84,40 @@ func WithMetadataExtractorOption(extractors ...ContextMetadataExtractor) GrpcCli
 	}
 }
 
+// WithDisableAccessTokenOption is an option to disable access token authentication.
+// Warning: Using this option means there won't be any service authentication.
+func WithDisableAccessTokenOption() GrpcClientInterceptorOption {
+	return func(gci *GrpcClientInterceptor) {
+		gci.cfg.accessTokenAuthEnabled = false
+	}
+}
+
+func setGrpcClientCfgDefaults(cfg *GrpcClientConfig) {
+	if cfg.AccessTokenMetadataKey == "" {
+		cfg.AccessTokenMetadataKey = DefaultAccessTokenMetadataKey
+	}
+	if cfg.IDTokenMetadataKey == "" {
+		cfg.IDTokenMetadataKey = DefaultIdTokenMetadataKey
+	}
+	if cfg.StackIDMetadataKey == "" {
+		cfg.StackIDMetadataKey = DefaultStackIDMetadataKey
+	}
+	cfg.accessTokenAuthEnabled = true
+}
+
 func NewGrpcClientInterceptor(cfg *GrpcClientConfig, opts ...GrpcClientInterceptorOption) (*GrpcClientInterceptor, error) {
+	setGrpcClientCfgDefaults(cfg)
 	gci := &GrpcClientInterceptor{cfg: cfg}
-
-	if gci.cfg.AccessTokenMetadataKey == "" {
-		gci.cfg.AccessTokenMetadataKey = DefaultAccessTokenMetadataKey
-	}
-	if gci.cfg.IDTokenMetadataKey == "" {
-		gci.cfg.IDTokenMetadataKey = DefaultIdTokenMetadataKey
-	}
-	if gci.cfg.StackIDMetadataKey == "" {
-		gci.cfg.StackIDMetadataKey = DefaultStackIDMetadataKey
-	}
-
-	if gci.cfg.TokenRequest == nil && !gci.cfg.DisableAccessToken {
-		return nil, fmt.Errorf("missing required token request: %w", ErrMissingConfig)
-	}
 
 	for _, opt := range opts {
 		opt(gci)
 	}
 
-	if gci.tokenClient == nil && !gci.cfg.DisableAccessToken {
+	if gci.cfg.TokenRequest == nil && gci.cfg.accessTokenAuthEnabled {
+		return nil, fmt.Errorf("missing required token request: %w", ErrMissingConfig)
+	}
+
+	if gci.tokenClient == nil && gci.cfg.accessTokenAuthEnabled {
 		if gci.cfg.TokenClientConfig == nil {
 			return nil, fmt.Errorf("missing required token client config: %w", ErrMissingConfig)
 		}
@@ -140,7 +153,7 @@ func (gci *GrpcClientInterceptor) StreamClientInterceptor(ctx context.Context, d
 func (gci *GrpcClientInterceptor) wrapContext(ctx context.Context) (context.Context, error) {
 	md := metadata.Pairs()
 
-	if !gci.cfg.DisableAccessToken {
+	if gci.cfg.accessTokenAuthEnabled {
 		token, err := gci.tokenClient.Exchange(ctx, *gci.cfg.TokenRequest)
 		if err != nil {
 			return ctx, err
