@@ -37,7 +37,6 @@ func setupGrpcAuthenticator() *testEnv {
 func TestGrpcAuthenticator_NewGrpcAuthenticator(t *testing.T) {
 	t.Run("should return error when missing signing keys URL", func(t *testing.T) {
 		ga, err := NewGrpcAuthenticator(&GrpcAuthenticatorConfig{})
-		require.Error(t, err)
 		require.ErrorIs(t, err, ErrMissingConfig)
 		require.Nil(t, ga)
 	})
