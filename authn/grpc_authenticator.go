@@ -79,7 +79,7 @@ func WithIDTokenAuthOption(required bool) GrpcAuthenticatorOption {
 	}
 }
 
-// WithDisableAccessTokenAuthOption is a flag to disable access token authentication.
+// WithDisableAccessTokenAuthOption is an option to disable access token authentication.
 // Warning: Using this option means there won't be any service authentication.
 func WithDisableAccessTokenAuthOption() GrpcAuthenticatorOption {
 	return func(ga *GrpcAuthenticator) {
