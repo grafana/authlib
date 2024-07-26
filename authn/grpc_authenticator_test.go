@@ -24,10 +24,12 @@ func setupGrpcAuthenticator() *testEnv {
 		idVerifier: &fakeIDTokenVerifier{},
 	}
 	env.authenticator = &GrpcAuthenticator{
+		cfg:          &GrpcAuthenticatorConfig{idTokenAuthEnabled: true, idTokenAuthRequired: true},
 		atVerifier:   env.atVerifier,
 		idVerifier:   env.idVerifier,
 		namespaceFmt: CloudNamespaceFormatter,
 	}
+	setDefaultMetadataKeys(env.authenticator.cfg)
 
 	return env
 }
@@ -95,6 +97,44 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "valid service authentication no id token",
+			md:   metadata.Pairs(DefaultStackIDMetadataKey, "12", DefaultAccessTokenMetadataKey, "access-token"),
+			initEnv: func(env *testEnv) {
+				env.authenticator.cfg.idTokenAuthEnabled = true
+				env.authenticator.cfg.idTokenAuthRequired = false
+				env.atVerifier.expectedClaims = &Claims[AccessTokenClaims]{
+					Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
+					Rest:   AccessTokenClaims{Namespace: "*"},
+				}
+			},
+			want: CallerAuthInfo{
+				StackID: 12,
+				AccessTokenClaims: Claims[AccessTokenClaims]{
+					Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
+					Rest:   AccessTokenClaims{Namespace: "*"},
+				},
+			},
+		},
+		{
+			name: "valid service authentication disable id token verification",
+			md:   metadata.Pairs(DefaultStackIDMetadataKey, "12", DefaultAccessTokenMetadataKey, "access-token", DefaultIdTokenMetadataKey, "id-token"),
+			initEnv: func(env *testEnv) {
+				env.authenticator.cfg.idTokenAuthEnabled = false
+				env.authenticator.cfg.idTokenAuthRequired = false
+				env.atVerifier.expectedClaims = &Claims[AccessTokenClaims]{
+					Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
+					Rest:   AccessTokenClaims{Namespace: "*"},
+				}
+			},
+			want: CallerAuthInfo{
+				StackID: 12,
+				AccessTokenClaims: Claims[AccessTokenClaims]{
+					Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
+					Rest:   AccessTokenClaims{Namespace: "*"},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -123,8 +163,13 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 			require.Equal(t, tt.want.StackID, got.StackID)
 			require.Equal(t, *tt.want.AccessTokenClaims.Claims, *got.AccessTokenClaims.Claims)
 			require.Equal(t, tt.want.AccessTokenClaims.Rest, got.AccessTokenClaims.Rest)
-			require.Equal(t, *tt.want.IDTokenClaims.Claims, *got.IDTokenClaims.Claims)
-			require.Equal(t, tt.want.IDTokenClaims.Rest, got.IDTokenClaims.Rest)
+
+			if tt.want.IDTokenClaims == nil {
+				require.Nil(t, got.IDTokenClaims)
+			} else {
+				require.Equal(t, *tt.want.IDTokenClaims.Claims, *got.IDTokenClaims.Claims)
+				require.Equal(t, tt.want.IDTokenClaims.Rest, got.IDTokenClaims.Rest)
+			}
 		})
 	}
 }
