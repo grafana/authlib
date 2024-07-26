@@ -44,8 +44,7 @@ type GrpcAuthenticatorConfig struct {
 	VerifierConfig VerifierConfig
 
 	// accessTokenAuthEnabled is a flag to enable access token authentication.
-	// If disabled, only ID token authentication is performed.
-	// Warning: Using this option means there won't be any service authentication.
+	// If disabled, only ID token authentication is performed. Defaults to true.
 	accessTokenAuthEnabled bool
 	// idTokenAuthEnabled is a flag to enable ID token authentication.
 	// If disabled, only access token authentication is performed.
