@@ -28,13 +28,13 @@ type GrpcAuthenticatorOption func(*GrpcAuthenticator)
 
 // GrpcAuthenticatorConfig holds the configuration for the gRPC authenticator.
 type GrpcAuthenticatorConfig struct {
-	// AccessTokenMetadataKey is the key used to store the access token in the outgoing context metadata.
+	// AccessTokenMetadataKey is the key used to retrieve the access token from the incoming metadata.
 	// Defaults to "X-Access-Token".
 	AccessTokenMetadataKey string
-	// IDTokenMetadataKey is the key used to store the ID token in the outgoing context metadata.
-	// Not required if IDTokenExtractor is provided. Defaults to "X-Id-Token".
+	// IDTokenMetadataKey is the key used to retrieve the ID token from the incoming metadata.
+	// Defaults to "X-Id-Token".
 	IDTokenMetadataKey string
-	// StackIDMetadataKey is the key used to store the stack ID in the outgoing context metadata.
+	// StackIDMetadataKey is the key used to retrieve the stack ID from the incoming metadata.
 	// Defaults to "X-Stack-Id".
 	StackIDMetadataKey string
 
