@@ -86,7 +86,7 @@ func WithDisableAccessTokenAuthOption() GrpcAuthenticatorOption {
 	}
 }
 
-func setCfgDefaults(cfg *GrpcAuthenticatorConfig) {
+func setGrpcAuthenticatorCfgDefaults(cfg *GrpcAuthenticatorConfig) {
 	if cfg.AccessTokenMetadataKey == "" {
 		cfg.AccessTokenMetadataKey = DefaultAccessTokenMetadataKey
 	}
@@ -100,7 +100,7 @@ func setCfgDefaults(cfg *GrpcAuthenticatorConfig) {
 }
 
 func NewGrpcAuthenticator(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthenticatorOption) (*GrpcAuthenticator, error) {
-	setCfgDefaults(cfg)
+	setGrpcAuthenticatorCfgDefaults(cfg)
 
 	ga := &GrpcAuthenticator{cfg: cfg}
 	for _, opt := range opts {

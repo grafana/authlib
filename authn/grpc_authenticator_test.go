@@ -29,7 +29,7 @@ func setupGrpcAuthenticator() *testEnv {
 		idVerifier:   env.idVerifier,
 		namespaceFmt: CloudNamespaceFormatter,
 	}
-	setCfgDefaults(env.authenticator.cfg)
+	setGrpcAuthenticatorCfgDefaults(env.authenticator.cfg)
 
 	return env
 }
