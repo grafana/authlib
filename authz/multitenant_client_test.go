@@ -599,7 +599,7 @@ func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			client, authz := setupLegacyClient()
-			client.authCfg.DisableAccessToken = true
+			WithDisableAccessTokenLCOption()(client)
 
 			authz.res = makeReadResponse(tt.res)
 
@@ -617,7 +617,7 @@ func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
 func setupLegacyClient() (*LegacyClientImpl, *FakeAuthzServiceClient) {
 	fakeClient := &FakeAuthzServiceClient{}
 	return &LegacyClientImpl{
-		authCfg:      &MultiTenantClientConfig{},
+		authCfg:      &MultiTenantClientConfig{accessTokenAuthEnabled: true},
 		clientV1:     fakeClient,
 		cache:        cache.NewLocalCache(cache.Config{}),
 		namespaceFmt: authn.CloudNamespaceFormatter,

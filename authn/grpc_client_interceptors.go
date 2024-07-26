@@ -84,6 +84,8 @@ func WithMetadataExtractorOption(extractors ...ContextMetadataExtractor) GrpcCli
 	}
 }
 
+// WithDisableAccessTokenOption is an option to disable access token authentication.
+// Warning: Using this option means there won't be any service authentication.
 func WithDisableAccessTokenOption() GrpcClientInterceptorOption {
 	return func(gci *GrpcClientInterceptor) {
 		gci.cfg.accessTokenAuthEnabled = false

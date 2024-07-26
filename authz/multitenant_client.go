@@ -44,14 +44,15 @@ type MultiTenantClient interface {
 type MultiTenantClientConfig struct {
 	// RemoteAddress is the address of the authz service. It should be in the format "host:port".
 	RemoteAddress string
-	// DisableAccessToken will disable the access token check.
-	// Warning: Using this option means there won't be any service authorization.
-	DisableAccessToken bool
+
+	// accessTokenAuthEnabled is a flag to enable access token authentication.
+	// If disabled, no service authentication will be performed. Defaults to true.
+	accessTokenAuthEnabled bool
 }
 
 var _ MultiTenantClient = (*LegacyClientImpl)(nil)
 
-type LegacyClientOption func(*LegacyClientImpl) error
+type LegacyClientOption func(*LegacyClientImpl)
 
 type LegacyClientImpl struct {
 	authCfg      *MultiTenantClientConfig
@@ -77,41 +78,42 @@ func (tp *tracerProvider) Tracer(name string, options ...trace.TracerOption) tra
 // -----
 
 func WithCacheLCOption(cache cache.Cache) LegacyClientOption {
-	return func(c *LegacyClientImpl) error {
+	return func(c *LegacyClientImpl) {
 		c.cache = cache
-		return nil
 	}
 }
 
 // WithGrpcDialOptionsLCOption sets the gRPC dial options for client connection setup.
 // Useful for adding client interceptors. These options are ignored if WithGrpcConnection is used.
 func WithGrpcDialOptionsLCOption(opts ...grpc.DialOption) LegacyClientOption {
-	return func(c *LegacyClientImpl) error {
+	return func(c *LegacyClientImpl) {
 		c.grpcOptions = opts
-		return nil
 	}
 }
 
 // WithGrpcConnectionLCOption sets the gRPC client connection directly.
 // Useful for running the client in the same process as the authorization service.
 func WithGrpcConnectionLCOption(conn grpc.ClientConnInterface) LegacyClientOption {
-	return func(c *LegacyClientImpl) error {
+	return func(c *LegacyClientImpl) {
 		c.grpcConn = conn
-		return nil
 	}
 }
 
 func WithTracerLCOption(tracer trace.Tracer) LegacyClientOption {
-	return func(c *LegacyClientImpl) error {
+	return func(c *LegacyClientImpl) {
 		c.tracer = tracer
-		return nil
 	}
 }
 
 func WithNamespaceFormatterLCOption(fmt authn.NamespaceFormatter) LegacyClientOption {
-	return func(c *LegacyClientImpl) error {
+	return func(c *LegacyClientImpl) {
 		c.namespaceFmt = fmt
-		return nil
+	}
+}
+
+func WithDisableAccessTokenLCOption() LegacyClientOption {
+	return func(c *LegacyClientImpl) {
+		c.authCfg.accessTokenAuthEnabled = false
 	}
 }
 
@@ -123,9 +125,7 @@ func NewLegacyClient(cfg *MultiTenantClientConfig, opts ...LegacyClientOption) (
 	if cfg == nil {
 		return nil, ErrMissingConfig
 	}
-	if cfg.RemoteAddress == "" {
-		return nil, fmt.Errorf("missing remote address: %w", ErrMissingConfig)
-	}
+	cfg.accessTokenAuthEnabled = true
 
 	client := &LegacyClientImpl{authCfg: cfg}
 
@@ -195,7 +195,7 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 	ctx, span := c.tracer.Start(ctx, "LegacyClientImpl.Check")
 	defer span.End()
 
-	if err := req.Validate(!c.authCfg.DisableAccessToken); err != nil {
+	if err := req.Validate(c.authCfg.accessTokenAuthEnabled); err != nil {
 		span.RecordError(err)
 		return false, err
 	}
@@ -204,7 +204,7 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 		return false, nil
 	}
 
-	if !c.authCfg.DisableAccessToken {
+	if c.authCfg.accessTokenAuthEnabled {
 		span.SetAttributes(attribute.String("service", req.Caller.AccessTokenClaims.Subject))
 	}
 	span.SetAttributes(attribute.Int64("stack_id", req.StackID))
@@ -218,7 +218,7 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 	// No user => check on the service permissions
 	if req.Caller.IDTokenClaims == nil {
 		// access token check is disabled => we can skip the authz service
-		if c.authCfg.DisableAccessToken {
+		if !c.authCfg.accessTokenAuthEnabled {
 			return true, nil
 		}
 
@@ -234,7 +234,7 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 	span.SetAttributes(attribute.String("subject", req.Caller.IDTokenClaims.Subject))
 
 	// Only check the service permissions if the access token check is enabled
-	if !c.authCfg.DisableAccessToken {
+	if c.authCfg.accessTokenAuthEnabled {
 		// Make sure the service is allowed to perform the requested action
 		serviceIsAllowedAction := false
 		for _, p := range req.Caller.AccessTokenClaims.Rest.DelegatedPermissions {
@@ -272,7 +272,7 @@ func (c *LegacyClientImpl) validateNamespace(caller authn.CallerAuthInfo, stackI
 	expectedNamespace := c.namespaceFmt(stackID)
 
 	// Check both AccessToken and IDToken (if present) for namespace match
-	accessTokenMatch := c.authCfg.DisableAccessToken || caller.AccessTokenClaims.Rest.NamespaceMatches(expectedNamespace)
+	accessTokenMatch := !c.authCfg.accessTokenAuthEnabled || caller.AccessTokenClaims.Rest.NamespaceMatches(expectedNamespace)
 	idTokenMatch := caller.IDTokenClaims == nil || caller.IDTokenClaims.Rest.NamespaceMatches(expectedNamespace)
 
 	return accessTokenMatch && idTokenMatch
