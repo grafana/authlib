@@ -23,7 +23,7 @@ var (
 // TODO (gamab) - StackID extract should be configurable - could come from the metadata, path, id token.
 
 // GrpcAuthenticatorOptions
-type GrpcAuthenticatorOption func(*GrpcAuthenticator)
+type GrpcAuthenticatorOption func(*GrpcAuthenticatorImpl)
 
 // GrpcAuthenticatorConfig holds the configuration for the gRPC authenticator.
 type GrpcAuthenticatorConfig struct {
@@ -54,8 +54,8 @@ type GrpcAuthenticatorConfig struct {
 	idTokenAuthRequired bool
 }
 
-// GrpcAuthenticator is a gRPC authenticator that authenticates incoming requests based on the access token and ID token.
-type GrpcAuthenticator struct {
+// GrpcAuthenticatorImpl is a gRPC authenticator that authenticates incoming requests based on the access token and ID token.
+type GrpcAuthenticatorImpl struct {
 	cfg          *GrpcAuthenticatorConfig
 	keyRetriever KeyRetriever
 	atVerifier   Verifier[AccessTokenClaims]
@@ -64,7 +64,7 @@ type GrpcAuthenticator struct {
 }
 
 func WithKeyRetrieverOption(kr KeyRetriever) GrpcAuthenticatorOption {
-	return func(ga *GrpcAuthenticator) {
+	return func(ga *GrpcAuthenticatorImpl) {
 		ga.keyRetriever = kr
 	}
 }
@@ -72,7 +72,7 @@ func WithKeyRetrieverOption(kr KeyRetriever) GrpcAuthenticatorOption {
 // WithIDTokenAuthOption is a flag to enable ID token authentication.
 // If required is true, the ID token is required for authentication.
 func WithIDTokenAuthOption(required bool) GrpcAuthenticatorOption {
-	return func(ga *GrpcAuthenticator) {
+	return func(ga *GrpcAuthenticatorImpl) {
 		ga.cfg.idTokenAuthEnabled = true
 		ga.cfg.idTokenAuthRequired = required
 	}
@@ -81,7 +81,7 @@ func WithIDTokenAuthOption(required bool) GrpcAuthenticatorOption {
 // WithDisableAccessTokenAuthOption is an option to disable access token authentication.
 // Warning: Using this option means there won't be any service authentication.
 func WithDisableAccessTokenAuthOption() GrpcAuthenticatorOption {
-	return func(ga *GrpcAuthenticator) {
+	return func(ga *GrpcAuthenticatorImpl) {
 		ga.cfg.accessTokenAuthEnabled = false
 	}
 }
@@ -99,10 +99,10 @@ func setGrpcAuthenticatorCfgDefaults(cfg *GrpcAuthenticatorConfig) {
 	cfg.accessTokenAuthEnabled = true
 }
 
-func NewGrpcAuthenticator(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthenticatorOption) (*GrpcAuthenticator, error) {
+func NewGrpcAuthenticator(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthenticatorOption) (*GrpcAuthenticatorImpl, error) {
 	setGrpcAuthenticatorCfgDefaults(cfg)
 
-	ga := &GrpcAuthenticator{cfg: cfg}
+	ga := &GrpcAuthenticatorImpl{cfg: cfg}
 	for _, opt := range opts {
 		opt(ga)
 	}
@@ -128,7 +128,7 @@ func NewGrpcAuthenticator(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthenticato
 }
 
 // Authenticate authenticates the incoming request based on the access token and ID token, and returns the context with the caller information.
-func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context, error) {
+func (ga *GrpcAuthenticatorImpl) Authenticate(ctx context.Context) (context.Context, error) {
 	callerInfo := CallerAuthInfo{}
 
 	md, ok := metadata.FromIncomingContext(ctx)
@@ -165,7 +165,7 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 	return AddCallerAuthInfoToContext(ctx, callerInfo), nil
 }
 
-func (ga *GrpcAuthenticator) authenticateService(ctx context.Context, stackID int64, md metadata.MD) (*Claims[AccessTokenClaims], error) {
+func (ga *GrpcAuthenticatorImpl) authenticateService(ctx context.Context, stackID int64, md metadata.MD) (*Claims[AccessTokenClaims], error) {
 	at, ok := getFirstMetadataValue(md, ga.cfg.AccessTokenMetadataKey)
 	if !ok {
 		return nil, ErrorMissingAccessToken
@@ -195,7 +195,7 @@ func (ga *GrpcAuthenticator) authenticateService(ctx context.Context, stackID in
 	return claims, nil
 }
 
-func (ga *GrpcAuthenticator) authenticateUser(ctx context.Context, stackID int64, md metadata.MD) (*Claims[IDTokenClaims], error) {
+func (ga *GrpcAuthenticatorImpl) authenticateUser(ctx context.Context, stackID int64, md metadata.MD) (*Claims[IDTokenClaims], error) {
 	id, ok := getFirstMetadataValue(md, ga.cfg.IDTokenMetadataKey)
 	if !ok {
 		if ga.cfg.idTokenAuthRequired {

@@ -11,7 +11,7 @@ import (
 )
 
 type testEnv struct {
-	authenticator *GrpcAuthenticator
+	authenticator *GrpcAuthenticatorImpl
 	atVerifier    *fakeAccessTokenVerifier
 	idVerifier    *fakeIDTokenVerifier
 }
@@ -23,7 +23,7 @@ func setupGrpcAuthenticator() *testEnv {
 		atVerifier: &fakeAccessTokenVerifier{},
 		idVerifier: &fakeIDTokenVerifier{},
 	}
-	env.authenticator = &GrpcAuthenticator{
+	env.authenticator = &GrpcAuthenticatorImpl{
 		cfg:          &GrpcAuthenticatorConfig{idTokenAuthEnabled: true, idTokenAuthRequired: true},
 		atVerifier:   env.atVerifier,
 		idVerifier:   env.idVerifier,
