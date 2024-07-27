@@ -57,6 +57,9 @@ type GrpcAuthenticatorConfig struct {
 	// VerifierConfig holds the configuration for the token verifiers.
 	VerifierConfig VerifierConfig
 
+	// stackIDExtractor is a function that extracts the stack ID from the incoming metadata, tokens or request.
+	stackIDExtractor func(AuthenticatePayload) (int64, error)
+
 	// accessTokenAuthEnabled is a flag to enable access token authentication.
 	// If disabled, only ID token authentication is performed. Defaults to true.
 	accessTokenAuthEnabled bool
@@ -97,6 +100,43 @@ func WithIDTokenAuthOption(required bool) GrpcAuthenticatorOption {
 func WithDisableAccessTokenAuthOption() GrpcAuthenticatorOption {
 	return func(ga *GrpcAuthenticatorImpl) {
 		ga.cfg.accessTokenAuthEnabled = false
+	}
+}
+
+func WithMetadataStackIDExtractorAuthOption() GrpcAuthenticatorOption {
+	return func(ga *GrpcAuthenticatorImpl) {
+		ga.cfg.stackIDExtractor = func(ap AuthenticatePayload) (int64, error) {
+			stackID, ok := getFirstMetadataValue(ap.Metadata, ga.cfg.StackIDMetadataKey)
+			if !ok {
+				return -1, fmt.Errorf("missing stack ID: %w", ErrorMissingMetadata)
+			}
+			stackIDInt, err := strconv.ParseInt(stackID, 10, 64)
+			if err != nil {
+				return -1, fmt.Errorf("failed to parse stack ID: %w", ErrorInvalidStackID)
+			}
+			return stackIDInt, nil
+		}
+	}
+}
+
+func WithRequestStackIDExtractorAuthOption() GrpcAuthenticatorOption {
+	return func(ga *GrpcAuthenticatorImpl) {
+		ga.cfg.stackIDExtractor = func(ap AuthenticatePayload) (int64, error) {
+			if req, ok := ap.Request.(RequestWithStack); ok {
+				return req.GetStackID(), nil
+			}
+			return -1, fmt.Errorf("missing stack ID: %w", ErrorMissingMetadata)
+		}
+	}
+}
+
+// TODO (gamab): WithIDTokenStackIDExtractorAuthOption - this will require the opposite of NamespaceFormatter
+// func WithIDTokenStackIDExtractorAuthOption() GrpcAuthenticatorOption {
+// }
+
+func WithStackIDExtractorAuthOption(extractor func(AuthenticatePayload) (int64, error)) GrpcAuthenticatorOption {
+	return func(ga *GrpcAuthenticatorImpl) {
+		ga.cfg.stackIDExtractor = extractor
 	}
 }
 
@@ -184,17 +224,11 @@ func (ga *GrpcAuthenticatorImpl) extractPayload(ctx context.Context, req any) (A
 func (ga *GrpcAuthenticatorImpl) Authenticate(ctx context.Context, payload AuthenticatePayload) (context.Context, error) {
 	callerInfo := CallerAuthInfo{}
 
-	stackID, ok := getFirstMetadataValue(payload.Metadata, ga.cfg.StackIDMetadataKey)
-	if !ok {
-		return nil, fmt.Errorf("missing stack ID: %w", ErrorMissingMetadata)
-	}
-	stackIDInt, err := strconv.ParseInt(stackID, 10, 64)
+	stackID, err := ga.cfg.stackIDExtractor(payload)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse stack ID: %w", ErrorInvalidStackID)
+		return nil, err
 	}
-	callerInfo.StackID = stackIDInt
-
-	expectedNamespace := ga.namespaceFmt(stackIDInt)
+	expectedNamespace := ga.namespaceFmt(stackID)
 
 	if ga.cfg.accessTokenAuthEnabled {
 		if payload.AccessTokenClaims == nil {
