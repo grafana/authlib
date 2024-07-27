@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -20,7 +21,20 @@ var (
 	ErrorInvalidAccessToken = status.Error(codes.PermissionDenied, "unauthorized: invalid access token")
 )
 
-// TODO (gamab) - StackID extract should be configurable - could come from the metadata, path, id token.
+type AuthenticatePayload struct {
+	Metadata          metadata.MD
+	AccessTokenClaims *Claims[AccessTokenClaims]
+	IDTokenClaims     *Claims[IDTokenClaims]
+	Request           any
+}
+
+type RequestWithStack interface {
+	GetStackID() int64
+}
+
+type ServiceAuthFuncOverride interface {
+	AuthFuncOverride(ctx context.Context, payload AuthenticatePayload) (context.Context, error)
+}
 
 // GrpcAuthenticatorOptions
 type GrpcAuthenticatorOption func(*GrpcAuthenticatorImpl)
@@ -127,16 +141,50 @@ func NewGrpcAuthenticator(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthenticato
 	return ga, nil
 }
 
-// Authenticate authenticates the incoming request based on the access token and ID token, and returns the context with the caller information.
-func (ga *GrpcAuthenticatorImpl) Authenticate(ctx context.Context) (context.Context, error) {
-	callerInfo := CallerAuthInfo{}
+func (ga *GrpcAuthenticatorImpl) extractPayload(ctx context.Context, req any) (AuthenticatePayload, error) {
+	res := AuthenticatePayload{Request: req}
 
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return nil, ErrorMissingMetadata
+		return res, ErrorMissingMetadata
+	}
+	res.Metadata = md
+
+	if ga.cfg.accessTokenAuthEnabled {
+		at, ok := getFirstMetadataValue(md, ga.cfg.AccessTokenMetadataKey)
+		if !ok {
+			return res, ErrorMissingAccessToken
+		}
+
+		claims, err := ga.atVerifier.Verify(ctx, at)
+		if err != nil {
+			return res, fmt.Errorf("%v: %w", err, ErrorInvalidAccessToken)
+		}
+		res.AccessTokenClaims = claims
 	}
 
-	stackID, ok := getFirstMetadataValue(md, ga.cfg.StackIDMetadataKey)
+	if ga.cfg.idTokenAuthEnabled {
+		id, ok := getFirstMetadataValue(md, ga.cfg.IDTokenMetadataKey)
+		if !ok {
+			if ga.cfg.idTokenAuthRequired {
+				return res, ErrorMissingIDToken
+			}
+		} else {
+			claims, err := ga.idVerifier.Verify(ctx, id)
+			if err != nil {
+				return res, fmt.Errorf("%v: %w", err, ErrorInvalidIDToken)
+			}
+			res.IDTokenClaims = claims
+		}
+	}
+
+	return res, nil
+}
+
+func (ga *GrpcAuthenticatorImpl) Authenticate(ctx context.Context, payload AuthenticatePayload) (context.Context, error) {
+	callerInfo := CallerAuthInfo{}
+
+	stackID, ok := getFirstMetadataValue(payload.Metadata, ga.cfg.StackIDMetadataKey)
 	if !ok {
 		return nil, fmt.Errorf("missing stack ID: %w", ErrorMissingMetadata)
 	}
@@ -146,85 +194,66 @@ func (ga *GrpcAuthenticatorImpl) Authenticate(ctx context.Context) (context.Cont
 	}
 	callerInfo.StackID = stackIDInt
 
+	expectedNamespace := ga.namespaceFmt(stackIDInt)
+
 	if ga.cfg.accessTokenAuthEnabled {
-		atClaims, err := ga.authenticateService(ctx, stackIDInt, md)
-		if err != nil {
+		if payload.AccessTokenClaims == nil {
+			return nil, ErrorMissingAccessToken
+		}
+		if err := ga.authenticateService(ctx, expectedNamespace, payload.AccessTokenClaims); err != nil {
 			return nil, err
 		}
-		callerInfo.AccessTokenClaims = *atClaims
+		callerInfo.AccessTokenClaims = *payload.AccessTokenClaims
 	}
 
 	if ga.cfg.idTokenAuthEnabled {
-		idClaims, err := ga.authenticateUser(ctx, stackIDInt, md)
-		if err != nil {
+		if payload.IDTokenClaims == nil {
+			if ga.cfg.idTokenAuthRequired {
+				return nil, ErrorMissingIDToken
+			}
+		}
+		if err := ga.authenticateUser(ctx, expectedNamespace, payload.IDTokenClaims); err != nil {
 			return nil, err
 		}
-		callerInfo.IDTokenClaims = idClaims
+		callerInfo.IDTokenClaims = payload.IDTokenClaims
 	}
 
 	return AddCallerAuthInfoToContext(ctx, callerInfo), nil
 }
 
-func (ga *GrpcAuthenticatorImpl) authenticateService(ctx context.Context, stackID int64, md metadata.MD) (*Claims[AccessTokenClaims], error) {
-	at, ok := getFirstMetadataValue(md, ga.cfg.AccessTokenMetadataKey)
-	if !ok {
-		return nil, ErrorMissingAccessToken
-	}
-
-	claims, err := ga.atVerifier.Verify(ctx, at)
-	if err != nil {
-		return nil, fmt.Errorf("%v: %w", err, ErrorInvalidAccessToken)
-	}
-
-	expectedNamespace := ga.namespaceFmt(stackID)
-
+func (ga *GrpcAuthenticatorImpl) authenticateService(ctx context.Context, expectedNamespace string, claims *Claims[AccessTokenClaims]) error {
 	// Allow access tokens with that has a wildcard namespace or a namespace matching this instance.
 	if !claims.Rest.NamespaceMatches(expectedNamespace) {
-		return nil, fmt.Errorf("unexpected access token namespace '%s': %w", claims.Rest.Namespace, ErrorInvalidAccessToken)
+		return fmt.Errorf("unexpected access token namespace '%s': %w", claims.Rest.Namespace, ErrorInvalidAccessToken)
 	}
 
 	subject, err := parseSubject(claims.Subject)
 	if err != nil {
-		return nil, fmt.Errorf("access token subject '%s' is not valid: %w", claims.Subject, err)
+		return fmt.Errorf("access token subject '%s' is not valid: %w", claims.Subject, err)
 	}
 
 	if subject.Type != typeAccessPolicy {
-		return nil, fmt.Errorf("access token subject '%s' type is not allowed: %w", subject.Type, ErrorInvalidSubjectType)
+		return fmt.Errorf("access token subject '%s' type is not allowed: %w", subject.Type, ErrorInvalidSubjectType)
 	}
 
-	return claims, nil
+	return nil
 }
 
-func (ga *GrpcAuthenticatorImpl) authenticateUser(ctx context.Context, stackID int64, md metadata.MD) (*Claims[IDTokenClaims], error) {
-	id, ok := getFirstMetadataValue(md, ga.cfg.IDTokenMetadataKey)
-	if !ok {
-		if ga.cfg.idTokenAuthRequired {
-			return nil, ErrorMissingIDToken
-		}
-		return nil, nil
-	}
-
-	claims, err := ga.idVerifier.Verify(ctx, id)
-	if err != nil {
-		return nil, fmt.Errorf("%v: %w", err, ErrorInvalidIDToken)
-	}
-
-	expectedNamespace := ga.namespaceFmt(stackID)
-
+func (ga *GrpcAuthenticatorImpl) authenticateUser(ctx context.Context, expectedNamespace string, claims *Claims[IDTokenClaims]) error {
 	if claims.Rest.Namespace != expectedNamespace {
-		return nil, fmt.Errorf("unexpected id token namespace '%s': %w", claims.Rest.Namespace, ErrorInvalidIDToken)
+		return fmt.Errorf("unexpected id token namespace '%s': %w", claims.Rest.Namespace, ErrorInvalidIDToken)
 	}
 
 	subject, err := parseSubject(claims.Subject)
 	if err != nil {
-		return nil, fmt.Errorf("id token subject '%s' is not valid: %w", claims.Subject, err)
+		return fmt.Errorf("id token subject '%s' is not valid: %w", claims.Subject, err)
 	}
 
 	if subject.Type != typeUser && subject.Type != typeServiceAccount {
-		return nil, fmt.Errorf("id token subject '%s' type is not allowed: %w", subject.Type, ErrorInvalidSubjectType)
+		return fmt.Errorf("id token subject '%s' type is not allowed: %w", subject.Type, ErrorInvalidSubjectType)
 	}
 
-	return claims, nil
+	return nil
 }
 
 func getFirstMetadataValue(md metadata.MD, key string) (string, bool) {
@@ -238,6 +267,32 @@ func getFirstMetadataValue(md metadata.MD, key string) (string, bool) {
 
 	return values[0], true
 }
+
+func (ga *GrpcAuthenticatorImpl) UnaryServerInterceptor() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
+		payload, err := ga.extractPayload(ctx, req)
+		if err != nil {
+			return nil, err
+		}
+
+		var newCtx context.Context
+		if overrideSrv, ok := info.Server.(ServiceAuthFuncOverride); ok {
+			newCtx, err = overrideSrv.AuthFuncOverride(ctx, payload)
+		} else {
+			newCtx, err = ga.Authenticate(ctx, payload)
+		}
+		if err != nil {
+			return nil, err
+		}
+		return handler(newCtx, req)
+	}
+}
+
+// TODO (gamab): Can we implement this?
+// func (ga *GrpcAuthenticatorImpl) StreamServerInterceptor() grpc.StreamServerInterceptor {
+// 	return func(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+// 	}
+// }
 
 // ------
 // Subject
