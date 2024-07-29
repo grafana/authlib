@@ -1,9 +1,10 @@
 package authz
 
 import (
-	"github.com/grafana/authlib/authn"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/grafana/authlib/authn"
 )
 
 var (

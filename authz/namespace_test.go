@@ -3,8 +3,9 @@ package authz
 import (
 	"testing"
 
-	"github.com/grafana/authlib/authn"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/authlib/authn"
 )
 
 func TestNamespaceAuthorizerImpl_ValidateAccessTokenOnly(t *testing.T) {
