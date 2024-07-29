@@ -14,12 +14,11 @@ var (
 	ErrorMissingMetadata    = status.Error(codes.Unauthenticated, "unauthenticated: no metadata found")
 	ErrorMissingIDToken     = status.Error(codes.Unauthenticated, "unauthenticated: missing id token")
 	ErrorMissingAccessToken = status.Error(codes.Unauthenticated, "unauthenticated: missing access token")
-	ErrorInvalidStackID     = status.Error(codes.PermissionDenied, "unauthorized: invalid stack ID")
 	ErrorInvalidIDToken     = status.Error(codes.PermissionDenied, "unauthorized: invalid id token")
 	ErrorInvalidAccessToken = status.Error(codes.PermissionDenied, "unauthorized: invalid access token")
 )
 
-// TODO (gamab) - StackID extract should be configurable - could come from the metadata, path, id token.
+// TODO (gamab) - Validate service and user namespace match
 
 // GrpcAuthenticatorOptions
 type GrpcAuthenticatorOption func(*GrpcAuthenticator)
