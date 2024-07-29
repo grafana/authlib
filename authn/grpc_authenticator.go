@@ -16,9 +16,8 @@ var (
 	ErrorMissingAccessToken = status.Error(codes.Unauthenticated, "unauthenticated: missing access token")
 	ErrorInvalidIDToken     = status.Error(codes.PermissionDenied, "unauthorized: invalid id token")
 	ErrorInvalidAccessToken = status.Error(codes.PermissionDenied, "unauthorized: invalid access token")
+	ErrorNamespacesMismatch = status.Error(codes.PermissionDenied, "unauthorized: access and id token namespaces mismatch")
 )
-
-// TODO (gamab) - Validate service and user namespace match ?
 
 // GrpcAuthenticatorOptions
 type GrpcAuthenticatorOption func(*GrpcAuthenticator)
@@ -141,6 +140,13 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 			return nil, err
 		}
 		callerInfo.IDTokenClaims = idClaims
+	}
+
+	// Validate accessToken namespace matches IDToken namespace
+	if ga.cfg.accessTokenAuthEnabled && ga.cfg.idTokenAuthEnabled && callerInfo.IDTokenClaims != nil {
+		if !callerInfo.AccessTokenClaims.Rest.NamespaceMatches(callerInfo.IDTokenClaims.Rest.Namespace) {
+			return nil, ErrorNamespacesMismatch
+		}
 	}
 
 	return AddCallerAuthInfoToContext(ctx, callerInfo), nil

@@ -182,6 +182,21 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 				AccessTokenClaims: Claims[AccessTokenClaims]{},
 			},
 		},
+		{
+			name: "access and id token namespaces mismatch",
+			md:   metadata.Pairs(DefaultAccessTokenMetadataKey, "access-token", DefaultIdTokenMetadataKey, "id-token"),
+			initEnv: func(env *testEnv) {
+				env.atVerifier.expectedClaims = &Claims[AccessTokenClaims]{
+					Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
+					Rest:   AccessTokenClaims{Namespace: "stack-13"},
+				}
+				env.idVerifier.expectedClaims = &Claims[IDTokenClaims]{
+					Claims: &jwt.Claims{Subject: string(typeUser) + ":3"},
+					Rest:   IDTokenClaims{Namespace: "stack-12"},
+				}
+			},
+			wantErr: ErrorNamespacesMismatch,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
