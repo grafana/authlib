@@ -3,7 +3,6 @@ package authn
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"google.golang.org/grpc/codes"
@@ -33,9 +32,6 @@ type GrpcAuthenticatorConfig struct {
 	// IDTokenMetadataKey is the key used to retrieve the ID token from the incoming metadata.
 	// Defaults to "X-Id-Token".
 	IDTokenMetadataKey string
-	// StackIDMetadataKey is the key used to retrieve the stack ID from the incoming metadata.
-	// Defaults to "X-Stack-Id".
-	StackIDMetadataKey string
 
 	// KeyRetrieverConfig holds the configuration for the key retriever.
 	// Ignored if KeyRetrieverOption is provided.
@@ -60,7 +56,6 @@ type GrpcAuthenticator struct {
 	keyRetriever KeyRetriever
 	atVerifier   Verifier[AccessTokenClaims]
 	idVerifier   Verifier[IDTokenClaims]
-	namespaceFmt NamespaceFormatter
 }
 
 func WithKeyRetrieverOption(kr KeyRetriever) GrpcAuthenticatorOption {
@@ -92,9 +87,6 @@ func setGrpcAuthenticatorCfgDefaults(cfg *GrpcAuthenticatorConfig) {
 	}
 	if cfg.IDTokenMetadataKey == "" {
 		cfg.IDTokenMetadataKey = DefaultIdTokenMetadataKey
-	}
-	if cfg.StackIDMetadataKey == "" {
-		cfg.StackIDMetadataKey = DefaultStackIDMetadataKey
 	}
 	cfg.accessTokenAuthEnabled = true
 }
@@ -136,18 +128,8 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 		return nil, ErrorMissingMetadata
 	}
 
-	stackID, ok := getFirstMetadataValue(md, ga.cfg.StackIDMetadataKey)
-	if !ok {
-		return nil, fmt.Errorf("missing stack ID: %w", ErrorMissingMetadata)
-	}
-	stackIDInt, err := strconv.ParseInt(stackID, 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse stack ID: %w", ErrorInvalidStackID)
-	}
-	callerInfo.StackID = stackIDInt
-
 	if ga.cfg.accessTokenAuthEnabled {
-		atClaims, err := ga.authenticateService(ctx, stackIDInt, md)
+		atClaims, err := ga.authenticateService(ctx, md)
 		if err != nil {
 			return nil, err
 		}
@@ -155,7 +137,7 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 	}
 
 	if ga.cfg.idTokenAuthEnabled {
-		idClaims, err := ga.authenticateUser(ctx, stackIDInt, md)
+		idClaims, err := ga.authenticateUser(ctx, md)
 		if err != nil {
 			return nil, err
 		}
@@ -165,7 +147,7 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 	return AddCallerAuthInfoToContext(ctx, callerInfo), nil
 }
 
-func (ga *GrpcAuthenticator) authenticateService(ctx context.Context, stackID int64, md metadata.MD) (*Claims[AccessTokenClaims], error) {
+func (ga *GrpcAuthenticator) authenticateService(ctx context.Context, md metadata.MD) (*Claims[AccessTokenClaims], error) {
 	at, ok := getFirstMetadataValue(md, ga.cfg.AccessTokenMetadataKey)
 	if !ok {
 		return nil, ErrorMissingAccessToken
@@ -174,13 +156,6 @@ func (ga *GrpcAuthenticator) authenticateService(ctx context.Context, stackID in
 	claims, err := ga.atVerifier.Verify(ctx, at)
 	if err != nil {
 		return nil, fmt.Errorf("%v: %w", err, ErrorInvalidAccessToken)
-	}
-
-	expectedNamespace := ga.namespaceFmt(stackID)
-
-	// Allow access tokens with that has a wildcard namespace or a namespace matching this instance.
-	if !claims.Rest.NamespaceMatches(expectedNamespace) {
-		return nil, fmt.Errorf("unexpected access token namespace '%s': %w", claims.Rest.Namespace, ErrorInvalidAccessToken)
 	}
 
 	subject, err := parseSubject(claims.Subject)
@@ -195,7 +170,7 @@ func (ga *GrpcAuthenticator) authenticateService(ctx context.Context, stackID in
 	return claims, nil
 }
 
-func (ga *GrpcAuthenticator) authenticateUser(ctx context.Context, stackID int64, md metadata.MD) (*Claims[IDTokenClaims], error) {
+func (ga *GrpcAuthenticator) authenticateUser(ctx context.Context, md metadata.MD) (*Claims[IDTokenClaims], error) {
 	id, ok := getFirstMetadataValue(md, ga.cfg.IDTokenMetadataKey)
 	if !ok {
 		if ga.cfg.idTokenAuthRequired {
@@ -207,12 +182,6 @@ func (ga *GrpcAuthenticator) authenticateUser(ctx context.Context, stackID int64
 	claims, err := ga.idVerifier.Verify(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("%v: %w", err, ErrorInvalidIDToken)
-	}
-
-	expectedNamespace := ga.namespaceFmt(stackID)
-
-	if claims.Rest.Namespace != expectedNamespace {
-		return nil, fmt.Errorf("unexpected id token namespace '%s': %w", claims.Rest.Namespace, ErrorInvalidIDToken)
 	}
 
 	subject, err := parseSubject(claims.Subject)

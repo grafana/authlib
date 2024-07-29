@@ -11,7 +11,6 @@ import (
 const (
 	DefaultAccessTokenMetadataKey = "X-Access-Token"
 	DefaultIdTokenMetadataKey     = "X-Id-Token"
-	DefaultStackIDMetadataKey     = "X-Stack-Id"
 )
 
 // GrpcClientConfig holds the configuration for the gRPC client interceptor.
@@ -22,9 +21,6 @@ type GrpcClientConfig struct {
 	// IDTokenMetadataKey is the key used to store the ID token in the outgoing context metadata.
 	// Not required if IDTokenExtractor is provided. Defaults to "X-Id-Token".
 	IDTokenMetadataKey string
-	// StackIDMetadataKey is the key used to store the stack ID in the outgoing context metadata.
-	// Defaults to "X-Stack-Id".
-	StackIDMetadataKey string
 	// TokenClientConfig holds the configuration for the token exchange client.
 	// Not required if TokenClient is provided.
 	TokenClientConfig *TokenExchangeConfig
@@ -66,18 +62,6 @@ func WithIDTokenExtractorOption(extractor func(context.Context) (string, error))
 	}
 }
 
-func WithStackIDExtractorOption(extractor func(context.Context) (int64, error)) GrpcClientInterceptorOption {
-	return func(gci *GrpcClientInterceptor) {
-		WithMetadataExtractorOption(func(ctx context.Context) (key string, values []string, err error) {
-			stackID, err := extractor(ctx)
-			if err != nil {
-				return "", nil, err
-			}
-			return gci.cfg.StackIDMetadataKey, []string{fmt.Sprintf("%d", stackID)}, nil
-		})(gci)
-	}
-}
-
 func WithMetadataExtractorOption(extractors ...ContextMetadataExtractor) GrpcClientInterceptorOption {
 	return func(gci *GrpcClientInterceptor) {
 		gci.metadataExtractors = append(gci.metadataExtractors, extractors...)
@@ -98,9 +82,6 @@ func setGrpcClientCfgDefaults(cfg *GrpcClientConfig) {
 	}
 	if cfg.IDTokenMetadataKey == "" {
 		cfg.IDTokenMetadataKey = DefaultIdTokenMetadataKey
-	}
-	if cfg.StackIDMetadataKey == "" {
-		cfg.StackIDMetadataKey = DefaultStackIDMetadataKey
 	}
 	cfg.accessTokenAuthEnabled = true
 }
