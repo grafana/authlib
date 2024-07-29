@@ -18,7 +18,7 @@ var (
 	ErrorInvalidAccessToken = status.Error(codes.PermissionDenied, "unauthorized: invalid access token")
 )
 
-// TODO (gamab) - Validate service and user namespace match
+// TODO (gamab) - Validate service and user namespace match ?
 
 // GrpcAuthenticatorOptions
 type GrpcAuthenticatorOption func(*GrpcAuthenticator)
