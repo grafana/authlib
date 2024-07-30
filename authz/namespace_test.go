@@ -8,7 +8,7 @@ import (
 	"github.com/grafana/authlib/authn"
 )
 
-func TestNamespaceAuthorizerImpl_ValidateAccessTokenOnly(t *testing.T) {
+func TestNamespaceAccessCheckerImpl_ValidateAccessTokenOnly(t *testing.T) {
 	stackID := int64(12)
 	tests := []struct {
 		name    string
@@ -47,13 +47,13 @@ func TestNamespaceAuthorizerImpl_ValidateAccessTokenOnly(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			na := NewNamespaceAuthorizer(tt.nsFmt)
-			require.ErrorIs(t, na.Validate(tt.caller, stackID), tt.wantErr)
+			na := NewNamespaceAccessChecker(tt.nsFmt)
+			require.ErrorIs(t, na.CheckAccess(tt.caller, stackID), tt.wantErr)
 		})
 	}
 }
 
-func TestNamespaceAuthorizerImpl_ValidateIDTokenOnly(t *testing.T) {
+func TestNamespaceAccessCheckerImpl_ValidateIDTokenOnly(t *testing.T) {
 	stackID := int64(12)
 	tests := []struct {
 		name    string
@@ -85,13 +85,13 @@ func TestNamespaceAuthorizerImpl_ValidateIDTokenOnly(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			na := NewNamespaceAuthorizer(tt.nsFmt, WithIDTokenNamespaceAuthorizerOption(true), WithDisableAccessTokenNamespaceAuthorizerOption())
-			require.ErrorIs(t, na.Validate(tt.caller, stackID), tt.wantErr)
+			na := NewNamespaceAccessChecker(tt.nsFmt, WithIDTokenNamespaceAccessCheckerOption(true), WithDisableAccessTokenNamespaceAccessCheckerOption())
+			require.ErrorIs(t, na.CheckAccess(tt.caller, stackID), tt.wantErr)
 		})
 	}
 }
 
-func TestNamespaceAuthorizerImpl_ValidateBoth(t *testing.T) {
+func TestNamespaceAccessCheckerImpl_ValidateBoth(t *testing.T) {
 	stackID := int64(12)
 	tests := []struct {
 		name    string
@@ -143,8 +143,8 @@ func TestNamespaceAuthorizerImpl_ValidateBoth(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			na := NewNamespaceAuthorizer(tt.nsFmt, WithIDTokenNamespaceAuthorizerOption(false))
-			require.ErrorIs(t, na.Validate(tt.caller, stackID), tt.wantErr)
+			na := NewNamespaceAccessChecker(tt.nsFmt, WithIDTokenNamespaceAccessCheckerOption(false))
+			require.ErrorIs(t, na.CheckAccess(tt.caller, stackID), tt.wantErr)
 		})
 	}
 }
