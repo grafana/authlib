@@ -1,13 +1,25 @@
 package authz
 
 import (
+	"context"
+	"strconv"
+
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	"github.com/grafana/authlib/authn"
 )
 
+const (
+	DefaultStackIDMetadataKey = "X-Stack-ID"
+)
+
 var (
+	ErrorMissingMetadata              = status.Errorf(codes.Unauthenticated, "unauthenticated: missing metadata")
+	ErrorMissingCallerInfo            = status.Errorf(codes.Unauthenticated, "unauthenticated: missing caller auth info")
+	ErrorInvalidStackID               = status.Errorf(codes.Unauthenticated, "unauthenticated: invalid stack ID")
 	ErrorMissingIDToken               = status.Errorf(codes.Unauthenticated, "unauthenticated: missing id token")
 	ErrorIDTokenNamespaceMismatch     = status.Errorf(codes.PermissionDenied, "unauthorized: id token namespace does not match expected namespace")
 	ErrorAccessTokenNamespaceMismatch = status.Errorf(codes.PermissionDenied, "unauthorized: access token namespace does not match expected namespace")
@@ -81,4 +93,85 @@ func (na *NamespaceAccessCheckerImpl) CheckAccess(caller authn.CallerAuthInfo, s
 		return ErrorAccessTokenNamespaceMismatch
 	}
 	return nil
+}
+
+type StackIDExtractors func(context.Context) (int64, error)
+
+// MetadataStackIDExtractor extracts the stack ID from the gRPC metadata.
+func MetadataStackIDExtractor(key string) StackIDExtractors {
+	return func(ctx context.Context) (int64, error) {
+		md, ok := metadata.FromIncomingContext(ctx)
+		if !ok {
+			return 0, ErrorMissingMetadata
+		}
+		stackIDStr, ok := getFirstMetadataValue(md, key)
+		if !ok {
+			return 0, ErrorMissingMetadata
+		}
+
+		stackID, err := strconv.ParseInt(stackIDStr, 10, 64)
+		if err != nil {
+			return 0, ErrorInvalidStackID
+		}
+
+		return stackID, nil
+	}
+}
+
+// gRPC Unary Interceptor for namespace validation
+func UnaryNamespaceAccessInterceptor(na NamespaceAccessChecker, stackID StackIDExtractors) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
+		caller, ok := authn.GetCallerAuthInfoFromContext(ctx)
+		if !ok {
+			return nil, ErrMissingCaller
+		}
+
+		stackID, err := stackID(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		err = na.CheckAccess(caller, stackID)
+		if err != nil {
+			return nil, err
+		}
+
+		return handler(ctx, req)
+	}
+}
+
+// gRPC Stream Interceptor for namespace validation
+func StreamNamespaceAccessInterceptor(na NamespaceAccessChecker, stackID StackIDExtractors) grpc.StreamServerInterceptor {
+	return func(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		ctx := stream.Context()
+
+		caller, ok := authn.GetCallerAuthInfoFromContext(ctx)
+		if !ok {
+			return ErrMissingCaller
+		}
+
+		stackID, err := stackID(ctx)
+		if err != nil {
+			return err
+		}
+
+		err = na.CheckAccess(caller, stackID)
+		if err != nil {
+			return err
+		}
+
+		return handler(srv, stream)
+	}
+}
+
+func getFirstMetadataValue(md metadata.MD, key string) (string, bool) {
+	values := md.Get(key)
+	if len(values) == 0 {
+		return "", false
+	}
+	if len(values[0]) == 0 {
+		return "", false
+	}
+
+	return values[0], true
 }

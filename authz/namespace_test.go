@@ -1,11 +1,12 @@
 package authz
 
 import (
+	"context"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-
 	"github.com/grafana/authlib/authn"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/metadata"
 )
 
 func TestNamespaceAccessCheckerImpl_ValidateAccessTokenOnly(t *testing.T) {
@@ -145,6 +146,53 @@ func TestNamespaceAccessCheckerImpl_ValidateBoth(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			na := NewNamespaceAccessChecker(tt.nsFmt, WithIDTokenNamespaceAccessCheckerOption(false))
 			require.ErrorIs(t, na.CheckAccess(tt.caller, stackID), tt.wantErr)
+		})
+	}
+}
+
+func TestMetadataStackIDExtractor(t *testing.T) {
+	key := "X-Stack-ID"
+	tests := []struct {
+		name string
+		init func(context.Context) context.Context
+		want int64
+		err  error
+	}{
+		{
+			name: "missing metadata",
+			err:  ErrorMissingMetadata,
+		},
+		{
+			name: "missing stack ID metadata",
+			init: func(ctx context.Context) context.Context {
+				return metadata.NewIncomingContext(ctx, metadata.MD{})
+			},
+			err: ErrorMissingMetadata,
+		},
+		{
+			name: "invalid stack ID",
+			init: func(ctx context.Context) context.Context {
+				return metadata.NewIncomingContext(ctx, metadata.Pairs(key, "invalid"))
+			},
+			err: ErrorInvalidStackID,
+		},
+		{
+			name: "valid stack ID",
+			init: func(ctx context.Context) context.Context {
+				return metadata.NewIncomingContext(ctx, metadata.Pairs(key, "12"))
+			},
+			want: 12,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			if tt.init != nil {
+				ctx = tt.init(ctx)
+			}
+			stackID, err := MetadataStackIDExtractor(key)(ctx)
+			require.Equal(t, tt.want, stackID)
+			require.ErrorIs(t, err, tt.err)
 		})
 	}
 }
