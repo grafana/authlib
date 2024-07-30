@@ -322,11 +322,44 @@ func (ga *GrpcAuthenticatorImpl) UnaryServerInterceptor() grpc.UnaryServerInterc
 	}
 }
 
+type grpcAuthenticatorStreamWrapper struct {
+	grpc.ServerStream
+	srv any
+	ga  *GrpcAuthenticatorImpl
+	ctx context.Context
+}
+
+func (w *grpcAuthenticatorStreamWrapper) RecvMsg(m any) error {
+	payload, err := w.ga.extractPayload(w.Context(), m)
+	if err != nil {
+		return err
+	}
+
+	var newCtx context.Context
+	if overrideSrv, ok := w.srv.(ServiceAuthFuncOverride); ok {
+		newCtx, err = overrideSrv.AuthFuncOverride(w.Context(), payload)
+	} else {
+		newCtx, err = w.ga.Authenticate(w.Context(), payload)
+	}
+	if err != nil {
+		return err
+	}
+
+	w.ctx = newCtx
+
+	return w.ServerStream.RecvMsg(m)
+}
+
+func (w *grpcAuthenticatorStreamWrapper) Context() context.Context {
+	return w.ctx
+}
+
 // TODO (gamab): Can we implement this?
-// func (ga *GrpcAuthenticatorImpl) StreamServerInterceptor() grpc.StreamServerInterceptor {
-// 	return func(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-// 	}
-// }
+func (ga *GrpcAuthenticatorImpl) StreamServerInterceptor() grpc.StreamServerInterceptor {
+	return func(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		return handler(srv, &grpcAuthenticatorStreamWrapper{ServerStream: stream, ga: ga, srv: srv, ctx: stream.Context()})
+	}
+}
 
 // ------
 // Subject
