@@ -24,10 +24,9 @@ func setupGrpcAuthenticator() *testEnv {
 		idVerifier: &fakeIDTokenVerifier{},
 	}
 	env.authenticator = &GrpcAuthenticator{
-		cfg:          &GrpcAuthenticatorConfig{idTokenAuthEnabled: true, idTokenAuthRequired: true},
-		atVerifier:   env.atVerifier,
-		idVerifier:   env.idVerifier,
-		namespaceFmt: CloudNamespaceFormatter,
+		cfg:        &GrpcAuthenticatorConfig{idTokenAuthEnabled: true, idTokenAuthRequired: true},
+		atVerifier: env.atVerifier,
+		idVerifier: env.idVerifier,
 	}
 	setGrpcAuthenticatorCfgDefaults(env.authenticator.cfg)
 
@@ -51,7 +50,6 @@ func TestGrpcAuthenticator_NewGrpcAuthenticator(t *testing.T) {
 		// Config has default metadata keys
 		require.Equal(t, DefaultAccessTokenMetadataKey, ga.cfg.AccessTokenMetadataKey)
 		require.Equal(t, DefaultIdTokenMetadataKey, ga.cfg.IDTokenMetadataKey)
-		require.Equal(t, DefaultStackIDMetadataKey, ga.cfg.StackIDMetadataKey)
 		// ID token authentication is disabled by default
 		require.Nil(t, ga.idVerifier)
 	})
@@ -97,23 +95,13 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 			wantErr: ErrorMissingMetadata,
 		},
 		{
-			name:    "missing stack ID",
-			md:      metadata.Pairs(),
-			wantErr: ErrorMissingMetadata,
-		},
-		{
-			name:    "invalid stack ID",
-			md:      metadata.Pairs(DefaultStackIDMetadataKey, "invalid-stack-id"),
-			wantErr: ErrorInvalidStackID,
-		},
-		{
 			name:    "missing access token",
-			md:      metadata.Pairs(DefaultStackIDMetadataKey, "12"),
+			md:      metadata.Pairs(),
 			wantErr: ErrorMissingAccessToken,
 		},
 		{
 			name: "missing id token",
-			md:   metadata.Pairs(DefaultStackIDMetadataKey, "12", DefaultAccessTokenMetadataKey, "access-token"),
+			md:   metadata.Pairs(DefaultAccessTokenMetadataKey, "access-token"),
 			initEnv: func(env *testEnv) {
 				env.atVerifier.expectedClaims = &Claims[AccessTokenClaims]{
 					Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
@@ -124,7 +112,7 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 		},
 		{
 			name: "valid authentication",
-			md:   metadata.Pairs(DefaultStackIDMetadataKey, "12", DefaultAccessTokenMetadataKey, "access-token", DefaultIdTokenMetadataKey, "id-token"),
+			md:   metadata.Pairs(DefaultAccessTokenMetadataKey, "access-token", DefaultIdTokenMetadataKey, "id-token"),
 			initEnv: func(env *testEnv) {
 				env.atVerifier.expectedClaims = &Claims[AccessTokenClaims]{
 					Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
@@ -136,7 +124,6 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 				}
 			},
 			want: CallerAuthInfo{
-				StackID: 12,
 				AccessTokenClaims: Claims[AccessTokenClaims]{
 					Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
 					Rest:   AccessTokenClaims{Namespace: "*"},
@@ -149,7 +136,7 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 		},
 		{
 			name: "valid service authentication no id token",
-			md:   metadata.Pairs(DefaultStackIDMetadataKey, "12", DefaultAccessTokenMetadataKey, "access-token"),
+			md:   metadata.Pairs(DefaultAccessTokenMetadataKey, "access-token"),
 			initEnv: func(env *testEnv) {
 				env.authenticator.cfg.idTokenAuthEnabled = true
 				env.authenticator.cfg.idTokenAuthRequired = false
@@ -159,7 +146,6 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 				}
 			},
 			want: CallerAuthInfo{
-				StackID: 12,
 				AccessTokenClaims: Claims[AccessTokenClaims]{
 					Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
 					Rest:   AccessTokenClaims{Namespace: "*"},
@@ -168,7 +154,7 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 		},
 		{
 			name: "valid service authentication disable id token verification",
-			md:   metadata.Pairs(DefaultStackIDMetadataKey, "12", DefaultAccessTokenMetadataKey, "access-token", DefaultIdTokenMetadataKey, "id-token"),
+			md:   metadata.Pairs(DefaultAccessTokenMetadataKey, "access-token", DefaultIdTokenMetadataKey, "id-token"),
 			initEnv: func(env *testEnv) {
 				env.authenticator.cfg.idTokenAuthEnabled = false
 				env.authenticator.cfg.idTokenAuthRequired = false
@@ -178,7 +164,6 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 				}
 			},
 			want: CallerAuthInfo{
-				StackID: 12,
 				AccessTokenClaims: Claims[AccessTokenClaims]{
 					Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
 					Rest:   AccessTokenClaims{Namespace: "*"},
@@ -187,16 +172,30 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 		},
 		{
 			name: "valid no authentication when both access and id token are disabled",
-			md:   metadata.Pairs(DefaultStackIDMetadataKey, "12", DefaultAccessTokenMetadataKey, "access-token", DefaultIdTokenMetadataKey, "id-token"),
+			md:   metadata.Pairs(DefaultAccessTokenMetadataKey, "access-token", DefaultIdTokenMetadataKey, "id-token"),
 			initEnv: func(env *testEnv) {
 				env.authenticator.cfg.accessTokenAuthEnabled = false
 				env.authenticator.cfg.idTokenAuthEnabled = false
 				env.authenticator.cfg.idTokenAuthRequired = false
 			},
 			want: CallerAuthInfo{
-				StackID:           12,
 				AccessTokenClaims: Claims[AccessTokenClaims]{},
 			},
+		},
+		{
+			name: "access and id token namespaces mismatch",
+			md:   metadata.Pairs(DefaultAccessTokenMetadataKey, "access-token", DefaultIdTokenMetadataKey, "id-token"),
+			initEnv: func(env *testEnv) {
+				env.atVerifier.expectedClaims = &Claims[AccessTokenClaims]{
+					Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
+					Rest:   AccessTokenClaims{Namespace: "stack-13"},
+				}
+				env.idVerifier.expectedClaims = &Claims[IDTokenClaims]{
+					Claims: &jwt.Claims{Subject: string(typeUser) + ":3"},
+					Rest:   IDTokenClaims{Namespace: "stack-12"},
+				}
+			},
+			wantErr: ErrorNamespacesMismatch,
 		},
 	}
 	for _, tt := range tests {
@@ -223,7 +222,6 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NotNil(t, got)
-			require.Equal(t, tt.want.StackID, got.StackID)
 			if tt.want.AccessTokenClaims.Claims == nil {
 				require.Nil(t, got.AccessTokenClaims.Claims)
 			} else {
@@ -257,16 +255,6 @@ func TestGrpcAuthenticator_authenticateService(t *testing.T) {
 		{
 			name:    "invalid access token",
 			md:      metadata.Pairs(DefaultAccessTokenMetadataKey, "invalid-access-token"),
-			wantErr: ErrorInvalidAccessToken,
-		},
-		{
-			name: "invalid namespace",
-			md:   metadata.Pairs(DefaultAccessTokenMetadataKey, "access-token"),
-			initEnv: func(env *testEnv) {
-				env.atVerifier.expectedClaims = &Claims[AccessTokenClaims]{
-					Rest: AccessTokenClaims{Namespace: "stack-13"},
-				}
-			},
 			wantErr: ErrorInvalidAccessToken,
 		},
 		{
@@ -327,7 +315,7 @@ func TestGrpcAuthenticator_authenticateService(t *testing.T) {
 				tt.initEnv(env)
 			}
 
-			got, err := env.authenticator.authenticateService(context.Background(), 12, tt.md)
+			got, err := env.authenticator.authenticateService(context.Background(), tt.md)
 			if tt.wantErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.wantErr)
@@ -357,16 +345,6 @@ func TestGrpcAuthenticator_authenticateUser(t *testing.T) {
 		{
 			name:    "invalid id token",
 			md:      metadata.Pairs(DefaultIdTokenMetadataKey, "invalid-id-token"),
-			wantErr: ErrorInvalidIDToken,
-		},
-		{
-			name: "invalid namespace",
-			md:   metadata.Pairs(DefaultIdTokenMetadataKey, "id-token"),
-			initEnv: func(env *testEnv) {
-				env.idVerifier.expectedClaims = &Claims[IDTokenClaims]{
-					Rest: IDTokenClaims{Namespace: "stack-13"},
-				}
-			},
 			wantErr: ErrorInvalidIDToken,
 		},
 		{
@@ -413,7 +391,7 @@ func TestGrpcAuthenticator_authenticateUser(t *testing.T) {
 				tt.initEnv(env)
 			}
 
-			got, err := env.authenticator.authenticateUser(context.Background(), 12, tt.md)
+			got, err := env.authenticator.authenticateUser(context.Background(), tt.md)
 			if tt.wantErr != nil {
 				require.Error(t, err)
 				require.ErrorIs(t, err, tt.wantErr)
