@@ -21,11 +21,6 @@ type Verifier[T any] interface {
 	Verify(ctx context.Context, token string) (*Claims[T], error)
 }
 
-type Claims[T any] struct {
-	*jwt.Claims
-	Rest T
-}
-
 func NewVerifier[T any](cfg VerifierConfig, typ TokenType, keys KeyRetriever) *VerifierBase[T] {
 	return &VerifierBase[T]{cfg, typ, keys}
 }
