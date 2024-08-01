@@ -21,14 +21,15 @@ type AccessRequest struct {
 }
 
 type AccessClient interface {
-	// Compile generates a function to check whether the user has access to any scope of a given list of scopes.
-	// This is particularly useful when you want to verify access to a list of resources.
-	Compile(ctx context.Context, id AuthInfo, verb string, req ...AccessRequest) (AccessChecker, error)
-
-	// HasAccess checks whether the user can perform the given action on any of the given resources.
-	// If the scope is empty, it checks whether the user can perform the action.
+	// HasAccess checks whether the user can perform the given action for all requests
+	// If the scope is empty, it checks whether the user can perform the verb.
 	HasAccess(ctx context.Context, id AuthInfo, verb string, req ...AccessRequest) (bool, error)
+
+	// Compile generates a function to check whether the id has access to items matching a request
+	// This is particularly useful when you want to verify access to a list of resources.
+	// Returns false if there is no access to any matching items
+	Compile(ctx context.Context, id AuthInfo, verb string, req AccessRequest) (bool, AccessChecker, error)
 }
 
-// Fast lookup
-type AccessChecker func(resource AccessRequest) bool
+// Checks for access to a specific item
+type AccessChecker func(namespace string, name string) bool
