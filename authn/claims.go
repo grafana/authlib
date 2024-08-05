@@ -10,7 +10,7 @@ import (
 var (
 	_ claims.IdentityClaims = &Identity{}
 	_ claims.AccessClaims   = &Access{}
-	_ claims.AuthInfo       = &CallerAuthInfoNEXT{}
+	_ claims.AuthInfo       = &AuthInfo{}
 )
 
 type Claims[T any] struct {
@@ -18,7 +18,7 @@ type Claims[T any] struct {
 	Rest T
 }
 
-type CallerAuthInfoNEXT struct {
+type AuthInfo struct {
 	IdentityClaims *Identity
 	AccessClaims   *Access
 }
@@ -32,12 +32,12 @@ type Access struct {
 }
 
 // Access implements claims.AuthInfo.
-func (c *CallerAuthInfoNEXT) Access() claims.AccessClaims {
+func (c *AuthInfo) Access() claims.AccessClaims {
 	return c.AccessClaims
 }
 
 // Identity implements claims.AuthInfo.
-func (c *CallerAuthInfoNEXT) Identity() claims.IdentityClaims {
+func (c *AuthInfo) Identity() claims.IdentityClaims {
 	return c.IdentityClaims
 }
 
