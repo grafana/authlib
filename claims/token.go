@@ -28,6 +28,7 @@ type IdentityClaims interface {
 	TokenClaims
 
 	// UID is the unique ID of the user (UID attribute)
+	// This will often be the string version of a TypedID `<type>:<id>`
 	UID() string
 
 	// AuthenticatedBy is the method used to authenticate the identity.
