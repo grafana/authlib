@@ -36,7 +36,7 @@ func (c *CallerAuthInfo) Identity() claims.IdentityClaims {
 type CallerAuthInfoContextKey struct{}
 
 func AddCallerAuthInfoToContext(ctx context.Context, info CallerAuthInfo) context.Context {
-	return context.WithValue(ctx, CallerAuthInfoContextKey{}, claims.WithClaims(ctx, &info))
+	return context.WithValue(claims.WithClaims(ctx, &info), CallerAuthInfoContextKey{}, info)
 }
 
 func GetCallerAuthInfoFromContext(ctx context.Context) (CallerAuthInfo, bool) {
