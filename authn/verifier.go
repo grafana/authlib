@@ -7,7 +7,6 @@ import (
 
 	"github.com/go-jose/go-jose/v3"
 	"github.com/go-jose/go-jose/v3/jwt"
-	"github.com/grafana/authlib/claims"
 )
 
 type TokenType = string
@@ -20,10 +19,6 @@ const (
 type Verifier[T any] interface {
 	// Verify will parse and verify provided token, if `AllowedAudiences` was configured those will be validated as well.
 	Verify(ctx context.Context, token string) (*Claims[T], error)
-
-	// Verify will parse and verify provided token, if `AllowedAudiences` was configured those will be validated as well.
-	// Additional claims will be
-	VerifyToken(ctx context.Context, token string) (claims.TokenClaims, T, error)
 }
 
 func NewVerifier[T any](cfg VerifierConfig, typ TokenType, keys KeyRetriever) *VerifierBase[T] {
@@ -70,13 +65,6 @@ func (v *VerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T],
 	}
 
 	return &claims, nil
-}
-
-func (v *VerifierBase[T]) VerifyToken(ctx context.Context, token string) (claims.TokenClaims, T, error) {
-	c, err := v.Verify(ctx, token)
-	return &jwtClaims{
-		claims: c.Claims,
-	}, c.Rest, err
 }
 
 func validType(token *jwt.JSONWebToken, typ string) bool {

@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/go-jose/go-jose/v3/jwt"
-	"github.com/grafana/authlib/claims"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
 )
@@ -418,13 +417,6 @@ func (f *fakeIDTokenVerifier) Verify(ctx context.Context, token string) (*Claims
 	return f.expectedClaims, f.expectedError
 }
 
-func (f *fakeIDTokenVerifier) VerifyToken(ctx context.Context, token string) (claims.TokenClaims, IDTokenClaims, error) {
-	c, err := f.Verify(ctx, token)
-	return &jwtClaims{
-		claims: c.Claims,
-	}, c.Rest, err
-}
-
 type fakeAccessTokenVerifier struct {
 	expectedClaims *Claims[AccessTokenClaims]
 	expectedError  error
@@ -435,11 +427,4 @@ func (f *fakeAccessTokenVerifier) Verify(ctx context.Context, token string) (*Cl
 		return nil, fmt.Errorf("invalid access token")
 	}
 	return f.expectedClaims, f.expectedError
-}
-
-func (f *fakeAccessTokenVerifier) VerifyToken(ctx context.Context, token string) (claims.TokenClaims, AccessTokenClaims, error) {
-	c, err := f.Verify(ctx, token)
-	return &jwtClaims{
-		claims: c.Claims,
-	}, c.Rest, err
 }

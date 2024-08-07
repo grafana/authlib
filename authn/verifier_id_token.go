@@ -2,8 +2,6 @@ package authn
 
 import (
 	"context"
-
-	"github.com/grafana/authlib/claims"
 )
 
 type IDTokenClaims struct {
@@ -43,8 +41,4 @@ type IDTokenVerifier struct {
 
 func (e *IDTokenVerifier) Verify(ctx context.Context, token string) (*Claims[IDTokenClaims], error) {
 	return e.v.Verify(ctx, token)
-}
-
-func (e *IDTokenVerifier) VerifyToken(ctx context.Context, token string) (claims.TokenClaims, IDTokenClaims, error) {
-	return e.v.VerifyToken(ctx, token)
 }
