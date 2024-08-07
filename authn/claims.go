@@ -11,6 +11,7 @@ var (
 	_ claims.IdentityClaims = &Identity{}
 	_ claims.AccessClaims   = &Access{}
 	_ claims.AuthInfo       = &AuthInfo{}
+	_ claims.TokenClaims    = &jwtClaims{}
 )
 
 type Claims[T any] struct {
@@ -29,6 +30,10 @@ type Identity struct {
 
 type Access struct {
 	claims Claims[AccessTokenClaims]
+}
+
+type jwtClaims struct {
+	claims *jwt.Claims
 }
 
 // Access implements claims.AuthInfo.
@@ -76,7 +81,7 @@ func (c *Identity) Expiry() *time.Time {
 }
 
 // ID implements claims.IdentityClaims.
-func (c *Identity) ID() string {
+func (c *Identity) JTI() string {
 	return c.claims.ID
 }
 
@@ -138,7 +143,7 @@ func (c *Access) Expiry() *time.Time {
 }
 
 // ID implements claims.IdentityClaims.
-func (c *Access) ID() string {
+func (c *Access) JTI() string {
 	return c.claims.ID
 }
 
@@ -188,4 +193,51 @@ func (c *Access) Permissions() []string {
 // Scopes implements claims.AccessClaims.
 func (c *Access) Scopes() []string {
 	return c.claims.Rest.Scopes
+}
+
+// Audience implements claims.IdentityClaims.
+func (c *jwtClaims) Audience() []string {
+	return c.claims.Audience
+}
+
+// Expiry implements claims.IdentityClaims.
+func (c *jwtClaims) Expiry() *time.Time {
+	if c.claims.Expiry == nil {
+		return nil
+	}
+	t := c.claims.Expiry.Time()
+	return &t
+}
+
+// ID implements claims.IdentityClaims.
+func (c *jwtClaims) JTI() string {
+	return c.claims.ID
+}
+
+// IssuedAt implements claims.IdentityClaims.
+func (c *jwtClaims) IssuedAt() *time.Time {
+	if c.claims.IssuedAt == nil {
+		return nil
+	}
+	t := c.claims.IssuedAt.Time()
+	return &t
+}
+
+// Issuer implements claims.IdentityClaims.
+func (c *jwtClaims) Issuer() string {
+	return c.claims.Issuer
+}
+
+// NotBefore implements claims.IdentityClaims.
+func (c *jwtClaims) NotBefore() *time.Time {
+	if c.claims.NotBefore == nil {
+		return nil
+	}
+	t := c.claims.NotBefore.Time()
+	return &t
+}
+
+// Subject implements claims.IdentityClaims.
+func (c *jwtClaims) Subject() string {
+	return c.claims.Subject
 }
