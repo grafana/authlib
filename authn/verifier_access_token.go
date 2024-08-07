@@ -2,6 +2,8 @@ package authn
 
 import (
 	"context"
+
+	"github.com/grafana/authlib/claims"
 )
 
 type AccessTokenClaims struct {
@@ -37,4 +39,8 @@ type AccessTokenVerifier struct {
 
 func (e *AccessTokenVerifier) Verify(ctx context.Context, token string) (*Claims[AccessTokenClaims], error) {
 	return e.v.Verify(ctx, token)
+}
+
+func (e *AccessTokenVerifier) VerifyToken(ctx context.Context, token string) (claims.TokenClaims, AccessTokenClaims, error) {
+	return e.v.VerifyToken(ctx, token)
 }
