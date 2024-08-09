@@ -48,7 +48,7 @@ type TokenClaims interface {
 	// The "iss" value is a case-sensitive string containing a StringOrURI
 	// value.  Use of this claim is OPTIONAL.
 	// [RFC 7519 §4.1.1]: https://datatracker.ietf.org/doc/html/rfc7519#section-4.1.1
-	GetIssuer() string
+	Issuer() string
 
 	// The "sub" (subject) claim identifies the principal that is the
 	// subject of the JWT.  The claims in a JWT are normally statements
@@ -58,7 +58,7 @@ type TokenClaims interface {
 	// "sub" value is a case-sensitive string containing a StringOrURI
 	// value.  Use of this claim is OPTIONAL.
 	// [RFC 7519 §4.1.2]: https://datatracker.ietf.org/rfc/rfc7519#section-4.1.2
-	GetSubject() string
+	Subject() string
 
 	// The "aud" (audience) claim identifies the recipients that the JWT is
 	// intended for.  Each principal intended to process the JWT MUST
@@ -72,7 +72,7 @@ type TokenClaims interface {
 	// interpretation of audience values is generally application specific.
 	// Use of this claim is OPTIONAL.
 	// [RFC 7519 §4.1.3]: https://datatracker.ietf.org/doc/html/rfc7519#section-4.1.3
-	GetAudience() []string
+	Audience() []string
 
 	// The "exp" (expiration time) claim identifies the expiration time on
 	// or after which the JWT MUST NOT be accepted for processing.  The
@@ -82,7 +82,7 @@ type TokenClaims interface {
 	// a few minutes, to account for clock skew.  Its value MUST be a number
 	// containing a NumericDate value.  Use of this claim is OPTIONAL.
 	// [RFC 7519 §4.1.4]: https://datatracker.ietf.org/doc/html/rfc7519#section-4.1.4
-	GetExpiry() *time.Time
+	Expiry() *time.Time
 
 	// The "nbf" (not before) claim identifies the time before which the JWT
 	// MUST NOT be accepted for processing.  The processing of the "nbf"
@@ -92,14 +92,14 @@ type TokenClaims interface {
 	// account for clock skew.  Its value MUST be a number containing a
 	// NumericDate value.  Use of this claim is OPTIONAL.
 	// [RFC 7519 §4.1.5]: https://datatracker.ietf.org/doc/html/rfc7519#section-4.1.5
-	GetNotBefore() *time.Time
+	NotBefore() *time.Time
 
 	// The "iat" (issued at) claim identifies the time at which the JWT was
 	// issued.  This claim can be used to determine the age of the JWT.  Its
 	// value MUST be a number containing a NumericDate value.  Use of this
 	// claim is OPTIONAL.
 	// [RFC 7519 §4.1.6]: https://datatracker.ietf.org/doc/html/rfc7519#section-4.1.6
-	GetIssuedAt() *time.Time
+	IssuedAt() *time.Time
 
 	// The "jti" (JWT ID) claim provides a unique identifier for the JWT.
 	// The identifier value MUST be assigned in a manner that ensures that
@@ -110,46 +110,46 @@ type TokenClaims interface {
 	// to prevent the JWT from being replayed.  The "jti" value is a case-
 	// sensitive string.  Use of this claim is OPTIONAL.
 	// [RFC 7519 §4.1.7]: https://datatracker.ietf.org/doc/html/rfc7519#section-4.1.7
-	GetJTI() string
+	JTI() string
 }
 
 type IdentityClaims interface {
 	TokenClaims
 
 	// Type indicates what kind of identity this is
-	GetIdentityType() IdentityType
+	IdentityType() IdentityType
 
 	// Raw UID is a unique identifier for this identity.
-	GetRawUID() string
+	RawUID() string
 
 	// The numeric internal ID for this identity.
 	// Deprecated: Use UID when possible
-	GetInternalID() int64
+	InternalID() int64
 
 	// The internal org-id
 	// Deprecated: Use namespace when possible
-	GetOrgID() int64
+	OrgID() int64
 
 	// Namespace takes the form of '<type>-<id>', '*' means all namespaces.
 	// In grafana the can be either org or stack.
 	// The claims are valid within this namespace
-	GetNamespace() string
+	Namespace() string
 
 	// AuthenticatedBy is the method used to authenticate the identity.
 	// Examples: oauth, oauth_azuread, etc
-	GetAuthenticatedBy() string
+	AuthenticatedBy() string
 
 	// The identity email
-	GetEmail() string
+	Email() string
 
 	// EmailVerified indicates that the email has been verified
-	GetEmailVerified() bool
+	EmailVerified() bool
 
 	// Username of the user (login attribute on the Identity)
-	GetUsername() string
+	Username() string
 
 	// Display Name of the user (name attribute if it is set, otherwise the login or email)
-	GetDisplayName() string
+	DisplayName() string
 }
 
 // Access claims indicate what the request can access independent from the identity
@@ -159,11 +159,11 @@ type AccessClaims interface {
 	// Namespace takes the form of '<type>-<id>', '*' means all namespaces.
 	// In grafana the can be either org or stack.
 	// The claims are valid within this namespace
-	GetNamespace() string
+	Namespace() string
 	// Access policy scopes
-	GetScopes() []string
+	Scopes() []string
 	// Grafana roles
-	GetPermissions() []string
+	Permissions() []string
 	// On-behalf-of user
-	GetDelegatedPermissions() []string
+	DelegatedPermissions() []string
 }
