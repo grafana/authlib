@@ -155,7 +155,7 @@ func (c *Identity) Subject() string {
 }
 
 // UID implements claims.IdentityClaims.
-func (c *Identity) RawUID() string {
+func (c *Identity) UID() string {
 	return c.claims.Rest.UID
 }
 

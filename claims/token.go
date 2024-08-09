@@ -119,8 +119,8 @@ type IdentityClaims interface {
 	// Type indicates what kind of identity this is
 	IdentityType() IdentityType
 
-	// Raw UID is a unique identifier for this identity.
-	RawUID() string
+	// UID is a unique identifier for this identity.
+	UID() string
 
 	// The numeric internal ID for this identity.
 	// Deprecated: Use UID when possible
