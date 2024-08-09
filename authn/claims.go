@@ -64,6 +64,10 @@ func NewAccessClaims(c Claims[AccessTokenClaims]) claims.AccessClaims {
 	return &Access{claims: c}
 }
 
+func NewIdentityClaims(c Claims[IDTokenClaims]) claims.IdentityClaims {
+	return &Identity{claims: c}
+}
+
 type jwtClaims struct {
 	claims *jwt.Claims
 }
