@@ -60,6 +60,10 @@ type Access struct {
 	claims Claims[AccessTokenClaims]
 }
 
+func NewAccessClaims(c Claims[AccessTokenClaims]) claims.AccessClaims {
+	return &Access{claims: c}
+}
+
 type jwtClaims struct {
 	claims *jwt.Claims
 }
