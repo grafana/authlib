@@ -7,7 +7,7 @@ toolchain go1.21.6
 require (
 	github.com/go-jose/go-jose/v3 v3.0.3
 	github.com/google/go-querystring v1.1.0
-	github.com/grafana/authlib/claims v0.0.0-20240809090428-0eaffcfc2870
+	github.com/grafana/authlib/claims v0.0.0-20240809095826-8eb5495c0b2a
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.20.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/stretchr/testify v1.9.0
