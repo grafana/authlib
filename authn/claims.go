@@ -147,7 +147,7 @@ func (c *Identity) GetSubject() string {
 }
 
 // UID implements claims.IdentityClaims.
-func (c *Identity) GetUID() string {
+func (c *Identity) GetRawUID() string {
 	return c.claims.Rest.UID
 }
 
@@ -157,7 +157,12 @@ func (c *Identity) GetInternalID() int64 {
 }
 
 // UID implements claims.IdentityClaims.
-func (c *Identity) GetType() claims.IdentityType {
+func (c *Identity) GetOrgID() int64 {
+	return c.claims.Rest.OrgID
+}
+
+// UID implements claims.IdentityClaims.
+func (c *Identity) GetIdentityType() claims.IdentityType {
 	return c.claims.Rest.Type
 }
 

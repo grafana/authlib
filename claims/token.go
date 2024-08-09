@@ -117,14 +117,18 @@ type IdentityClaims interface {
 	TokenClaims
 
 	// Type indicates what kind of identity this is
-	GetType() IdentityType
+	GetIdentityType() IdentityType
 
-	// UID is the unique ID of the user (UID attribute)
-	GetUID() string
+	// Raw UID is a unique identifier for this identity.
+	GetRawUID() string
 
 	// The numeric internal ID for this identity.
 	// Deprecated: Use UID when possible
 	GetInternalID() int64
+
+	// The internal org-id
+	// Deprecated: Use namespace when possible
+	GetOrgID() int64
 
 	// Namespace takes the form of '<type>-<id>', '*' means all namespaces.
 	// In grafana the can be either org or stack.
