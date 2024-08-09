@@ -52,7 +52,9 @@ func (v *VerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T],
 		return nil, err
 	}
 
-	claims := Claims[T]{}
+	claims := Claims[T]{
+		token: token, // hold on to the original token
+	}
 	if err := parsed.Claims(jwk, &claims.Claims, &claims.Rest); err != nil {
 		return nil, err
 	}

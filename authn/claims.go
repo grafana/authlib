@@ -17,11 +17,39 @@ var (
 type Claims[T any] struct {
 	*jwt.Claims
 	Rest T
+
+	// The original raw token
+	token string
 }
 
 type AuthInfo struct {
 	IdentityClaims *Identity
 	AccessClaims   *Access
+}
+
+// GetExtra implements claims.AuthInfo.
+func (c *AuthInfo) GetExtra() map[string][]string {
+	if c.IdentityClaims != nil && c.IdentityClaims.claims.token != "" {
+		// Currently required for external k8s aggregation
+		// but this should be removed in the not-to-distant future
+		return map[string][]string{"id-token": {c.IdentityClaims.claims.token}}
+	}
+	return map[string][]string{}
+}
+
+// GetGroups implements claims.AuthInfo.
+func (c *AuthInfo) GetGroups() []string {
+	return []string{}
+}
+
+// GetName implements claims.AuthInfo.
+func (c *AuthInfo) GetName() string {
+	return c.IdentityClaims.claims.Rest.getK8sName()
+}
+
+// GetUID implements claims.AuthInfo.
+func (c *AuthInfo) GetUID() string {
+	return c.IdentityClaims.claims.Rest.asTypedUID()
 }
 
 type Identity struct {
@@ -37,42 +65,42 @@ type jwtClaims struct {
 }
 
 // Access implements claims.AuthInfo.
-func (c *AuthInfo) Access() claims.AccessClaims {
+func (c *AuthInfo) GetAccess() claims.AccessClaims {
 	return c.AccessClaims
 }
 
 // Identity implements claims.AuthInfo.
-func (c *AuthInfo) Identity() claims.IdentityClaims {
+func (c *AuthInfo) GetIdentity() claims.IdentityClaims {
 	return c.IdentityClaims
 }
 
 // Audience implements claims.IdentityClaims.
-func (c *Identity) Audience() []string {
+func (c *Identity) GetAudience() []string {
 	return c.claims.Audience
 }
 
 // AuthenticatedBy implements claims.IdentityClaims.
-func (c *Identity) AuthenticatedBy() string {
+func (c *Identity) GetAuthenticatedBy() string {
 	return c.claims.Rest.AuthenticatedBy
 }
 
 // DisplayName implements claims.IdentityClaims.
-func (c *Identity) DisplayName() string {
+func (c *Identity) GetDisplayName() string {
 	return c.claims.Rest.DisplayName
 }
 
 // Email implements claims.IdentityClaims.
-func (c *Identity) Email() string {
+func (c *Identity) GetEmail() string {
 	return c.claims.Rest.Email
 }
 
 // EmailVerified implements claims.IdentityClaims.
-func (c *Identity) EmailVerified() bool {
+func (c *Identity) GetEmailVerified() bool {
 	return c.claims.Rest.EmailVerified
 }
 
 // Expiry implements claims.IdentityClaims.
-func (c *Identity) Expiry() *time.Time {
+func (c *Identity) GetExpiry() *time.Time {
 	if c.claims.Expiry == nil {
 		return nil
 	}
@@ -81,12 +109,12 @@ func (c *Identity) Expiry() *time.Time {
 }
 
 // ID implements claims.IdentityClaims.
-func (c *Identity) JTI() string {
+func (c *Identity) GetJTI() string {
 	return c.claims.ID
 }
 
 // IssuedAt implements claims.IdentityClaims.
-func (c *Identity) IssuedAt() *time.Time {
+func (c *Identity) GetIssuedAt() *time.Time {
 	if c.claims.IssuedAt == nil {
 		return nil
 	}
@@ -95,17 +123,17 @@ func (c *Identity) IssuedAt() *time.Time {
 }
 
 // Issuer implements claims.IdentityClaims.
-func (c *Identity) Issuer() string {
+func (c *Identity) GetIssuer() string {
 	return c.claims.Issuer
 }
 
 // Namespace implements claims.IdentityClaims.
-func (c *Identity) Namespace() string {
+func (c *Identity) GetNamespace() string {
 	return c.claims.Rest.Namespace
 }
 
 // NotBefore implements claims.IdentityClaims.
-func (c *Identity) NotBefore() *time.Time {
+func (c *Identity) GetNotBefore() *time.Time {
 	if c.claims.NotBefore == nil {
 		return nil
 	}
@@ -114,27 +142,37 @@ func (c *Identity) NotBefore() *time.Time {
 }
 
 // Subject implements claims.IdentityClaims.
-func (c *Identity) Subject() string {
+func (c *Identity) GetSubject() string {
 	return c.claims.Subject
 }
 
 // UID implements claims.IdentityClaims.
-func (c *Identity) UID() string {
+func (c *Identity) GetUID() string {
 	return c.claims.Rest.UID
 }
 
+// UID implements claims.IdentityClaims.
+func (c *Identity) GetInternalID() int64 {
+	return c.claims.Rest.InternalID
+}
+
+// UID implements claims.IdentityClaims.
+func (c *Identity) GetType() claims.IdentityType {
+	return c.claims.Rest.Type
+}
+
 // Username implements claims.IdentityClaims.
-func (c *Identity) Username() string {
+func (c *Identity) GetUsername() string {
 	return c.claims.Rest.Username
 }
 
 // Audience implements claims.IdentityClaims.
-func (c *Access) Audience() []string {
+func (c *Access) GetAudience() []string {
 	return c.claims.Audience
 }
 
 // Expiry implements claims.IdentityClaims.
-func (c *Access) Expiry() *time.Time {
+func (c *Access) GetExpiry() *time.Time {
 	if c.claims.Expiry == nil {
 		return nil
 	}
@@ -143,12 +181,12 @@ func (c *Access) Expiry() *time.Time {
 }
 
 // ID implements claims.IdentityClaims.
-func (c *Access) JTI() string {
+func (c *Access) GetJTI() string {
 	return c.claims.ID
 }
 
 // IssuedAt implements claims.IdentityClaims.
-func (c *Access) IssuedAt() *time.Time {
+func (c *Access) GetIssuedAt() *time.Time {
 	if c.claims.IssuedAt == nil {
 		return nil
 	}
@@ -157,17 +195,17 @@ func (c *Access) IssuedAt() *time.Time {
 }
 
 // Issuer implements claims.IdentityClaims.
-func (c *Access) Issuer() string {
+func (c *Access) GetIssuer() string {
 	return c.claims.Issuer
 }
 
 // Namespace implements claims.IdentityClaims.
-func (c *Access) Namespace() string {
+func (c *Access) GetNamespace() string {
 	return c.claims.Rest.Namespace
 }
 
 // NotBefore implements claims.IdentityClaims.
-func (c *Access) NotBefore() *time.Time {
+func (c *Access) GetNotBefore() *time.Time {
 	if c.claims.NotBefore == nil {
 		return nil
 	}
@@ -176,32 +214,32 @@ func (c *Access) NotBefore() *time.Time {
 }
 
 // Subject implements claims.IdentityClaims.
-func (c *Access) Subject() string {
+func (c *Access) GetSubject() string {
 	return c.claims.Subject
 }
 
 // DelegatedPermissions implements claims.AccessClaims.
-func (c *Access) DelegatedPermissions() []string {
+func (c *Access) GetDelegatedPermissions() []string {
 	return c.claims.Rest.DelegatedPermissions
 }
 
 // Permissions implements claims.AccessClaims.
-func (c *Access) Permissions() []string {
+func (c *Access) GetPermissions() []string {
 	return c.claims.Rest.Permissions
 }
 
 // Scopes implements claims.AccessClaims.
-func (c *Access) Scopes() []string {
+func (c *Access) GetScopes() []string {
 	return c.claims.Rest.Scopes
 }
 
 // Audience implements claims.IdentityClaims.
-func (c *jwtClaims) Audience() []string {
+func (c *jwtClaims) GetAudience() []string {
 	return c.claims.Audience
 }
 
 // Expiry implements claims.IdentityClaims.
-func (c *jwtClaims) Expiry() *time.Time {
+func (c *jwtClaims) GetExpiry() *time.Time {
 	if c.claims.Expiry == nil {
 		return nil
 	}
@@ -210,12 +248,12 @@ func (c *jwtClaims) Expiry() *time.Time {
 }
 
 // ID implements claims.IdentityClaims.
-func (c *jwtClaims) JTI() string {
+func (c *jwtClaims) GetJTI() string {
 	return c.claims.ID
 }
 
 // IssuedAt implements claims.IdentityClaims.
-func (c *jwtClaims) IssuedAt() *time.Time {
+func (c *jwtClaims) GetIssuedAt() *time.Time {
 	if c.claims.IssuedAt == nil {
 		return nil
 	}
@@ -224,12 +262,12 @@ func (c *jwtClaims) IssuedAt() *time.Time {
 }
 
 // Issuer implements claims.IdentityClaims.
-func (c *jwtClaims) Issuer() string {
+func (c *jwtClaims) GetIssuer() string {
 	return c.claims.Issuer
 }
 
 // NotBefore implements claims.IdentityClaims.
-func (c *jwtClaims) NotBefore() *time.Time {
+func (c *jwtClaims) GetNotBefore() *time.Time {
 	if c.claims.NotBefore == nil {
 		return nil
 	}
@@ -238,6 +276,6 @@ func (c *jwtClaims) NotBefore() *time.Time {
 }
 
 // Subject implements claims.IdentityClaims.
-func (c *jwtClaims) Subject() string {
+func (c *jwtClaims) GetSubject() string {
 	return c.claims.Subject
 }
