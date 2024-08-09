@@ -2,9 +2,22 @@ package authn
 
 import (
 	"context"
+	"fmt"
+
+	"github.com/grafana/authlib/claims"
 )
 
 type IDTokenClaims struct {
+	// UID is the unique ID of the user (UID attribute)
+	UID string `json:"uid"`
+	// The type of user
+	Type claims.IdentityType `json:"type"`
+	// The internal numeric ID
+	// Deprecated: use UID if possible
+	InternalID int64 `json:"id,omitempty"`
+	// The internal numeric org ID
+	// Deprecated: use namespace where possible
+	OrgID int64 `json:"orgId,omitempty"`
 	// Namespace takes the form of '<type>-<id>', '*' means all namespaces.
 	// Type can be either org or stack.
 	Namespace string `json:"namespace"`
@@ -14,10 +27,26 @@ type IDTokenClaims struct {
 	EmailVerified   bool   `json:"email_verified"`
 	// Username of the user (login attribute on the Identity)
 	Username string `json:"username"`
-	// UID is the unique ID of the user (UID attribute)
-	UID string `json:"uid"`
 	// Display Name of the user (name attribute if it is set, otherwise the login or email)
 	DisplayName string `json:"name"`
+}
+
+// Helper for the id
+func (c IDTokenClaims) asTypedUID() string {
+	return fmt.Sprintf("%s:%s", c.Type, c.UID)
+}
+
+func (c IDTokenClaims) getK8sName() string {
+	if c.DisplayName != "" {
+		return c.DisplayName
+	}
+	if c.Username != "" {
+		return c.Username
+	}
+	if c.Email != "" {
+		return c.Email
+	}
+	return c.asTypedUID()
 }
 
 func (c IDTokenClaims) NamespaceMatches(namespace string) bool {

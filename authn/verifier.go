@@ -21,11 +21,6 @@ type Verifier[T any] interface {
 	Verify(ctx context.Context, token string) (*Claims[T], error)
 }
 
-type Claims[T any] struct {
-	*jwt.Claims
-	Rest T
-}
-
 func NewVerifier[T any](cfg VerifierConfig, typ TokenType, keys KeyRetriever) *VerifierBase[T] {
 	return &VerifierBase[T]{cfg, typ, keys}
 }
@@ -57,7 +52,9 @@ func (v *VerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T],
 		return nil, err
 	}
 
-	claims := Claims[T]{}
+	claims := Claims[T]{
+		token: token, // hold on to the original token
+	}
 	if err := parsed.Claims(jwk, &claims.Claims, &claims.Rest); err != nil {
 		return nil, err
 	}

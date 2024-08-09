@@ -7,10 +7,12 @@ import "fmt"
 // Example: stack-6481, org-12
 type NamespaceFormatter func(int64) string
 
+// Deprecated: use claims.CloudNamespaceFormatter
 func CloudNamespaceFormatter(id int64) string {
 	return fmt.Sprintf("stack-%d", id)
 }
 
+// Deprecated: use claims.CloudNamespaceFormatter
 func OnPremNamespaceFormatter(id int64) string {
 	if id == 1 {
 		return "default"
