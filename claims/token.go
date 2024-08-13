@@ -14,7 +14,7 @@ type AuthInfo interface {
 	// GetUID returns a unique value for a particular user that will change
 	// if the user is removed from the system and another user is added with
 	// the same name.
-	// This will either be a full GUID, or in the form: <IdentityType>:<Identity.UID>
+	// This be in the form: <IdentityType>:<Identifier>
 	GetUID() string
 
 	// GetGroups returns the names of the groups the user is a member of
@@ -119,8 +119,9 @@ type IdentityClaims interface {
 	// Type indicates what kind of identity this is
 	IdentityType() IdentityType
 
-	// UID is a unique identifier for this identity.
-	UID() string
+	// Identifier is a unique identifier for this IdentityType within a namespace.
+	// For some identity types this can be empty e.g. Anonymous.
+	Identifier() string
 
 	// Namespace takes the form of '<type>-<id>', '*' means all namespaces.
 	// In grafana the can be either org or stack.
@@ -128,7 +129,7 @@ type IdentityClaims interface {
 	Namespace() string
 
 	// AuthenticatedBy is the method used to authenticate the identity.
-	// Examples: oauth, oauth_azuread, etc
+	// Examples: password, oauth_azuread, etc
 	AuthenticatedBy() string
 
 	// The identity email
