@@ -27,10 +27,6 @@ func (n IdentityType) String() string {
 	return string(n)
 }
 
-func (n IdentityType) AsPrefix() string {
-	return string(n) + ":"
-}
-
 func ParseType(str string) (IdentityType, error) {
 	switch str {
 	case string(TypeUser):
