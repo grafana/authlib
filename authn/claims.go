@@ -1,7 +1,6 @@
 package authn
 
 import (
-	"strings"
 	"time"
 
 	"github.com/go-jose/go-jose/v3/jwt"
@@ -155,9 +154,9 @@ func (c *Identity) Subject() string {
 	return c.claims.Subject
 }
 
-// UID implements claims.IdentityClaims.
-func (c *Identity) UID() string {
-	return strings.TrimPrefix(c.claims.Rest.UID, c.IdentityType().AsPrefix())
+// Identifier implements claims.IdentityClaims.
+func (c *Identity) Identifier() string {
+	return c.claims.Rest.Identifier
 }
 
 // UID implements claims.IdentityClaims.

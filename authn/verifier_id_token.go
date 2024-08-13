@@ -8,9 +8,9 @@ import (
 )
 
 type IDTokenClaims struct {
-	// UID is the unique ID of the of entity, it is a typed id e.g. `user:some-uid`.
-	UID string `json:"uid"`
-	// The type of user
+	// Identifier is the unique ID of the of entity, it is a typed id e.g. `user:some-uid`.
+	Identifier string `json:"identifier"`
+	// The type of the entity.
 	Type claims.IdentityType `json:"type"`
 	// Namespace takes the form of '<type>-<id>', '*' means all namespaces.
 	// Type can be either org or stack.
@@ -21,13 +21,13 @@ type IDTokenClaims struct {
 	EmailVerified   bool   `json:"email_verified"`
 	// Username of the user (login attribute on the Identity)
 	Username string `json:"username"`
-	// Display Name of the user (name attribute if it is set, otherwise the login or email)
+	// Display name of the user (name attribute if it is set, otherwise the login or email)
 	DisplayName string `json:"name"`
 }
 
 // Helper for the id
 func (c IDTokenClaims) asTypedUID() string {
-	return fmt.Sprintf("%s:%s", c.Type, c.UID)
+	return fmt.Sprintf("%s:%s", c.Type, c.Identifier)
 }
 
 func (c IDTokenClaims) getK8sName() string {
@@ -40,7 +40,7 @@ func (c IDTokenClaims) getK8sName() string {
 	if c.Email != "" {
 		return c.Email
 	}
-	return c.UID
+	return c.Identifier
 }
 
 func (c IDTokenClaims) NamespaceMatches(namespace string) bool {
