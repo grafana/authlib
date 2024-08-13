@@ -14,7 +14,7 @@ type AuthInfo interface {
 	// GetUID returns a unique value for a particular user that will change
 	// if the user is removed from the system and another user is added with
 	// the same name.
-	// This be in the form: <IdentityType>:<Identifier>
+	// This will be in the form: <IdentityType>:<Identifier>
 	GetUID() string
 
 	// GetGroups returns the names of the groups the user is a member of
