@@ -8,7 +8,7 @@ import (
 )
 
 type IDTokenClaims struct {
-	// Identifier is the unique ID of the of entity, it is a typed id e.g. `user:some-uid`.
+	// Identifier is the unique ID of the of entity
 	Identifier string `json:"identifier"`
 	// The type of the entity.
 	Type claims.IdentityType `json:"type"`
