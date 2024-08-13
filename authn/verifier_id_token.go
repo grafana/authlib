@@ -18,7 +18,7 @@ type IDTokenClaims struct {
 	// AuthenticatedBy is the method used to authenticate the identity.
 	AuthenticatedBy string `json:"authenticatedBy"`
 	Email           string `json:"email"`
-	EmailVerified   bool   `json:"email_verified"`
+	EmailVerified   bool   `json:"email_verified,omitempty"`
 	// Username of the user (login attribute on the Identity)
 	Username string `json:"username"`
 	// Display name of the user (name attribute if it is set, otherwise the login or email)
