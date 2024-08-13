@@ -8,7 +8,7 @@ import (
 )
 
 type IDTokenClaims struct {
-	// UID is the unique ID of the user (UID attribute)
+	// UID is the unique ID of the of entity, it is a typed id e.g. `user:some-uid`.
 	UID string `json:"uid"`
 	// The type of user
 	Type claims.IdentityType `json:"type"`
@@ -40,7 +40,7 @@ func (c IDTokenClaims) getK8sName() string {
 	if c.Email != "" {
 		return c.Email
 	}
-	return c.asTypedUID()
+	return c.UID
 }
 
 func (c IDTokenClaims) NamespaceMatches(namespace string) bool {
