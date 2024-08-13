@@ -12,9 +12,6 @@ type IDTokenClaims struct {
 	UID string `json:"uid"`
 	// The type of user
 	Type claims.IdentityType `json:"type"`
-	// The internal numeric org ID
-	// Deprecated: use namespace where possible
-	OrgID int64 `json:"orgId,omitempty"`
 	// Namespace takes the form of '<type>-<id>', '*' means all namespaces.
 	// Type can be either org or stack.
 	Namespace string `json:"namespace"`

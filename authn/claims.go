@@ -160,11 +160,6 @@ func (c *Identity) UID() string {
 }
 
 // UID implements claims.IdentityClaims.
-func (c *Identity) OrgID() int64 {
-	return c.claims.Rest.OrgID
-}
-
-// UID implements claims.IdentityClaims.
 func (c *Identity) IdentityType() claims.IdentityType {
 	return c.claims.Rest.Type
 }

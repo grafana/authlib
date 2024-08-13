@@ -122,10 +122,6 @@ type IdentityClaims interface {
 	// UID is a unique identifier for this identity.
 	UID() string
 
-	// The internal org-id
-	// Deprecated: Use namespace when possible
-	OrgID() int64
-
 	// Namespace takes the form of '<type>-<id>', '*' means all namespaces.
 	// In grafana the can be either org or stack.
 	// The claims are valid within this namespace
