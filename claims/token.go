@@ -122,10 +122,6 @@ type IdentityClaims interface {
 	// UID is a unique identifier for this identity.
 	UID() string
 
-	// The numeric internal ID for this identity.
-	// Deprecated: Use UID when possible
-	InternalID() int64
-
 	// The internal org-id
 	// Deprecated: Use namespace when possible
 	OrgID() int64

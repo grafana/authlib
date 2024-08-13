@@ -12,9 +12,6 @@ type IDTokenClaims struct {
 	UID string `json:"uid"`
 	// The type of user
 	Type claims.IdentityType `json:"type"`
-	// The internal numeric ID
-	// Deprecated: use UID if possible
-	InternalID int64 `json:"id,omitempty"`
 	// The internal numeric org ID
 	// Deprecated: use namespace where possible
 	OrgID int64 `json:"orgId,omitempty"`
