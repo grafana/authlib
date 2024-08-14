@@ -20,7 +20,7 @@ type IDTokenClaims struct {
 	Email           string `json:"email,omitempty"`
 	EmailVerified   bool   `json:"email_verified,omitempty"`
 	// Username of the user (login attribute on the Identity)
-	Username string `json:"username"`
+	Username string `json:"username,omitempty"`
 	// Display name of the user (name attribute if it is set, otherwise the login or email)
 	DisplayName string `json:"name"`
 }
