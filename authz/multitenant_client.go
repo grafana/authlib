@@ -189,7 +189,7 @@ func (r *CheckRequest) Validate(accessTokenEnabled bool) error {
 		return ErrMissingCaller
 	}
 	idClaims := r.Caller.GetIdentity()
-	if idClaims != nil && !idClaims.IsNil() && r.Caller.GetIdentity().Subject() == "" {
+	if idClaims != nil && !idClaims.IsNil() && idClaims.Subject() == "" {
 		return ErrMissingSubject
 	}
 	return nil
@@ -208,8 +208,11 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 		return false, nil
 	}
 
-	if c.authCfg.accessTokenAuthEnabled && req.Caller.GetAccess() != nil {
-		span.SetAttributes(attribute.String("service", req.Caller.GetAccess().Subject()))
+	accessClaims := req.Caller.GetAccess()
+	identityClaims := req.Caller.GetIdentity()
+
+	if c.authCfg.accessTokenAuthEnabled && accessClaims != nil && !accessClaims.IsNil() {
+		span.SetAttributes(attribute.String("service", accessClaims.Subject()))
 	}
 	span.SetAttributes(attribute.Int64("stack_id", req.StackID))
 	span.SetAttributes(attribute.String("action", req.Action))
@@ -217,20 +220,20 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 		span.SetAttributes(attribute.String("resource", req.Resource.Scope()))
 		span.SetAttributes(attribute.Int("contextual", len(req.Contextual)))
 	}
-	span.SetAttributes(attribute.Bool("with_user", req.Caller.GetIdentity() != nil))
+	span.SetAttributes(attribute.Bool("with_user", identityClaims != nil && !identityClaims.IsNil()))
 
 	// No user => check on the service permissions
-	if req.Caller.GetIdentity() == nil || req.Caller.GetIdentity().IsNil() {
+	if identityClaims == nil || identityClaims.IsNil() {
 		// access token check is disabled => we can skip the authz service
 		if !c.authCfg.accessTokenAuthEnabled {
 			return true, nil
 		}
 
-		if req.Caller.GetAccess() == nil {
+		if accessClaims == nil || accessClaims.IsNil() {
 			return false, ErrMissingCaller
 		}
 
-		perms := req.Caller.GetAccess().Permissions()
+		perms := accessClaims.Permissions()
 		for _, p := range perms {
 			if p == req.Action {
 				return true, nil
@@ -239,17 +242,17 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 		return false, nil
 	}
 
-	span.SetAttributes(attribute.String("subject", req.Caller.GetIdentity().Subject()))
+	span.SetAttributes(attribute.String("subject", identityClaims.Subject()))
 
 	// Only check the service permissions if the access token check is enabled
 	if c.authCfg.accessTokenAuthEnabled {
-		if req.Caller.GetAccess() == nil {
+		if accessClaims == nil || accessClaims.IsNil() {
 			return false, ErrMissingCaller
 		}
 
 		// Make sure the service is allowed to perform the requested action
 		serviceIsAllowedAction := false
-		for _, p := range req.Caller.GetAccess().DelegatedPermissions() {
+		for _, p := range accessClaims.DelegatedPermissions() {
 			if p == req.Action {
 				serviceIsAllowedAction = true
 				break
@@ -260,7 +263,7 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 		}
 	}
 
-	res, err := c.retrievePermissions(ctx, req.StackID, req.Caller.GetIdentity().Subject(), req.Action)
+	res, err := c.retrievePermissions(ctx, req.StackID, identityClaims.Subject(), req.Action)
 	if err != nil {
 		span.RecordError(err)
 		return false, err
