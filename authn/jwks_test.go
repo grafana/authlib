@@ -30,7 +30,7 @@ func TestDefaultKeyRetriever_Get(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		calls++
 		w.WriteHeader(http.StatusOK)
-		w.Write(keys())
+		_, _ = w.Write(keys())
 	}))
 	service := NewKeyRetriever(KeyRetrieverConfig{
 		SigningKeysURL: server.URL,
