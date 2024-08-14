@@ -8,32 +8,26 @@ import (
 )
 
 type IDTokenClaims struct {
-	// UID is the unique ID of the user (UID attribute)
-	UID string `json:"uid"`
-	// The type of user
+	// Identifier is the unique ID of the of entity
+	Identifier string `json:"identifier"`
+	// The type of the entity.
 	Type claims.IdentityType `json:"type"`
-	// The internal numeric ID
-	// Deprecated: use UID if possible
-	InternalID int64 `json:"id,omitempty"`
-	// The internal numeric org ID
-	// Deprecated: use namespace where possible
-	OrgID int64 `json:"orgId,omitempty"`
 	// Namespace takes the form of '<type>-<id>', '*' means all namespaces.
 	// Type can be either org or stack.
 	Namespace string `json:"namespace"`
 	// AuthenticatedBy is the method used to authenticate the identity.
-	AuthenticatedBy string `json:"authenticatedBy"`
-	Email           string `json:"email"`
-	EmailVerified   bool   `json:"email_verified"`
+	AuthenticatedBy string `json:"authenticatedBy,omitempty"`
+	Email           string `json:"email,omitempty"`
+	EmailVerified   bool   `json:"email_verified,omitempty"`
 	// Username of the user (login attribute on the Identity)
-	Username string `json:"username"`
-	// Display Name of the user (name attribute if it is set, otherwise the login or email)
-	DisplayName string `json:"name"`
+	Username string `json:"username,omitempty"`
+	// Display name of the user (name attribute if it is set, otherwise the login or email)
+	DisplayName string `json:"name,omitempty"`
 }
 
 // Helper for the id
 func (c IDTokenClaims) asTypedUID() string {
-	return fmt.Sprintf("%s:%s", c.Type, c.UID)
+	return fmt.Sprintf("%s:%s", c.Type, c.Identifier)
 }
 
 func (c IDTokenClaims) getK8sName() string {
@@ -46,7 +40,7 @@ func (c IDTokenClaims) getK8sName() string {
 	if c.Email != "" {
 		return c.Email
 	}
-	return c.asTypedUID()
+	return c.Identifier
 }
 
 func (c IDTokenClaims) NamespaceMatches(namespace string) bool {

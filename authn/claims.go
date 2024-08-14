@@ -154,19 +154,9 @@ func (c *Identity) Subject() string {
 	return c.claims.Subject
 }
 
-// UID implements claims.IdentityClaims.
-func (c *Identity) UID() string {
-	return c.claims.Rest.UID
-}
-
-// UID implements claims.IdentityClaims.
-func (c *Identity) InternalID() int64 {
-	return c.claims.Rest.InternalID
-}
-
-// UID implements claims.IdentityClaims.
-func (c *Identity) OrgID() int64 {
-	return c.claims.Rest.OrgID
+// Identifier implements claims.IdentityClaims.
+func (c *Identity) Identifier() string {
+	return c.claims.Rest.Identifier
 }
 
 // UID implements claims.IdentityClaims.
