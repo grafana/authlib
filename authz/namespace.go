@@ -27,6 +27,7 @@ var (
 )
 
 type NamespaceAccessChecker interface {
+	// nolint:staticcheck
 	CheckAccess(caller authn.CallerAuthInfo, stackID int64) error
 }
 
@@ -79,6 +80,7 @@ func NewNamespaceAccessChecker(namespaceFmt claims.NamespaceFormatter, opts ...N
 	return na
 }
 
+// nolint:staticcheck
 func (na *NamespaceAccessCheckerImpl) CheckAccess(caller authn.CallerAuthInfo, stackID int64) error {
 	expectedNamespace := na.namespaceFmt(stackID)
 	if na.idTokenEnabled {
@@ -122,6 +124,7 @@ func MetadataStackIDExtractor(key string) StackIDExtractors {
 // gRPC Unary Interceptor for namespace validation
 func UnaryNamespaceAccessInterceptor(na NamespaceAccessChecker, stackID StackIDExtractors) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
+		// nolint:staticcheck
 		caller, ok := authn.GetCallerAuthInfoFromContext(ctx)
 		if !ok {
 			return nil, ErrMissingCaller
@@ -146,6 +149,7 @@ func StreamNamespaceAccessInterceptor(na NamespaceAccessChecker, stackID StackID
 	return func(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		ctx := stream.Context()
 
+		// nolint:staticcheck
 		caller, ok := authn.GetCallerAuthInfoFromContext(ctx)
 		if !ok {
 			return ErrMissingCaller

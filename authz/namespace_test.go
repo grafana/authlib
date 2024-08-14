@@ -13,20 +13,23 @@ import (
 func TestNamespaceAccessCheckerImpl_ValidateAccessTokenOnly(t *testing.T) {
 	stackID := int64(12)
 	tests := []struct {
-		name    string
-		nsFmt   claims.NamespaceFormatter
+		name  string
+		nsFmt claims.NamespaceFormatter
+		// nolint:staticcheck
 		caller  authn.CallerAuthInfo
 		wantErr error
 	}{
 		{
-			name:    "missing access token",
-			nsFmt:   claims.CloudNamespaceFormatter,
+			name:  "missing access token",
+			nsFmt: claims.CloudNamespaceFormatter,
+			// nolint:staticcheck
 			caller:  authn.CallerAuthInfo{},
 			wantErr: ErrorAccessTokenNamespaceMismatch,
 		},
 		{
 			name:  "access token match",
 			nsFmt: claims.CloudNamespaceFormatter,
+			// nolint:staticcheck
 			caller: authn.CallerAuthInfo{
 				AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stack-12"}},
 			},
@@ -34,6 +37,7 @@ func TestNamespaceAccessCheckerImpl_ValidateAccessTokenOnly(t *testing.T) {
 		{
 			name:  "access token wildcard match",
 			nsFmt: claims.CloudNamespaceFormatter,
+			// nolint:staticcheck
 			caller: authn.CallerAuthInfo{
 				AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "*"}},
 			},
@@ -41,6 +45,7 @@ func TestNamespaceAccessCheckerImpl_ValidateAccessTokenOnly(t *testing.T) {
 		{
 			name:  "access token mismatch",
 			nsFmt: claims.CloudNamespaceFormatter,
+			// nolint:staticcheck
 			caller: authn.CallerAuthInfo{
 				AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stack-13"}},
 			},
@@ -58,20 +63,23 @@ func TestNamespaceAccessCheckerImpl_ValidateAccessTokenOnly(t *testing.T) {
 func TestNamespaceAccessCheckerImpl_ValidateIDTokenOnly(t *testing.T) {
 	stackID := int64(12)
 	tests := []struct {
-		name    string
-		nsFmt   claims.NamespaceFormatter
+		name  string
+		nsFmt claims.NamespaceFormatter
+		// nolint:staticcheck
 		caller  authn.CallerAuthInfo
 		wantErr error
 	}{
 		{
-			name:    "missing id token",
-			nsFmt:   claims.CloudNamespaceFormatter,
+			name:  "missing id token",
+			nsFmt: claims.CloudNamespaceFormatter,
+			// nolint:staticcheck
 			caller:  authn.CallerAuthInfo{},
 			wantErr: ErrorMissingIDToken,
 		},
 		{
 			name:  "id token match",
 			nsFmt: claims.CloudNamespaceFormatter,
+			// nolint:staticcheck
 			caller: authn.CallerAuthInfo{
 				IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stack-12"}},
 			},
@@ -79,6 +87,7 @@ func TestNamespaceAccessCheckerImpl_ValidateIDTokenOnly(t *testing.T) {
 		{
 			name:  "id token mismatch",
 			nsFmt: claims.CloudNamespaceFormatter,
+			// nolint:staticcheck
 			caller: authn.CallerAuthInfo{
 				IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stack-13"}},
 			},
@@ -96,14 +105,16 @@ func TestNamespaceAccessCheckerImpl_ValidateIDTokenOnly(t *testing.T) {
 func TestNamespaceAccessCheckerImpl_ValidateBoth(t *testing.T) {
 	stackID := int64(12)
 	tests := []struct {
-		name    string
-		nsFmt   claims.NamespaceFormatter
+		name  string
+		nsFmt claims.NamespaceFormatter
+		// nolint:staticcheck
 		caller  authn.CallerAuthInfo
 		wantErr error
 	}{
 		{
 			name:  "id token and access token match",
 			nsFmt: claims.CloudNamespaceFormatter,
+			// nolint:staticcheck
 			caller: authn.CallerAuthInfo{
 				IDTokenClaims:     &authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stack-12"}},
 				AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stack-12"}},
@@ -112,6 +123,7 @@ func TestNamespaceAccessCheckerImpl_ValidateBoth(t *testing.T) {
 		{
 			name:  "id token and access token wildcard match",
 			nsFmt: claims.CloudNamespaceFormatter,
+			// nolint:staticcheck
 			caller: authn.CallerAuthInfo{
 				IDTokenClaims:     &authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stack-12"}},
 				AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "*"}},
@@ -120,6 +132,7 @@ func TestNamespaceAccessCheckerImpl_ValidateBoth(t *testing.T) {
 		{
 			name:  "access token mismatch",
 			nsFmt: claims.CloudNamespaceFormatter,
+			// nolint:staticcheck
 			caller: authn.CallerAuthInfo{
 				IDTokenClaims:     &authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stack-12"}},
 				AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stack-13"}},
@@ -129,6 +142,7 @@ func TestNamespaceAccessCheckerImpl_ValidateBoth(t *testing.T) {
 		{
 			name:  "id token mismatch",
 			nsFmt: claims.CloudNamespaceFormatter,
+			// nolint:staticcheck
 			caller: authn.CallerAuthInfo{
 				IDTokenClaims:     &authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stack-13"}},
 				AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stack-12"}},
@@ -138,6 +152,7 @@ func TestNamespaceAccessCheckerImpl_ValidateBoth(t *testing.T) {
 		{
 			name:  "id token missing but not required",
 			nsFmt: claims.CloudNamespaceFormatter,
+			// nolint:staticcheck
 			caller: authn.CallerAuthInfo{
 				AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stack-12"}},
 			},

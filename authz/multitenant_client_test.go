@@ -255,6 +255,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		{
 			name: "No Caller",
 			req: CheckRequest{
+				// nolint:staticcheck
 				Caller:  authn.CallerAuthInfo{},
 				StackID: 12,
 				Action:  "dashboards:read",
@@ -264,6 +265,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		{
 			name: "Service does not have the action",
 			req: CheckRequest{
+				// nolint:staticcheck
 				Caller: authn.CallerAuthInfo{
 					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
@@ -278,6 +280,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		{
 			name: "Service has the action",
 			req: CheckRequest{
+				// nolint:staticcheck
 				Caller: authn.CallerAuthInfo{
 					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
@@ -292,6 +295,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		{
 			name: "Service has the action but in the wrong namespace",
 			req: CheckRequest{
+				// nolint:staticcheck
 				Caller: authn.CallerAuthInfo{
 					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
@@ -306,6 +310,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		{
 			name: "On behalf of, service does not have the action",
 			req: CheckRequest{
+				// nolint:staticcheck
 				Caller: authn.CallerAuthInfo{
 					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
@@ -324,6 +329,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		{
 			name: "On behalf of, service does have the action, but user not",
 			req: CheckRequest{
+				// nolint:staticcheck
 				Caller: authn.CallerAuthInfo{
 					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
@@ -342,6 +348,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		{
 			name: "On behalf of, action check only",
 			req: CheckRequest{
+				// nolint:staticcheck
 				Caller: authn.CallerAuthInfo{
 					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
@@ -361,6 +368,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		{
 			name: "On behalf of, action check only, user is in another namespaces",
 			req: CheckRequest{
+				// nolint:staticcheck
 				Caller: authn.CallerAuthInfo{
 					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
@@ -379,6 +387,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		{
 			name: "On behalf of, user has the action on another resource",
 			req: CheckRequest{
+				// nolint:staticcheck
 				Caller: authn.CallerAuthInfo{
 					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
@@ -399,6 +408,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		{
 			name: "On behalf of, user has the action on the resource",
 			req: CheckRequest{
+				// nolint:staticcheck
 				Caller: authn.CallerAuthInfo{
 					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
@@ -419,6 +429,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		{
 			name: "On behalf of, user has the action on the contextual resource",
 			req: CheckRequest{
+				// nolint:staticcheck
 				Caller: authn.CallerAuthInfo{
 					AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
@@ -461,6 +472,7 @@ func TestLegacyClientImpl_Check_OnPremFmt(t *testing.T) {
 	authz.res = &authzv1.ReadResponse{Found: true, Data: []*authzv1.ReadResponse_Data{{Object: "dashboards:uid:1"}}}
 
 	req := CheckRequest{
+		// nolint:staticcheck
 		Caller: authn.CallerAuthInfo{
 			AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
 				Claims: &jwt.Claims{Subject: "service"},
@@ -486,6 +498,7 @@ func TestLegacyClientImpl_Check_Cache(t *testing.T) {
 	authz.res = &authzv1.ReadResponse{Found: true, Data: []*authzv1.ReadResponse_Data{{Object: "dashboards:uid:1"}}}
 
 	req := CheckRequest{
+		// nolint:staticcheck
 		Caller: authn.CallerAuthInfo{
 			AccessTokenClaims: authn.Claims[authn.AccessTokenClaims]{
 				Claims: &jwt.Claims{Subject: "service"},
@@ -558,6 +571,7 @@ func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
 		{
 			name: "No user assume the service is allowed",
 			req: CheckRequest{
+				// nolint:staticcheck
 				Caller:  authn.CallerAuthInfo{},
 				StackID: 12,
 				Action:  "dashboards:read",
@@ -567,6 +581,7 @@ func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
 		{
 			name: "User has the action on the resource",
 			req: CheckRequest{
+				// nolint:staticcheck
 				Caller: authn.CallerAuthInfo{
 					IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{
 						Claims: &jwt.Claims{Subject: "user:1"},
@@ -583,6 +598,7 @@ func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
 		{
 			name: "User has the action on another resource",
 			req: CheckRequest{
+				// nolint:staticcheck
 				Caller: authn.CallerAuthInfo{
 					IDTokenClaims: &authn.Claims[authn.IDTokenClaims]{
 						Claims: &jwt.Claims{Subject: "user:1"},

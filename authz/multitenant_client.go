@@ -31,6 +31,7 @@ var (
 )
 
 type CheckRequest struct {
+	// nolint:staticcheck
 	Caller     authn.CallerAuthInfo
 	StackID    int64
 	Action     string
@@ -271,6 +272,7 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 	return res.Check(append(req.Contextual, *req.Resource)...), nil
 }
 
+// nolint:staticcheck
 func (c *LegacyClientImpl) validateNamespace(caller authn.CallerAuthInfo, stackID int64) bool {
 	expectedNamespace := c.namespaceFmt(stackID)
 
