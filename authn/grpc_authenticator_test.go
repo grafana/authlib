@@ -8,6 +8,8 @@ import (
 	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
+
+	"github.com/grafana/authlib/claims"
 )
 
 type testEnv struct {
@@ -87,7 +89,7 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 		name    string
 		md      metadata.MD
 		initEnv initEnv
-		want    CallerAuthInfo
+		want    AuthInfo
 		wantErr error
 	}{
 		{
@@ -123,15 +125,15 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 					Rest:   IDTokenClaims{Namespace: "stack-12"},
 				}
 			},
-			want: CallerAuthInfo{
-				AccessTokenClaims: Claims[AccessTokenClaims]{
+			want: AuthInfo{
+				AccessClaims: NewAccessClaims(Claims[AccessTokenClaims]{
 					Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
 					Rest:   AccessTokenClaims{Namespace: "*"},
-				},
-				IDTokenClaims: &Claims[IDTokenClaims]{
+				}),
+				IdentityClaims: NewIdentityClaims(Claims[IDTokenClaims]{
 					Claims: &jwt.Claims{Subject: string(typeUser) + ":3"},
 					Rest:   IDTokenClaims{Namespace: "stack-12"},
-				},
+				}),
 			},
 		},
 		{
@@ -145,11 +147,11 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 					Rest:   AccessTokenClaims{Namespace: "*"},
 				}
 			},
-			want: CallerAuthInfo{
-				AccessTokenClaims: Claims[AccessTokenClaims]{
+			want: AuthInfo{
+				AccessClaims: NewAccessClaims(Claims[AccessTokenClaims]{
 					Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
 					Rest:   AccessTokenClaims{Namespace: "*"},
-				},
+				}),
 			},
 		},
 		{
@@ -163,11 +165,11 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 					Rest:   AccessTokenClaims{Namespace: "*"},
 				}
 			},
-			want: CallerAuthInfo{
-				AccessTokenClaims: Claims[AccessTokenClaims]{
+			want: AuthInfo{
+				AccessClaims: NewAccessClaims(Claims[AccessTokenClaims]{
 					Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
 					Rest:   AccessTokenClaims{Namespace: "*"},
-				},
+				}),
 			},
 		},
 		{
@@ -178,9 +180,7 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 				env.authenticator.cfg.idTokenAuthEnabled = false
 				env.authenticator.cfg.idTokenAuthRequired = false
 			},
-			want: CallerAuthInfo{
-				AccessTokenClaims: Claims[AccessTokenClaims]{},
-			},
+			want: AuthInfo{},
 		},
 		{
 			name: "access and id token namespaces mismatch",
@@ -217,23 +217,23 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 				return
 			}
 
-			got, ok := GetCallerAuthInfoFromContext(ctx)
+			got, ok := claims.From(ctx)
 			require.True(t, ok)
 
 			require.NoError(t, err)
 			require.NotNil(t, got)
-			if tt.want.AccessTokenClaims.Claims == nil {
-				require.Nil(t, got.AccessTokenClaims.Claims)
+			if tt.want.GetAccess() == nil || tt.want.GetAccess().IsNil() {
+				require.Nil(t, got.GetAccess())
+				require.True(t, got.GetAccess().IsNil())
 			} else {
-				require.Equal(t, *tt.want.AccessTokenClaims.Claims, *got.AccessTokenClaims.Claims)
+				require.Equal(t, tt.want.GetAccess(), got.GetAccess())
 			}
-			require.Equal(t, tt.want.AccessTokenClaims.Rest, got.AccessTokenClaims.Rest)
 
-			if tt.want.IDTokenClaims == nil {
-				require.Nil(t, got.IDTokenClaims)
+			if tt.want.GetIdentity() == nil || tt.want.GetIdentity().IsNil() {
+				require.Nil(t, got.GetIdentity())
+				require.True(t, got.GetIdentity().IsNil())
 			} else {
-				require.Equal(t, *tt.want.IDTokenClaims.Claims, *got.IDTokenClaims.Claims)
-				require.Equal(t, tt.want.IDTokenClaims.Rest, got.IDTokenClaims.Rest)
+				require.Equal(t, tt.want.GetIdentity(), got.GetIdentity())
 			}
 		})
 	}

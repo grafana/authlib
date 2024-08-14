@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/go-jose/go-jose/v3/jwt"
+
 	"github.com/grafana/authlib/claims"
 )
 
@@ -60,11 +61,11 @@ type Access struct {
 	claims Claims[AccessTokenClaims]
 }
 
-func NewAccessClaims(c Claims[AccessTokenClaims]) claims.AccessClaims {
+func NewAccessClaims(c Claims[AccessTokenClaims]) *Access {
 	return &Access{claims: c}
 }
 
-func NewIdentityClaims(c Claims[IDTokenClaims]) claims.IdentityClaims {
+func NewIdentityClaims(c Claims[IDTokenClaims]) *Identity {
 	return &Identity{claims: c}
 }
 
@@ -169,6 +170,19 @@ func (c *Identity) Username() string {
 	return c.claims.Rest.Username
 }
 
+// NamespaceMatches implements claims.IdentityClaims.
+func (c *Identity) NamespaceMatches(namespace string) bool {
+	if c.Namespace() == "*" {
+		return true
+	}
+	return c.Namespace() == namespace
+}
+
+// IsNil implements claims.IdentityClaims.
+func (c *Identity) IsNil() bool {
+	return c == nil
+}
+
 // Audience implements claims.IdentityClaims.
 func (c *Access) Audience() []string {
 	return c.claims.Audience
@@ -234,6 +248,19 @@ func (c *Access) Permissions() []string {
 // Scopes implements claims.AccessClaims.
 func (c *Access) Scopes() []string {
 	return c.claims.Rest.Scopes
+}
+
+// NamespaceMatches implements claims.AccessClaims.
+func (c *Access) NamespaceMatches(namespace string) bool {
+	if c.Namespace() == "*" {
+		return true
+	}
+	return c.Namespace() == namespace
+}
+
+// IsNil implements claims.AccessClaims.
+func (c *Access) IsNil() bool {
+	return c == nil
 }
 
 // Audience implements claims.IdentityClaims.

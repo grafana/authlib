@@ -8,6 +8,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+
+	"github.com/grafana/authlib/claims"
 )
 
 var (
@@ -119,7 +121,7 @@ func NewGrpcAuthenticator(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthenticato
 
 // Authenticate authenticates the incoming request based on the access token and ID token, and returns the context with the caller information.
 func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context, error) {
-	callerInfo := CallerAuthInfo{}
+	authInfo := AuthInfo{}
 
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
@@ -131,7 +133,9 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 		if err != nil {
 			return nil, err
 		}
-		callerInfo.AccessTokenClaims = *atClaims
+		if atClaims != nil {
+			authInfo.AccessClaims = &Access{claims: *atClaims}
+		}
 	}
 
 	if ga.cfg.idTokenAuthEnabled {
@@ -139,17 +143,24 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 		if err != nil {
 			return nil, err
 		}
-		callerInfo.IDTokenClaims = idClaims
-	}
-
-	// Validate accessToken namespace matches IDToken namespace
-	if ga.cfg.accessTokenAuthEnabled && ga.cfg.idTokenAuthEnabled && callerInfo.IDTokenClaims != nil {
-		if !callerInfo.AccessTokenClaims.Rest.NamespaceMatches(callerInfo.IDTokenClaims.Rest.Namespace) {
-			return nil, ErrorNamespacesMismatch
+		if idClaims != nil {
+			authInfo.IdentityClaims = NewIdentityClaims(*idClaims)
 		}
 	}
 
-	return AddCallerAuthInfoToContext(ctx, callerInfo), nil
+	// Validate accessToken namespace matches IDToken namespace
+	if ga.cfg.accessTokenAuthEnabled && ga.cfg.idTokenAuthEnabled {
+		accessToken := authInfo.GetAccess()
+		identityToken := authInfo.GetIdentity()
+
+		if !accessToken.IsNil() && !identityToken.IsNil() {
+			if !accessToken.NamespaceMatches(identityToken.Namespace()) {
+				return nil, ErrorNamespacesMismatch
+			}
+		}
+	}
+
+	return claims.WithClaims(ctx, &authInfo), nil
 }
 
 func (ga *GrpcAuthenticator) authenticateService(ctx context.Context, md metadata.MD) (*Claims[AccessTokenClaims], error) {
