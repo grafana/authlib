@@ -144,6 +144,7 @@ type IdentityClaims interface {
 	// Display Name of the user (name attribute if it is set, otherwise the login or email)
 	DisplayName() string
 
+	NamespaceMatches(namespace string) bool
 	IsNil() bool
 }
 
@@ -162,5 +163,6 @@ type AccessClaims interface {
 	// On-behalf-of user
 	DelegatedPermissions() []string
 
+	NamespaceMatches(namespace string) bool
 	IsNil() bool
 }

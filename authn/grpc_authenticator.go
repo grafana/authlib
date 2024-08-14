@@ -154,10 +154,7 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 		identityToken := authInfo.GetIdentity()
 
 		if !accessToken.IsNil() && !identityToken.IsNil() {
-			accessNamespace := accessToken.Namespace()
-			identityNamespace := identityToken.Namespace()
-
-			if accessNamespace != "*" && accessNamespace != identityNamespace {
+			if !accessToken.NamespaceMatches(identityToken.Namespace()) {
 				return nil, ErrorNamespacesMismatch
 			}
 		}
