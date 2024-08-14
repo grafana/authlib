@@ -9,7 +9,6 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/grafana/authlib/authn"
 	"github.com/grafana/authlib/claims"
 )
 
@@ -22,13 +21,13 @@ var (
 	ErrorMissingCallerInfo            = status.Errorf(codes.Unauthenticated, "unauthenticated: missing caller auth info")
 	ErrorInvalidStackID               = status.Errorf(codes.Unauthenticated, "unauthenticated: invalid stack ID")
 	ErrorMissingIDToken               = status.Errorf(codes.Unauthenticated, "unauthenticated: missing id token")
+	ErrorMissingAccessToken           = status.Errorf(codes.Unauthenticated, "unauthenticated: missing access token")
 	ErrorIDTokenNamespaceMismatch     = status.Errorf(codes.PermissionDenied, "unauthorized: id token namespace does not match expected namespace")
 	ErrorAccessTokenNamespaceMismatch = status.Errorf(codes.PermissionDenied, "unauthorized: access token namespace does not match expected namespace")
 )
 
 type NamespaceAccessChecker interface {
-	// nolint:staticcheck
-	CheckAccess(caller authn.CallerAuthInfo, stackID int64) error
+	CheckAccess(caller claims.AuthInfo, stackID int64) error
 }
 
 type NamespaceAccessCheckerOption func(*NamespaceAccessCheckerImpl)
@@ -80,20 +79,27 @@ func NewNamespaceAccessChecker(namespaceFmt claims.NamespaceFormatter, opts ...N
 	return na
 }
 
-// nolint:staticcheck
-func (na *NamespaceAccessCheckerImpl) CheckAccess(caller authn.CallerAuthInfo, stackID int64) error {
+func (na *NamespaceAccessCheckerImpl) CheckAccess(caller claims.AuthInfo, stackID int64) error {
 	expectedNamespace := na.namespaceFmt(stackID)
 	if na.idTokenEnabled {
-		if caller.IDTokenClaims == nil {
+		idClaims := caller.GetIdentity()
+		if idClaims == nil || idClaims.IsNil() {
 			if na.idTokenRequired {
 				return ErrorMissingIDToken
 			}
-		} else if caller.IDTokenClaims.Rest.Namespace != expectedNamespace {
+		} else if idClaims.Namespace() != expectedNamespace {
 			return ErrorIDTokenNamespaceMismatch
 		}
 	}
-	if na.accessTokenEnabled && !caller.AccessTokenClaims.Rest.NamespaceMatches(expectedNamespace) {
-		return ErrorAccessTokenNamespaceMismatch
+	if na.accessTokenEnabled {
+		accessClaims := caller.GetAccess()
+		if accessClaims == nil || accessClaims.IsNil() {
+			return ErrorMissingAccessToken
+		}
+		namespace := accessClaims.Namespace()
+		if namespace != "*" && namespace != expectedNamespace {
+			return ErrorAccessTokenNamespaceMismatch
+		}
 	}
 	return nil
 }
@@ -124,8 +130,7 @@ func MetadataStackIDExtractor(key string) StackIDExtractors {
 // gRPC Unary Interceptor for namespace validation
 func UnaryNamespaceAccessInterceptor(na NamespaceAccessChecker, stackID StackIDExtractors) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
-		// nolint:staticcheck
-		caller, ok := authn.GetCallerAuthInfoFromContext(ctx)
+		caller, ok := claims.From(ctx)
 		if !ok {
 			return nil, ErrMissingCaller
 		}
@@ -149,8 +154,7 @@ func StreamNamespaceAccessInterceptor(na NamespaceAccessChecker, stackID StackID
 	return func(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		ctx := stream.Context()
 
-		// nolint:staticcheck
-		caller, ok := authn.GetCallerAuthInfoFromContext(ctx)
+		caller, ok := claims.From(ctx)
 		if !ok {
 			return ErrMissingCaller
 		}

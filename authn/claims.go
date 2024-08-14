@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/go-jose/go-jose/v3/jwt"
+
 	"github.com/grafana/authlib/claims"
 )
 
@@ -60,11 +61,11 @@ type Access struct {
 	claims Claims[AccessTokenClaims]
 }
 
-func NewAccessClaims(c Claims[AccessTokenClaims]) claims.AccessClaims {
+func NewAccessClaims(c Claims[AccessTokenClaims]) *Access {
 	return &Access{claims: c}
 }
 
-func NewIdentityClaims(c Claims[IDTokenClaims]) claims.IdentityClaims {
+func NewIdentityClaims(c Claims[IDTokenClaims]) *Identity {
 	return &Identity{claims: c}
 }
 
@@ -174,6 +175,10 @@ func (c *Access) Audience() []string {
 	return c.claims.Audience
 }
 
+func (c *Identity) IsNil() bool {
+	return c == nil
+}
+
 // Expiry implements claims.IdentityClaims.
 func (c *Access) Expiry() *time.Time {
 	if c.claims.Expiry == nil {
@@ -234,6 +239,10 @@ func (c *Access) Permissions() []string {
 // Scopes implements claims.AccessClaims.
 func (c *Access) Scopes() []string {
 	return c.claims.Rest.Scopes
+}
+
+func (c *Access) IsNil() bool {
+	return c == nil
 }
 
 // Audience implements claims.IdentityClaims.

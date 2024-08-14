@@ -143,6 +143,8 @@ type IdentityClaims interface {
 
 	// Display Name of the user (name attribute if it is set, otherwise the login or email)
 	DisplayName() string
+
+	IsNil() bool
 }
 
 // Access claims indicate what the request can access independent from the identity
@@ -159,4 +161,6 @@ type AccessClaims interface {
 	Permissions() []string
 	// On-behalf-of user
 	DelegatedPermissions() []string
+
+	IsNil() bool
 }
