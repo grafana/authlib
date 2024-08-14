@@ -16,8 +16,8 @@ type IDTokenClaims struct {
 	// Type can be either org or stack.
 	Namespace string `json:"namespace"`
 	// AuthenticatedBy is the method used to authenticate the identity.
-	AuthenticatedBy string `json:"authenticatedBy"`
-	Email           string `json:"email"`
+	AuthenticatedBy string `json:"authenticatedBy,omitempty"`
+	Email           string `json:"email,omitempty"`
 	EmailVerified   bool   `json:"email_verified,omitempty"`
 	// Username of the user (login attribute on the Identity)
 	Username string `json:"username"`
