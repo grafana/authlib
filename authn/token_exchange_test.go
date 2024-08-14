@@ -68,7 +68,7 @@ func Test_TokenExchangeClient_Exchange(t *testing.T) {
 	t.Run("should return error for unexpected server response", func(t *testing.T) {
 		c := setup(httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte("{}"))
+			_, _ = w.Write([]byte("{}"))
 		})))
 		res, err := c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service"}})
 		assert.ErrorIs(t, err, ErrInvalidExchangeResponse)
@@ -81,7 +81,7 @@ func Test_TokenExchangeClient_Exchange(t *testing.T) {
 			calls++
 			require.Equal(t, r.Header.Get("Authorization"), "Bearer some-token")
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"data": {"token": "` + signAccessToken(t) + `"}}`))
+			_, _ = w.Write([]byte(`{"data": {"token": "` + signAccessToken(t) + `"}}`))
 			bytes.NewBuffer([]byte(`{}`))
 			json.NewEncoder(&bytes.Buffer{})
 		})))

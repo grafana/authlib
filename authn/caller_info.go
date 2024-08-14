@@ -10,7 +10,7 @@ var (
 	_ claims.AuthInfo = &CallerAuthInfo{}
 )
 
-// Deprecated: Use claims.AuthInfo
+// Deprecated: Use authn.AuthInfo
 type CallerAuthInfo struct {
 	IDTokenClaims     *Claims[IDTokenClaims]
 	AccessTokenClaims Claims[AccessTokenClaims]

@@ -63,7 +63,7 @@ func TestVerifier_Verify(t *testing.T) {
 			},
 		})
 		require.NoError(t, err)
-		w.Write([]byte(response))
+		_, _ = w.Write([]byte(response))
 	}))
 
 	type CustomClaims struct{}
@@ -121,7 +121,7 @@ func TestVerifier_Verify(t *testing.T) {
 				},
 			})
 			require.NoError(t, err)
-			w.Write([]byte(response))
+			_, _ = w.Write([]byte(response))
 		}))
 
 		verifier := NewVerifier[CustomClaims](

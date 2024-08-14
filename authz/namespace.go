@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/grafana/authlib/authn"
+	"github.com/grafana/authlib/claims"
 )
 
 const (
@@ -26,6 +27,7 @@ var (
 )
 
 type NamespaceAccessChecker interface {
+	// nolint:staticcheck
 	CheckAccess(caller authn.CallerAuthInfo, stackID int64) error
 }
 
@@ -34,7 +36,7 @@ type NamespaceAccessCheckerOption func(*NamespaceAccessCheckerImpl)
 type NamespaceAccessCheckerImpl struct {
 	// namespaceFmt is the namespace formatter used to generate the expected namespace.
 	// Ex: "stack-%d" -> "stack-12"
-	namespaceFmt authn.NamespaceFormatter
+	namespaceFmt claims.NamespaceFormatter
 
 	// idTokenEnabled is a flag to enable ID token namespace validation.
 	idTokenEnabled bool
@@ -63,7 +65,7 @@ func WithDisableAccessTokenNamespaceAccessCheckerOption() NamespaceAccessChecker
 
 // NewNamespaceAuthorizer creates a new namespace authorizer.
 // If both ID token and access token are disabled, the authorizer will always return nil.
-func NewNamespaceAccessChecker(namespaceFmt authn.NamespaceFormatter, opts ...NamespaceAccessCheckerOption) *NamespaceAccessCheckerImpl {
+func NewNamespaceAccessChecker(namespaceFmt claims.NamespaceFormatter, opts ...NamespaceAccessCheckerOption) *NamespaceAccessCheckerImpl {
 	na := &NamespaceAccessCheckerImpl{
 		namespaceFmt:       namespaceFmt,
 		idTokenEnabled:     false,
@@ -78,6 +80,7 @@ func NewNamespaceAccessChecker(namespaceFmt authn.NamespaceFormatter, opts ...Na
 	return na
 }
 
+// nolint:staticcheck
 func (na *NamespaceAccessCheckerImpl) CheckAccess(caller authn.CallerAuthInfo, stackID int64) error {
 	expectedNamespace := na.namespaceFmt(stackID)
 	if na.idTokenEnabled {
@@ -121,6 +124,7 @@ func MetadataStackIDExtractor(key string) StackIDExtractors {
 // gRPC Unary Interceptor for namespace validation
 func UnaryNamespaceAccessInterceptor(na NamespaceAccessChecker, stackID StackIDExtractors) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
+		// nolint:staticcheck
 		caller, ok := authn.GetCallerAuthInfoFromContext(ctx)
 		if !ok {
 			return nil, ErrMissingCaller
@@ -145,6 +149,7 @@ func StreamNamespaceAccessInterceptor(na NamespaceAccessChecker, stackID StackID
 	return func(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		ctx := stream.Context()
 
+		// nolint:staticcheck
 		caller, ok := authn.GetCallerAuthInfoFromContext(ctx)
 		if !ok {
 			return ErrMissingCaller
