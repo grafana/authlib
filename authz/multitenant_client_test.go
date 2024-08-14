@@ -12,6 +12,7 @@ import (
 	"github.com/grafana/authlib/authn"
 	authzv1 "github.com/grafana/authlib/authz/proto/v1"
 	"github.com/grafana/authlib/cache"
+	"github.com/grafana/authlib/claims"
 )
 
 func TestNewController(t *testing.T) {
@@ -455,7 +456,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 
 func TestLegacyClientImpl_Check_OnPremFmt(t *testing.T) {
 	client, authz := setupLegacyClient()
-	client.namespaceFmt = authn.OnPremNamespaceFormatter
+	client.namespaceFmt = claims.OrgNamespaceFormatter
 
 	authz.res = &authzv1.ReadResponse{Found: true, Data: []*authzv1.ReadResponse_Data{{Object: "dashboards:uid:1"}}}
 
@@ -620,7 +621,7 @@ func setupLegacyClient() (*LegacyClientImpl, *FakeAuthzServiceClient) {
 		authCfg:      &MultiTenantClientConfig{accessTokenAuthEnabled: true},
 		clientV1:     fakeClient,
 		cache:        cache.NewLocalCache(cache.Config{}),
-		namespaceFmt: authn.CloudNamespaceFormatter,
+		namespaceFmt: claims.CloudNamespaceFormatter,
 		tracer:       noop.NewTracerProvider().Tracer("noopTracer"),
 	}, fakeClient
 }

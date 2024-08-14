@@ -18,6 +18,7 @@ import (
 	"github.com/grafana/authlib/authn"
 	authzv1 "github.com/grafana/authlib/authz/proto/v1"
 	"github.com/grafana/authlib/cache"
+	"github.com/grafana/authlib/claims"
 )
 
 var (
@@ -60,7 +61,7 @@ type LegacyClientImpl struct {
 	cache        cache.Cache
 	grpcConn     grpc.ClientConnInterface
 	grpcOptions  []grpc.DialOption
-	namespaceFmt authn.NamespaceFormatter
+	namespaceFmt claims.NamespaceFormatter
 	tracer       trace.Tracer
 }
 
@@ -105,7 +106,7 @@ func WithTracerLCOption(tracer trace.Tracer) LegacyClientOption {
 	}
 }
 
-func WithNamespaceFormatterLCOption(fmt authn.NamespaceFormatter) LegacyClientOption {
+func WithNamespaceFormatterLCOption(fmt claims.NamespaceFormatter) LegacyClientOption {
 	return func(c *LegacyClientImpl) {
 		c.namespaceFmt = fmt
 	}
@@ -167,7 +168,7 @@ func NewLegacyClient(cfg *MultiTenantClientConfig, opts ...LegacyClientOption) (
 	client.clientV1 = authzv1.NewAuthzServiceClient(client.grpcConn)
 
 	if client.namespaceFmt == nil {
-		client.namespaceFmt = authn.CloudNamespaceFormatter
+		client.namespaceFmt = claims.CloudNamespaceFormatter
 	}
 
 	return client, nil

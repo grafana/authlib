@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/grafana/authlib/authn"
+	"github.com/grafana/authlib/claims"
 )
 
 const (
@@ -34,7 +35,7 @@ type NamespaceAccessCheckerOption func(*NamespaceAccessCheckerImpl)
 type NamespaceAccessCheckerImpl struct {
 	// namespaceFmt is the namespace formatter used to generate the expected namespace.
 	// Ex: "stack-%d" -> "stack-12"
-	namespaceFmt authn.NamespaceFormatter
+	namespaceFmt claims.NamespaceFormatter
 
 	// idTokenEnabled is a flag to enable ID token namespace validation.
 	idTokenEnabled bool
@@ -63,7 +64,7 @@ func WithDisableAccessTokenNamespaceAccessCheckerOption() NamespaceAccessChecker
 
 // NewNamespaceAuthorizer creates a new namespace authorizer.
 // If both ID token and access token are disabled, the authorizer will always return nil.
-func NewNamespaceAccessChecker(namespaceFmt authn.NamespaceFormatter, opts ...NamespaceAccessCheckerOption) *NamespaceAccessCheckerImpl {
+func NewNamespaceAccessChecker(namespaceFmt claims.NamespaceFormatter, opts ...NamespaceAccessCheckerOption) *NamespaceAccessCheckerImpl {
 	na := &NamespaceAccessCheckerImpl{
 		namespaceFmt:       namespaceFmt,
 		idTokenEnabled:     false,
