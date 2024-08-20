@@ -38,7 +38,10 @@ func (v *VerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T],
 		return nil, ErrParseToken
 	}
 
-	if !validType(parsed, v.tokenType) {
+	// Header "typ" has been added only in Grafana 11.1.0 (https://github.com/grafana/grafana/pull/87430)
+	// So this check will fail for Grafana < 11.1.0
+	// Set VerifierConfig{DisableTypHeaderCheck: false} for those cases
+	if !v.cfg.DisableTypHeaderCheck && !validType(parsed, v.tokenType) {
 		return nil, ErrInvalidTokenType
 	}
 
@@ -74,15 +77,12 @@ func validType(token *jwt.JSONWebToken, typ string) bool {
 		return true
 	}
 
-	// Header "typ" has been added only in Grafana 11.1.0 (https://github.com/grafana/grafana/pull/87430)
-	// So this check will fail for Grafana < 11.1.0
-	// If the header is not found, we pass this check to make it backward compatible
 	for _, h := range token.Headers {
-		if t, ok := h.ExtraHeaders["typ"].(string); !ok || (ok && t == typ) {
+		if t, ok := h.ExtraHeaders["typ"].(string); ok && t == typ {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -104,6 +104,7 @@ func getKeyID(headers []jose.Header) (string, error) {
 			return h.KeyID, nil
 		}
 	}
+
 	return "", ErrInvalidSigningKey
 }
 

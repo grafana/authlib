@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 
+	"github.com/grafana/authlib/authn"
 	"github.com/grafana/authlib/cache"
 )
 
@@ -20,9 +21,18 @@ type EnforcementClientImpl struct {
 	clientOpts    []clientOption
 }
 
+func WithVerifier(verifier authn.Verifier[CustomClaims]) ClientOption {
+	return func(s *EnforcementClientImpl) error {
+		s.clientOpts = append(s.clientOpts, withVerifier(verifier))
+
+		return nil
+	}
+}
+
 func WithHTTPClient(doer HTTPRequestDoer) ClientOption {
 	return func(s *EnforcementClientImpl) error {
 		s.clientOpts = append(s.clientOpts, withHTTPClient(doer))
+
 		return nil
 	}
 }
@@ -30,6 +40,7 @@ func WithHTTPClient(doer HTTPRequestDoer) ClientOption {
 func WithCache(cache cache.Cache) ClientOption {
 	return func(s *EnforcementClientImpl) error {
 		s.clientOpts = append(s.clientOpts, withCache(cache))
+
 		return nil
 	}
 }
@@ -41,6 +52,7 @@ func WithSearchByPrefix(prefix string) ClientOption {
 		s.queryTemplate = &searchQuery{
 			ActionPrefix: prefix,
 		}
+
 		return nil
 	}
 }

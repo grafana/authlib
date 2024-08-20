@@ -83,5 +83,5 @@ type searchQuery struct {
 	Resource     *Resource `json:"-" url:"-"`
 }
 
-// customClaims is a placeholder for any potential additional claims in the id token.
-type customClaims struct{}
+// CustomClaims is a placeholder for any potential additional claims in the id token.
+type CustomClaims struct{}

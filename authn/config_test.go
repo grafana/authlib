@@ -13,9 +13,10 @@ func TestVerifierConfig_RegisterFlags(t *testing.T) {
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
 	cfg.RegisterFlags("test", fs)
 
-	err := fs.Parse([]string{"-test.allowed-audiences", "a,b,c"})
+	err := fs.Parse([]string{"-test.allowed-audiences", "a,b,c", "-test.disable-typ-header-check", "true"})
 	require.NoError(t, err)
 	require.Equal(t, jwt.Audience{"a", "b", "c"}, cfg.AllowedAudiences)
+	require.True(t, cfg.DisableTypHeaderCheck)
 }
 
 func TestKeyRetrieverConfig_RegisterFlags(t *testing.T) {

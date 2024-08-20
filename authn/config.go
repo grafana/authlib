@@ -9,11 +9,16 @@ import (
 
 type VerifierConfig struct {
 	AllowedAudiences jwt.Audience `yaml:"allowedAudiences"`
+	// Disable token typ header check when it is not present
+	DisableTypHeaderCheck bool `yaml:"disableTypHeaderCheck"`
 }
 
 func (c *VerifierConfig) RegisterFlags(prefix string, fs *flag.FlagSet) {
+	fs.BoolVar(&c.DisableTypHeaderCheck, prefix+".disable-typ-header-check", false, "Disable typ header check in JWT token")
+
 	fs.Func(prefix+".allowed-audiences", "Specifies a comma-separated list of allowed audiences.", func(v string) error {
 		c.AllowedAudiences = jwt.Audience(strings.Split(v, ","))
+
 		return nil
 	})
 }

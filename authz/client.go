@@ -37,6 +37,17 @@ const (
 	NamespaceUser           = "user"
 )
 
+// withVerifier allows overriding the default verifier, which is
+// automatically created. This is useful for skipping typ header
+// verification which is not sent by Grafana < 11.1.0
+func withVerifier(verifier authn.Verifier[CustomClaims]) clientOption {
+	return func(c *clientImpl) error {
+		c.verifier = verifier
+
+		return nil
+	}
+}
+
 // withHTTPClient allows overriding the default Doer, which is
 // automatically created using http.Client. This is useful for tests.
 func withHTTPClient(doer HTTPRequestDoer) clientOption {
@@ -77,11 +88,18 @@ func newClient(cfg Config, opts ...clientOption) (*clientImpl, error) {
 		})
 	}
 
-	client.verifier = authn.NewVerifier[customClaims](authn.VerifierConfig{}, authn.TokenTypeID, authn.NewKeyRetriever(authn.KeyRetrieverConfig{SigningKeysURL: cfg.JWKsURL}))
-
 	// create httpClient, if not already present
 	if client.client == nil {
 		client.client = httpclient.New()
+	}
+
+	// create verifier, if not already present
+	if client.verifier == nil {
+		client.verifier = authn.NewVerifier[CustomClaims](authn.VerifierConfig{},
+			authn.TokenTypeID,
+			authn.NewKeyRetriever(authn.KeyRetrieverConfig{
+				SigningKeysURL: cfg.JWKsURL,
+			}))
 	}
 
 	return client, nil
@@ -91,7 +109,7 @@ type clientImpl struct {
 	cache    cache.Cache
 	cfg      Config
 	client   HTTPRequestDoer
-	verifier authn.Verifier[customClaims]
+	verifier authn.Verifier[CustomClaims]
 	singlef  singleflight.Group
 }
 

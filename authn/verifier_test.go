@@ -167,6 +167,17 @@ func TestVerifier_Verify(t *testing.T) {
 		assert.Nil(t, claims)
 	})
 
+	t.Run("valid: disable typ header check", func(t *testing.T) {
+		verifier := NewVerifier[CustomClaims](
+			VerifierConfig{DisableTypHeaderCheck: true},
+			TokenTypeAccess,
+			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
+		)
+		claims, err := verifier.Verify(context.Background(), signFirst(t))
+		assert.NoError(t, err)
+		assert.NotNil(t, claims)
+	})
+
 	t.Run("valid: token audience allowed", func(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](
 			VerifierConfig{AllowedAudiences: []string{"stack:1"}},
@@ -180,7 +191,6 @@ func TestVerifier_Verify(t *testing.T) {
 
 	t.Run("valid: token", func(t *testing.T) {
 		claims, err := verifier.Verify(context.Background(), signFirst(t))
-		fmt.Println(claims.Claims)
 		assert.NoError(t, err)
 		assert.NotNil(t, claims)
 	})
