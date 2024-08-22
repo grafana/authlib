@@ -11,7 +11,7 @@ import (
 // Example: stack-6481, org-12
 type NamespaceFormatter func(int64) string
 
-func CloudNamespaceFormatter(id string) string {
+func CloudNamespaceFormatter(id int64) string {
 	return fmt.Sprintf("stacks-%d", id)
 }
 
@@ -31,7 +31,7 @@ type NamespaceInfo struct {
 	OrgID int64
 
 	// The cloud stack ID (must match the value in cfg.Settings)
-	StackID string
+	StackID int64
 }
 
 func ParseNamespace(ns string) (NamespaceInfo, error) {
@@ -55,7 +55,11 @@ func ParseNamespace(ns string) (NamespaceInfo, error) {
 
 	if strings.HasPrefix(ns, "stacks-") {
 		stackIDStr := ns[6:]
-		info.StackID = stackIDStr
+		stackId, err := strconv.Atoi(stackIDStr)
+		if err != nil {
+			return info, err
+		}
+		info.StackID = int64(stackId)
 		info.OrgID = 1
 		return info, nil
 	}
