@@ -122,7 +122,7 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 				}
 				env.idVerifier.expectedClaims = &Claims[IDTokenClaims]{
 					Claims: &jwt.Claims{Subject: string(typeUser) + ":3"},
-					Rest:   IDTokenClaims{Namespace: "stack-12"},
+					Rest:   IDTokenClaims{Namespace: "stacks-12"},
 				}
 			},
 			want: AuthInfo{
@@ -132,7 +132,7 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 				}),
 				IdentityClaims: NewIdentityClaims(Claims[IDTokenClaims]{
 					Claims: &jwt.Claims{Subject: string(typeUser) + ":3"},
-					Rest:   IDTokenClaims{Namespace: "stack-12"},
+					Rest:   IDTokenClaims{Namespace: "stacks-12"},
 				}),
 			},
 		},
@@ -188,11 +188,11 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 			initEnv: func(env *testEnv) {
 				env.atVerifier.expectedClaims = &Claims[AccessTokenClaims]{
 					Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
-					Rest:   AccessTokenClaims{Namespace: "stack-13"},
+					Rest:   AccessTokenClaims{Namespace: "stacks-13"},
 				}
 				env.idVerifier.expectedClaims = &Claims[IDTokenClaims]{
 					Claims: &jwt.Claims{Subject: string(typeUser) + ":3"},
-					Rest:   IDTokenClaims{Namespace: "stack-12"},
+					Rest:   IDTokenClaims{Namespace: "stacks-12"},
 				}
 			},
 			wantErr: ErrorNamespacesMismatch,
@@ -263,7 +263,7 @@ func TestGrpcAuthenticator_authenticateService(t *testing.T) {
 			initEnv: func(env *testEnv) {
 				env.atVerifier.expectedClaims = &Claims[AccessTokenClaims]{
 					Claims: &jwt.Claims{Subject: "invalid-subject"},
-					Rest:   AccessTokenClaims{Namespace: "stack-12"},
+					Rest:   AccessTokenClaims{Namespace: "stacks-12"},
 				}
 			},
 			wantErr: ErrorInvalidSubject,
@@ -274,7 +274,7 @@ func TestGrpcAuthenticator_authenticateService(t *testing.T) {
 			initEnv: func(env *testEnv) {
 				env.atVerifier.expectedClaims = &Claims[AccessTokenClaims]{
 					Claims: &jwt.Claims{Subject: string(typeAPIKey) + ":3"},
-					Rest:   AccessTokenClaims{Namespace: "stack-12"},
+					Rest:   AccessTokenClaims{Namespace: "stacks-12"},
 				}
 			},
 			wantErr: ErrorInvalidSubjectType,
@@ -285,12 +285,12 @@ func TestGrpcAuthenticator_authenticateService(t *testing.T) {
 			initEnv: func(env *testEnv) {
 				env.atVerifier.expectedClaims = &Claims[AccessTokenClaims]{
 					Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
-					Rest:   AccessTokenClaims{Namespace: "stack-12"},
+					Rest:   AccessTokenClaims{Namespace: "stacks-12"},
 				}
 			},
 			want: &Claims[AccessTokenClaims]{
 				Claims: &jwt.Claims{Subject: string(typeAccessPolicy) + ":3"},
-				Rest:   AccessTokenClaims{Namespace: "stack-12"},
+				Rest:   AccessTokenClaims{Namespace: "stacks-12"},
 			},
 		},
 		{
@@ -353,7 +353,7 @@ func TestGrpcAuthenticator_authenticateUser(t *testing.T) {
 			initEnv: func(env *testEnv) {
 				env.idVerifier.expectedClaims = &Claims[IDTokenClaims]{
 					Claims: &jwt.Claims{Subject: "invalid-subject"},
-					Rest:   IDTokenClaims{Namespace: "stack-12"},
+					Rest:   IDTokenClaims{Namespace: "stacks-12"},
 				}
 			},
 			wantErr: ErrorInvalidSubject,
@@ -364,7 +364,7 @@ func TestGrpcAuthenticator_authenticateUser(t *testing.T) {
 			initEnv: func(env *testEnv) {
 				env.idVerifier.expectedClaims = &Claims[IDTokenClaims]{
 					Claims: &jwt.Claims{Subject: string(typeAPIKey) + ":3"},
-					Rest:   IDTokenClaims{Namespace: "stack-12"},
+					Rest:   IDTokenClaims{Namespace: "stacks-12"},
 				}
 			},
 			wantErr: ErrorInvalidSubjectType,
@@ -375,12 +375,12 @@ func TestGrpcAuthenticator_authenticateUser(t *testing.T) {
 			initEnv: func(env *testEnv) {
 				env.idVerifier.expectedClaims = &Claims[IDTokenClaims]{
 					Claims: &jwt.Claims{Subject: string(typeUser) + ":3"},
-					Rest:   IDTokenClaims{Namespace: "stack-12"},
+					Rest:   IDTokenClaims{Namespace: "stacks-12"},
 				}
 			},
 			want: &Claims[IDTokenClaims]{
 				Claims: &jwt.Claims{Subject: string(typeUser) + ":3"},
-				Rest:   IDTokenClaims{Namespace: "stack-12"},
+				Rest:   IDTokenClaims{Namespace: "stacks-12"},
 			},
 		},
 	}

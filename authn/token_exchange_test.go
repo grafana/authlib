@@ -98,7 +98,7 @@ func Test_TokenExchangeClient_Exchange(t *testing.T) {
 		require.Equal(t, 1, calls)
 
 		// different namespace should issue new token request
-		res, err = c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "stack-1", Audiences: []string{"some-service"}})
+		res, err = c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "stacks-1", Audiences: []string{"some-service"}})
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 		require.Equal(t, 2, calls)

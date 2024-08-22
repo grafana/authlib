@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	DefaultStackIDMetadataKey = "X-Stack-ID"
+	DefaultStackIDMetadataKey = "X-stacks-ID"
 )
 
 var (
@@ -34,7 +34,7 @@ type NamespaceAccessCheckerOption func(*NamespaceAccessCheckerImpl)
 
 type NamespaceAccessCheckerImpl struct {
 	// namespaceFmt is the namespace formatter used to generate the expected namespace.
-	// Ex: "stack-%d" -> "stack-12"
+	// Ex: "stacks-%d" -> "stacks-12"
 	namespaceFmt claims.NamespaceFormatter
 
 	// idTokenEnabled is a flag to enable ID token namespace validation.
