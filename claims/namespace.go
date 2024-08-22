@@ -11,8 +11,8 @@ import (
 // Example: stack-6481, org-12
 type NamespaceFormatter func(int64) string
 
-func CloudNamespaceFormatter(id int64) string {
-	return fmt.Sprintf("stack-%d", id)
+func CloudNamespaceFormatter(id string) string {
+	return fmt.Sprintf("stacks-%d", id)
 }
 
 // OrgNamespaceFormatter is the namespace format used in on-prem deployments
@@ -31,7 +31,7 @@ type NamespaceInfo struct {
 	OrgID int64
 
 	// The cloud stack ID (must match the value in cfg.Settings)
-	StackID int64
+	StackID string
 }
 
 func ParseNamespace(ns string) (NamespaceInfo, error) {
@@ -53,13 +53,9 @@ func ParseNamespace(ns string) (NamespaceInfo, error) {
 		return info, err
 	}
 
-	if strings.HasPrefix(ns, "stack-") {
+	if strings.HasPrefix(ns, "stacks-") {
 		stackIDStr := ns[6:]
-		stackID, err := strconv.ParseInt(stackIDStr, 10, 64)
-		if err != nil || stackID < 1 {
-			return info, fmt.Errorf("invalid stack id")
-		}
-		info.StackID = stackID
+		info.StackID = stackIDStr
 		info.OrgID = 1
 		return info, nil
 	}
