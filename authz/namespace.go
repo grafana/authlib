@@ -2,6 +2,7 @@ package authz
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -27,6 +28,13 @@ var (
 	ErrorAccessTokenNamespaceMismatch = status.Errorf(codes.PermissionDenied, "unauthorized: access token namespace does not match expected namespace")
 )
 
+type NamespaceAccessCheckerType int
+
+const (
+	NamespaceAccessCheckerTypeCloud NamespaceAccessCheckerType = iota + 1
+	NamespaceAccessCheckerTypeOrg
+)
+
 type NamespaceAccessChecker interface {
 	CheckAccess(caller claims.AuthInfo, namespace string) error
 	CheckAccessForIdentitfier(caller claims.AuthInfo, id int64) error
@@ -37,6 +45,7 @@ var _ NamespaceAccessChecker = &NamespaceAccessCheckerImpl{}
 type NamespaceAccessCheckerOption func(*NamespaceAccessCheckerImpl)
 
 type NamespaceAccessCheckerImpl struct {
+	checkerType NamespaceAccessCheckerType
 	// namespaceFmt is the namespace formatter used to generate the expected namespace.
 	// Ex: "stacks-%d" -> "stacks-12"
 	namespaceFmt claims.NamespaceFormatter
@@ -68,8 +77,20 @@ func WithDisableAccessTokenNamespaceAccessCheckerOption() NamespaceAccessChecker
 
 // NewNamespaceAuthorizer creates a new namespace authorizer.
 // If both ID token and access token are disabled, the authorizer will always return nil.
-func NewNamespaceAccessChecker(namespaceFmt claims.NamespaceFormatter, opts ...NamespaceAccessCheckerOption) *NamespaceAccessCheckerImpl {
+func NewNamespaceAccessChecker(checkerType NamespaceAccessCheckerType, opts ...NamespaceAccessCheckerOption) (*NamespaceAccessCheckerImpl, error) {
+	var namespaceFmt claims.NamespaceFormatter
+
+	switch checkerType {
+	case NamespaceAccessCheckerTypeCloud:
+		namespaceFmt = claims.CloudNamespaceFormatter
+	case NamespaceAccessCheckerTypeOrg:
+		namespaceFmt = claims.OrgNamespaceFormatter
+	default:
+		return nil, fmt.Errorf("invalid namespace access checker specified: %d", checkerType)
+	}
+
 	na := &NamespaceAccessCheckerImpl{
+		checkerType:        checkerType,
 		namespaceFmt:       namespaceFmt,
 		idTokenEnabled:     false,
 		idTokenRequired:    false,
@@ -80,7 +101,7 @@ func NewNamespaceAccessChecker(namespaceFmt claims.NamespaceFormatter, opts ...N
 		opt(na)
 	}
 
-	return na
+	return na, nil
 }
 
 func (na *NamespaceAccessCheckerImpl) CheckAccess(caller claims.AuthInfo, expectedNamespace string) error {
@@ -90,7 +111,7 @@ func (na *NamespaceAccessCheckerImpl) CheckAccess(caller claims.AuthInfo, expect
 			if na.idTokenRequired {
 				return ErrorMissingIDToken
 			}
-		} else if !checkEqualsNamespaceDisambiguous(expectedNamespace, idClaims.Namespace()) {
+		} else if !checkEqualsNamespaceDisambiguous(expectedNamespace, idClaims.Namespace(), na.checkerType) {
 			return ErrorIDTokenNamespaceMismatch
 		}
 	}
@@ -100,14 +121,14 @@ func (na *NamespaceAccessCheckerImpl) CheckAccess(caller claims.AuthInfo, expect
 			return ErrorMissingAccessToken
 		}
 		namespace := accessClaims.Namespace()
-		if namespace != "*" && !checkEqualsNamespaceDisambiguous(expectedNamespace, namespace) {
+		if namespace != "*" && !checkEqualsNamespaceDisambiguous(expectedNamespace, namespace, na.checkerType) {
 			return ErrorAccessTokenNamespaceMismatch
 		}
 	}
 	return nil
 }
 
-// CheckAccessForIdentitfier needs an identifier which it uses the preconfigured namespace formatter
+// CheckAccessForIdentitfier uses the specified identifier to use with the namespace formatter
 // to generate the expected namespace from.
 func (na *NamespaceAccessCheckerImpl) CheckAccessForIdentitfier(caller claims.AuthInfo, id int64) error {
 	expectedNamespace := na.namespaceFmt(id)
@@ -196,7 +217,7 @@ func getFirstMetadataValue(md metadata.MD, key string) (string, bool) {
 }
 
 // checkEqualsNamespaceDisambiguous is a helper to temporarily navigate the issue with cloud namespace claims being ambiguous.
-func checkEqualsNamespaceDisambiguous(expectedNamespace, actualNamespace string) bool {
+func checkEqualsNamespaceDisambiguous(expectedNamespace, actualNamespace string, checkerType NamespaceAccessCheckerType) bool {
 	actualNamespaceParts := strings.Split(actualNamespace, "-")
 	if len(actualNamespaceParts) < 2 {
 		return false
@@ -207,11 +228,11 @@ func checkEqualsNamespaceDisambiguous(expectedNamespace, actualNamespace string)
 		return false
 	}
 
-	if actualNamespaceParts[0] == "org" && expectedNamespaceParts[0] == "org" {
+	if checkerType == NamespaceAccessCheckerTypeCloud && (actualNamespaceParts[0] == "stack" || actualNamespaceParts[0] == "stacks") && expectedNamespaceParts[0] == "stacks" {
 		return actualNamespaceParts[1] == expectedNamespaceParts[1]
 	}
 
-	if (actualNamespaceParts[0] == "stack" || actualNamespaceParts[0] == "stacks") && expectedNamespaceParts[0] == "stacks" {
+	if checkerType == NamespaceAccessCheckerTypeOrg && actualNamespaceParts[0] == "org" && expectedNamespaceParts[0] == "org" {
 		return actualNamespaceParts[1] == expectedNamespaceParts[1]
 	}
 

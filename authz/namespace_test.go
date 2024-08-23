@@ -2,7 +2,6 @@ package authz
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -15,113 +14,168 @@ import (
 func TestNamespaceAccessCheckerImpl_ValidateAccessTokenOnly(t *testing.T) {
 	stackID := int64(12)
 	tests := []struct {
-		name    string
-		nsFmt   claims.NamespaceFormatter
-		caller  claims.AuthInfo
-		wantErr error
+		name        string
+		checkerType NamespaceAccessCheckerType
+		caller      claims.AuthInfo
+		wantErr     error
 	}{
 		{
-			name:    "missing access token",
-			nsFmt:   claims.CloudNamespaceFormatter,
-			caller:  &authn.AuthInfo{},
-			wantErr: ErrorMissingAccessToken,
+			name:        "missing access token",
+			checkerType: NamespaceAccessCheckerTypeCloud,
+			caller:      &authn.AuthInfo{},
+			wantErr:     ErrorMissingAccessToken,
 		},
 		{
-			name:  "access token match",
-			nsFmt: claims.CloudNamespaceFormatter,
+			name:        "access token match",
+			checkerType: NamespaceAccessCheckerTypeCloud,
 			caller: &authn.AuthInfo{
 				AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stacks-12"}}),
 			},
 		},
 		{
-			name:  "access token wildcard match",
-			nsFmt: claims.CloudNamespaceFormatter,
+			name:        "access token match for org checker",
+			checkerType: NamespaceAccessCheckerTypeOrg,
+			caller: &authn.AuthInfo{
+				AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "org-12"}}),
+			},
+		},
+		{
+			name:        "access token wildcard match",
+			checkerType: NamespaceAccessCheckerTypeCloud,
 			caller: &authn.AuthInfo{
 				AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "*"}}),
 			},
 		},
 		{
-			name:  "access token mismatch",
-			nsFmt: claims.CloudNamespaceFormatter,
+			name:        "access token wildcard match for org checker",
+			checkerType: NamespaceAccessCheckerTypeOrg,
+			caller: &authn.AuthInfo{
+				AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "*"}}),
+			},
+		},
+		{
+			name:        "access token mismatch",
+			checkerType: NamespaceAccessCheckerTypeCloud,
 			caller: &authn.AuthInfo{
 				AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stacks-13"}}),
+			},
+			wantErr: ErrorAccessTokenNamespaceMismatch,
+		},
+		{
+			name:        "access token mismatch for org checker",
+			checkerType: NamespaceAccessCheckerTypeOrg,
+			caller: &authn.AuthInfo{
+				AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "org-13"}}),
 			},
 			wantErr: ErrorAccessTokenNamespaceMismatch,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			na := NewNamespaceAccessChecker(tt.nsFmt)
+			na, err := NewNamespaceAccessChecker(tt.checkerType)
+			require.NoError(t, err)
 			require.ErrorIs(t, na.CheckAccessForIdentitfier(tt.caller, stackID), tt.wantErr)
 		})
 	}
 }
 
 func TestNamespaceAccessCheckerImpl_ValidateIDTokenOnly(t *testing.T) {
-	stackID := int64(12)
+	identifier := int64(12)
 	tests := []struct {
-		name    string
-		nsFmt   claims.NamespaceFormatter
-		caller  claims.AuthInfo
-		wantErr error
+		name        string
+		checkerType NamespaceAccessCheckerType
+		caller      claims.AuthInfo
+		wantErr     error
 	}{
 		{
-			name:    "missing id token",
-			nsFmt:   claims.CloudNamespaceFormatter,
-			caller:  &authn.AuthInfo{},
-			wantErr: ErrorMissingIDToken,
+			name:        "missing id token",
+			checkerType: NamespaceAccessCheckerTypeCloud,
+			caller:      &authn.AuthInfo{},
+			wantErr:     ErrorMissingIDToken,
 		},
 		{
-			name:  "id token match",
-			nsFmt: claims.CloudNamespaceFormatter,
+			name:        "id token match",
+			checkerType: NamespaceAccessCheckerTypeCloud,
 			caller: &authn.AuthInfo{
 				IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stacks-12"}}),
 			},
 		},
 		{
-			name:  "id token mismatch",
-			nsFmt: claims.CloudNamespaceFormatter,
+			name:        "id token match for org checker",
+			checkerType: NamespaceAccessCheckerTypeOrg,
+			caller: &authn.AuthInfo{
+				IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "org-12"}}),
+			},
+		},
+		{
+			name:        "id token mismatch",
+			checkerType: NamespaceAccessCheckerTypeCloud,
 			caller: &authn.AuthInfo{
 				IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stacks-13"}}),
+			},
+			wantErr: ErrorIDTokenNamespaceMismatch,
+		},
+		{
+			name:        "id token mismatch for org checker",
+			checkerType: NamespaceAccessCheckerTypeOrg,
+			caller: &authn.AuthInfo{
+				IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "org-13"}}),
 			},
 			wantErr: ErrorIDTokenNamespaceMismatch,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			na := NewNamespaceAccessChecker(tt.nsFmt, WithIDTokenNamespaceAccessCheckerOption(true), WithDisableAccessTokenNamespaceAccessCheckerOption())
-			require.ErrorIs(t, na.CheckAccessForIdentitfier(tt.caller, stackID), tt.wantErr)
+			na, err := NewNamespaceAccessChecker(tt.checkerType, WithIDTokenNamespaceAccessCheckerOption(true), WithDisableAccessTokenNamespaceAccessCheckerOption())
+			require.NoError(t, err)
+			require.ErrorIs(t, na.CheckAccessForIdentitfier(tt.caller, identifier), tt.wantErr)
 		})
 	}
 }
 
 func TestNamespaceAccessCheckerImpl_ValidateBoth(t *testing.T) {
-	stackID := int64(12)
+	identitifer := int64(12)
 	tests := []struct {
-		name    string
-		nsFmt   claims.NamespaceFormatter
-		caller  claims.AuthInfo
-		wantErr error
+		name        string
+		checkerType NamespaceAccessCheckerType
+		caller      claims.AuthInfo
+		wantErr     error
 	}{
 		{
-			name:  "id token and access token match",
-			nsFmt: claims.CloudNamespaceFormatter,
+			name:        "id token and access token match",
+			checkerType: NamespaceAccessCheckerTypeCloud,
 			caller: &authn.AuthInfo{
 				IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stacks-12"}}),
 				AccessClaims:   authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stacks-12"}}),
 			},
 		},
 		{
-			name:  "id token and access token wildcard match",
-			nsFmt: claims.CloudNamespaceFormatter,
+			name:        "id token and access token match for org checker",
+			checkerType: NamespaceAccessCheckerTypeOrg,
+			caller: &authn.AuthInfo{
+				IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "org-12"}}),
+				AccessClaims:   authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "org-12"}}),
+			},
+		},
+		{
+			name:        "id token and access token match deprecated values",
+			checkerType: NamespaceAccessCheckerTypeCloud,
+			caller: &authn.AuthInfo{
+				IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stack-12"}}),
+				AccessClaims:   authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stack-12"}}),
+			},
+		},
+		{
+			name:        "id token and access token wildcard match",
+			checkerType: NamespaceAccessCheckerTypeCloud,
 			caller: &authn.AuthInfo{
 				IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stacks-12"}}),
 				AccessClaims:   authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "*"}}),
 			},
 		},
 		{
-			name:  "access token mismatch",
-			nsFmt: claims.CloudNamespaceFormatter,
+			name:        "access token mismatch",
+			checkerType: NamespaceAccessCheckerTypeCloud,
 			caller: &authn.AuthInfo{
 				IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stacks-12"}}),
 				AccessClaims:   authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stacks-13"}}),
@@ -129,8 +183,8 @@ func TestNamespaceAccessCheckerImpl_ValidateBoth(t *testing.T) {
 			wantErr: ErrorAccessTokenNamespaceMismatch,
 		},
 		{
-			name:  "id token mismatch",
-			nsFmt: claims.CloudNamespaceFormatter,
+			name:        "id token mismatch",
+			checkerType: NamespaceAccessCheckerTypeCloud,
 			caller: &authn.AuthInfo{
 				IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stacks-13"}}),
 				AccessClaims:   authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stacks-12"}}),
@@ -138,8 +192,8 @@ func TestNamespaceAccessCheckerImpl_ValidateBoth(t *testing.T) {
 			wantErr: ErrorIDTokenNamespaceMismatch,
 		},
 		{
-			name:  "id token missing but not required",
-			nsFmt: claims.CloudNamespaceFormatter,
+			name:        "id token missing but not required",
+			checkerType: NamespaceAccessCheckerTypeCloud,
 			caller: &authn.AuthInfo{
 				AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stacks-12"}}),
 			},
@@ -147,9 +201,9 @@ func TestNamespaceAccessCheckerImpl_ValidateBoth(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			na := NewNamespaceAccessChecker(tt.nsFmt, WithIDTokenNamespaceAccessCheckerOption(false))
-			require.ErrorIs(t, na.CheckAccess(tt.caller, fmt.Sprintf("stack-%d", stackID)), tt.wantErr)
-			require.ErrorIs(t, na.CheckAccess(tt.caller, fmt.Sprintf("stacks-%d", stackID)), tt.wantErr)
+			na, err := NewNamespaceAccessChecker(tt.checkerType, WithIDTokenNamespaceAccessCheckerOption(false))
+			require.NoError(t, err)
+			require.ErrorIs(t, na.CheckAccess(tt.caller, na.namespaceFmt(identitifer)), tt.wantErr)
 		})
 	}
 }
