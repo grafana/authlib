@@ -3,6 +3,7 @@ package authz
 import (
 	"context"
 	"strconv"
+	"strings"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -27,8 +28,11 @@ var (
 )
 
 type NamespaceAccessChecker interface {
-	CheckAccess(caller claims.AuthInfo, stackID int64) error
+	CheckAccess(caller claims.AuthInfo, namespace string) error
+	CheckAccessForIdentitfier(caller claims.AuthInfo, id int64) error
 }
+
+var _ NamespaceAccessChecker = &NamespaceAccessCheckerImpl{}
 
 type NamespaceAccessCheckerOption func(*NamespaceAccessCheckerImpl)
 
@@ -79,15 +83,14 @@ func NewNamespaceAccessChecker(namespaceFmt claims.NamespaceFormatter, opts ...N
 	return na
 }
 
-func (na *NamespaceAccessCheckerImpl) CheckAccess(caller claims.AuthInfo, stackID int64) error {
-	expectedNamespace := na.namespaceFmt(stackID)
+func (na *NamespaceAccessCheckerImpl) CheckAccess(caller claims.AuthInfo, expectedNamespace string) error {
 	if na.idTokenEnabled {
 		idClaims := caller.GetIdentity()
 		if idClaims == nil || idClaims.IsNil() {
 			if na.idTokenRequired {
 				return ErrorMissingIDToken
 			}
-		} else if idClaims.Namespace() != expectedNamespace {
+		} else if !checkEqualsNamespaceDisambiguous(expectedNamespace, idClaims.Namespace()) {
 			return ErrorIDTokenNamespaceMismatch
 		}
 	}
@@ -97,11 +100,18 @@ func (na *NamespaceAccessCheckerImpl) CheckAccess(caller claims.AuthInfo, stackI
 			return ErrorMissingAccessToken
 		}
 		namespace := accessClaims.Namespace()
-		if namespace != "*" && namespace != expectedNamespace {
+		if namespace != "*" && !checkEqualsNamespaceDisambiguous(expectedNamespace, namespace) {
 			return ErrorAccessTokenNamespaceMismatch
 		}
 	}
 	return nil
+}
+
+// CheckAccessForIdentitfier needs an identifier which it uses the preconfigured namespace formatter
+// to generate the expected namespace from.
+func (na *NamespaceAccessCheckerImpl) CheckAccessForIdentitfier(caller claims.AuthInfo, id int64) error {
+	expectedNamespace := na.namespaceFmt(id)
+	return na.CheckAccess(caller, expectedNamespace)
 }
 
 type StackIDExtractors func(context.Context) (int64, error)
@@ -140,7 +150,7 @@ func UnaryNamespaceAccessInterceptor(na NamespaceAccessChecker, stackID StackIDE
 			return nil, err
 		}
 
-		err = na.CheckAccess(caller, stackID)
+		err = na.CheckAccessForIdentitfier(caller, stackID)
 		if err != nil {
 			return nil, err
 		}
@@ -164,7 +174,7 @@ func StreamNamespaceAccessInterceptor(na NamespaceAccessChecker, stackID StackID
 			return err
 		}
 
-		err = na.CheckAccess(caller, stackID)
+		err = na.CheckAccessForIdentitfier(caller, stackID)
 		if err != nil {
 			return err
 		}
@@ -183,4 +193,27 @@ func getFirstMetadataValue(md metadata.MD, key string) (string, bool) {
 	}
 
 	return values[0], true
+}
+
+// checkEqualsNamespaceDisambiguous is a helper to temporarily navigate the issue with cloud namespace claims being ambiguous.
+func checkEqualsNamespaceDisambiguous(expectedNamespace, actualNamespace string) bool {
+	actualNamespaceParts := strings.Split(actualNamespace, "-")
+	if len(actualNamespaceParts) < 2 {
+		return false
+	}
+
+	expectedNamespaceParts := strings.Split(expectedNamespace, "-")
+	if len(expectedNamespaceParts) < 2 {
+		return false
+	}
+
+	if actualNamespaceParts[0] == "org" && expectedNamespaceParts[0] == "org" {
+		return actualNamespaceParts[1] == expectedNamespaceParts[1]
+	}
+
+	if (actualNamespaceParts[0] == "stack" || actualNamespaceParts[0] == "stacks") && expectedNamespaceParts[0] == "stacks" {
+		return actualNamespaceParts[1] == expectedNamespaceParts[1]
+	}
+
+	return false
 }

@@ -2,6 +2,7 @@ package authz
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -51,7 +52,7 @@ func TestNamespaceAccessCheckerImpl_ValidateAccessTokenOnly(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			na := NewNamespaceAccessChecker(tt.nsFmt)
-			require.ErrorIs(t, na.CheckAccess(tt.caller, stackID), tt.wantErr)
+			require.ErrorIs(t, na.CheckAccessForIdentitfier(tt.caller, stackID), tt.wantErr)
 		})
 	}
 }
@@ -89,7 +90,7 @@ func TestNamespaceAccessCheckerImpl_ValidateIDTokenOnly(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			na := NewNamespaceAccessChecker(tt.nsFmt, WithIDTokenNamespaceAccessCheckerOption(true), WithDisableAccessTokenNamespaceAccessCheckerOption())
-			require.ErrorIs(t, na.CheckAccess(tt.caller, stackID), tt.wantErr)
+			require.ErrorIs(t, na.CheckAccessForIdentitfier(tt.caller, stackID), tt.wantErr)
 		})
 	}
 }
@@ -147,7 +148,8 @@ func TestNamespaceAccessCheckerImpl_ValidateBoth(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			na := NewNamespaceAccessChecker(tt.nsFmt, WithIDTokenNamespaceAccessCheckerOption(false))
-			require.ErrorIs(t, na.CheckAccess(tt.caller, stackID), tt.wantErr)
+			require.ErrorIs(t, na.CheckAccess(tt.caller, fmt.Sprintf("stack-%d", stackID)), tt.wantErr)
+			require.ErrorIs(t, na.CheckAccess(tt.caller, fmt.Sprintf("stacks-%d", stackID)), tt.wantErr)
 		})
 	}
 }
