@@ -218,6 +218,10 @@ func getFirstMetadataValue(md metadata.MD, key string) (string, bool) {
 
 // checkEqualsNamespaceDisambiguous is a helper to temporarily navigate the issue with cloud namespace claims being ambiguous.
 func checkEqualsNamespaceDisambiguous(expectedNamespace, actualNamespace string, checkerType NamespaceAccessCheckerType) bool {
+	if checkerType == NamespaceAccessCheckerTypeOrg {
+		return expectedNamespace == actualNamespace
+	}
+	
 	actualNamespaceParts := strings.Split(actualNamespace, "-")
 	if len(actualNamespaceParts) < 2 {
 		return false
@@ -229,10 +233,6 @@ func checkEqualsNamespaceDisambiguous(expectedNamespace, actualNamespace string,
 	}
 
 	if checkerType == NamespaceAccessCheckerTypeCloud && (actualNamespaceParts[0] == "stack" || actualNamespaceParts[0] == "stacks") && expectedNamespaceParts[0] == "stacks" {
-		return actualNamespaceParts[1] == expectedNamespaceParts[1]
-	}
-
-	if checkerType == NamespaceAccessCheckerTypeOrg && actualNamespaceParts[0] == "org" && expectedNamespaceParts[0] == "org" {
 		return actualNamespaceParts[1] == expectedNamespaceParts[1]
 	}
 
