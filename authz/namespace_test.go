@@ -209,7 +209,7 @@ func TestNamespaceAccessCheckerImpl_ValidateBoth(t *testing.T) {
 }
 
 func TestMetadataStackIDExtractor(t *testing.T) {
-	key := "X-stacks-ID"
+	key := "X-Stack-ID"
 	tests := []struct {
 		name string
 		init func(context.Context) context.Context

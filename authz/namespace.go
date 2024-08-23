@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	DefaultStackIDMetadataKey = "X-stacks-ID"
+	DefaultStackIDMetadataKey = "X-Stack-ID"
 )
 
 var (
