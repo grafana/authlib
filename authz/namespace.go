@@ -132,7 +132,7 @@ func (na *NamespaceAccessCheckerImpl) CheckAccess(caller claims.AuthInfo, expect
 }
 
 // CheckAccessForIdentitfier uses the specified identifier to use with the namespace formatter
-// to generate the expected namespace from.
+// to generate the expected namespace which will be checked for access.
 func (na *NamespaceAccessCheckerImpl) CheckAccessForIdentitfier(caller claims.AuthInfo, id int64) error {
 	expectedNamespace := na.namespaceFmt(id)
 	return na.CheckAccess(caller, expectedNamespace)
