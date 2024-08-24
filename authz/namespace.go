@@ -2,7 +2,6 @@ package authz
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -77,16 +76,14 @@ func WithDisableAccessTokenNamespaceAccessCheckerOption() NamespaceAccessChecker
 
 // NewNamespaceAuthorizer creates a new namespace authorizer.
 // If both ID token and access token are disabled, the authorizer will always return nil.
-func NewNamespaceAccessChecker(checkerType NamespaceAccessCheckerType, opts ...NamespaceAccessCheckerOption) (*NamespaceAccessCheckerImpl, error) {
+func NewNamespaceAccessChecker(checkerType NamespaceAccessCheckerType, opts ...NamespaceAccessCheckerOption) *NamespaceAccessCheckerImpl {
 	var namespaceFmt claims.NamespaceFormatter
 
 	switch checkerType {
 	case NamespaceAccessCheckerTypeCloud:
 		namespaceFmt = claims.CloudNamespaceFormatter
-	case NamespaceAccessCheckerTypeOrg:
-		namespaceFmt = claims.OrgNamespaceFormatter
 	default:
-		return nil, fmt.Errorf("invalid namespace access checker specified: %d", checkerType)
+		namespaceFmt = claims.OrgNamespaceFormatter
 	}
 
 	na := &NamespaceAccessCheckerImpl{
@@ -101,7 +98,7 @@ func NewNamespaceAccessChecker(checkerType NamespaceAccessCheckerType, opts ...N
 		opt(na)
 	}
 
-	return na, nil
+	return na
 }
 
 func (na *NamespaceAccessCheckerImpl) CheckAccess(caller claims.AuthInfo, expectedNamespace string) error {
@@ -221,7 +218,7 @@ func checkEqualsNamespaceDisambiguous(expectedNamespace, actualNamespace string,
 	if checkerType == NamespaceAccessCheckerTypeOrg {
 		return expectedNamespace == actualNamespace
 	}
-	
+
 	actualNamespaceParts := strings.Split(actualNamespace, "-")
 	if len(actualNamespaceParts) < 2 {
 		return false

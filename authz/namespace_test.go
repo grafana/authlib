@@ -72,8 +72,7 @@ func TestNamespaceAccessCheckerImpl_ValidateAccessTokenOnly(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			na, err := NewNamespaceAccessChecker(tt.checkerType)
-			require.NoError(t, err)
+			na := NewNamespaceAccessChecker(tt.checkerType)
 			require.ErrorIs(t, na.CheckAccessForIdentitfier(tt.caller, stackID), tt.wantErr)
 		})
 	}
@@ -126,8 +125,7 @@ func TestNamespaceAccessCheckerImpl_ValidateIDTokenOnly(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			na, err := NewNamespaceAccessChecker(tt.checkerType, WithIDTokenNamespaceAccessCheckerOption(true), WithDisableAccessTokenNamespaceAccessCheckerOption())
-			require.NoError(t, err)
+			na := NewNamespaceAccessChecker(tt.checkerType, WithIDTokenNamespaceAccessCheckerOption(true), WithDisableAccessTokenNamespaceAccessCheckerOption())
 			require.ErrorIs(t, na.CheckAccessForIdentitfier(tt.caller, identifier), tt.wantErr)
 		})
 	}
@@ -201,8 +199,7 @@ func TestNamespaceAccessCheckerImpl_ValidateBoth(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			na, err := NewNamespaceAccessChecker(tt.checkerType, WithIDTokenNamespaceAccessCheckerOption(false))
-			require.NoError(t, err)
+			na := NewNamespaceAccessChecker(tt.checkerType, WithIDTokenNamespaceAccessCheckerOption(false))
 			require.ErrorIs(t, na.CheckAccess(tt.caller, na.namespaceFmt(identitifer)), tt.wantErr)
 		})
 	}
