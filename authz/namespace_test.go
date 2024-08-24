@@ -148,6 +148,14 @@ func TestNamespaceAccessCheckerImpl_ValidateBoth(t *testing.T) {
 			},
 		},
 		{
+			name:        "id token and access token (with wildcard namespace) match",
+			checkerType: NamespaceAccessCheckerTypeCloud,
+			caller: &authn.AuthInfo{
+				IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stacks-12"}}),
+				AccessClaims:   authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "*"}}),
+			},
+		},
+		{
 			name:        "id token and access token match for org checker",
 			checkerType: NamespaceAccessCheckerTypeOrg,
 			caller: &authn.AuthInfo{
@@ -160,6 +168,22 @@ func TestNamespaceAccessCheckerImpl_ValidateBoth(t *testing.T) {
 			checkerType: NamespaceAccessCheckerTypeCloud,
 			caller: &authn.AuthInfo{
 				IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stack-12"}}),
+				AccessClaims:   authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stack-12"}}),
+			},
+		},
+		{
+			name:        "id token (deprecated value) and access token match",
+			checkerType: NamespaceAccessCheckerTypeCloud,
+			caller: &authn.AuthInfo{
+				IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stack-12"}}),
+				AccessClaims:   authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stacks-12"}}),
+			},
+		},
+		{
+			name:        "id token and access token (deprecated value) match",
+			checkerType: NamespaceAccessCheckerTypeCloud,
+			caller: &authn.AuthInfo{
+				IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stacks-12"}}),
 				AccessClaims:   authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stack-12"}}),
 			},
 		},
