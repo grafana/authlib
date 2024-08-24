@@ -108,7 +108,10 @@ func (na *NamespaceAccessCheckerImpl) CheckAccess(caller claims.AuthInfo, expect
 			if na.idTokenRequired {
 				return ErrorMissingIDToken
 			}
-		} else if !checkEqualsNamespaceDisambiguous(expectedNamespace, idClaims.Namespace(), na.checkerType) {
+			// for else-if branch below,
+			// when id token claims are evaluated with an access token claims (with wildcard namespace) present
+			// but expectedNamespace is *, we skip the namespace equality check since it will always fail
+		} else if expectedNamespace != "*" && !checkEqualsNamespaceDisambiguous(expectedNamespace, idClaims.Namespace(), na.checkerType) {
 			return ErrorIDTokenNamespaceMismatch
 		}
 	}
@@ -118,6 +121,9 @@ func (na *NamespaceAccessCheckerImpl) CheckAccess(caller claims.AuthInfo, expect
 			return ErrorMissingAccessToken
 		}
 		namespace := accessClaims.Namespace()
+		// for if branch below,
+		// when access token claims with a wildcard namespace are passed in, we skip the namespace equality check
+		// it **will fail** when checking on resources in specific namespaces, which we don't want
 		if namespace != "*" && !checkEqualsNamespaceDisambiguous(expectedNamespace, namespace, na.checkerType) {
 			return ErrorAccessTokenNamespaceMismatch
 		}
@@ -214,6 +220,7 @@ func getFirstMetadataValue(md metadata.MD, key string) (string, bool) {
 }
 
 // checkEqualsNamespaceDisambiguous is a helper to temporarily navigate the issue with cloud namespace claims being ambiguous.
+// this helper **should not** be used for an ID token claim when expectedNamespace is "*", it will always fail
 func checkEqualsNamespaceDisambiguous(expectedNamespace, actualNamespace string, checkerType NamespaceAccessCheckerType) bool {
 	if checkerType == NamespaceAccessCheckerTypeOrg {
 		return expectedNamespace == actualNamespace
