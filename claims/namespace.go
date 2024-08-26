@@ -60,6 +60,7 @@ func ParseNamespace(ns string) (NamespaceInfo, error) {
 		}
 		info.StackID = stackID
 		info.OrgID = 1
+		return info, err
 	}
 
 	// handle deprecated stack-X value
@@ -70,7 +71,8 @@ func ParseNamespace(ns string) (NamespaceInfo, error) {
 		}
 		info.StackID = stackID
 		info.OrgID = 1
+		return info, err
 	}
 
-	return info, nil
+	return info, fmt.Errorf("namespace didn't parse to a legal value: raw=%s", info.Value)
 }
