@@ -44,10 +44,10 @@ func (c IDTokenClaims) getK8sName() string {
 }
 
 func (c IDTokenClaims) NamespaceMatches(namespace string) bool {
-	if c.Namespace == "*" {
-		return true
-	}
-	return c.Namespace == namespace
+	actual := disambiguateNamespace(c.Namespace)
+	expected := disambiguateNamespace(namespace)
+
+	return actual == expected
 }
 
 func NewIDTokenVerifier(cfg VerifierConfig, keys KeyRetriever) *IDTokenVerifier {

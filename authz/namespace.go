@@ -3,7 +3,6 @@ package authz
 import (
 	"context"
 	"strconv"
-	"strings"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -36,7 +35,7 @@ const (
 
 type NamespaceAccessChecker interface {
 	CheckAccess(caller claims.AuthInfo, namespace string) error
-	CheckAccessForIdentitfier(caller claims.AuthInfo, id int64) error
+	CheckAccessByID(caller claims.AuthInfo, id int64) error
 }
 
 var _ NamespaceAccessChecker = &NamespaceAccessCheckerImpl{}
@@ -111,7 +110,7 @@ func (na *NamespaceAccessCheckerImpl) CheckAccess(caller claims.AuthInfo, expect
 			// for else-if branch below,
 			// when id token claims are evaluated with an access token claims (with wildcard namespace) present
 			// but expectedNamespace is *, we skip the namespace equality check since it will always fail
-		} else if expectedNamespace != "*" && !checkEqualsNamespaceDisambiguous(expectedNamespace, idClaims.Namespace(), na.checkerType) {
+		} else if expectedNamespace != "*" && !idClaims.NamespaceMatches(expectedNamespace) {
 			return ErrorIDTokenNamespaceMismatch
 		}
 	}
@@ -120,20 +119,19 @@ func (na *NamespaceAccessCheckerImpl) CheckAccess(caller claims.AuthInfo, expect
 		if accessClaims == nil || accessClaims.IsNil() {
 			return ErrorMissingAccessToken
 		}
-		namespace := accessClaims.Namespace()
 		// for if branch below,
 		// when access token claims with a wildcard namespace are passed in, we skip the namespace equality check
 		// it **will fail** when checking on resources in specific namespaces, which we don't want
-		if namespace != "*" && !checkEqualsNamespaceDisambiguous(expectedNamespace, namespace, na.checkerType) {
+		if !accessClaims.NamespaceMatches(expectedNamespace) {
 			return ErrorAccessTokenNamespaceMismatch
 		}
 	}
 	return nil
 }
 
-// CheckAccessForIdentitfier uses the specified identifier to use with the namespace formatter
+// CheckAccessById uses the specified identifier to use with the namespace formatter
 // to generate the expected namespace which will be checked for access.
-func (na *NamespaceAccessCheckerImpl) CheckAccessForIdentitfier(caller claims.AuthInfo, id int64) error {
+func (na *NamespaceAccessCheckerImpl) CheckAccessByID(caller claims.AuthInfo, id int64) error {
 	expectedNamespace := na.namespaceFmt(id)
 	return na.CheckAccess(caller, expectedNamespace)
 }
@@ -174,7 +172,7 @@ func UnaryNamespaceAccessInterceptor(na NamespaceAccessChecker, stackID StackIDE
 			return nil, err
 		}
 
-		err = na.CheckAccessForIdentitfier(caller, stackID)
+		err = na.CheckAccessByID(caller, stackID)
 		if err != nil {
 			return nil, err
 		}
@@ -198,7 +196,7 @@ func StreamNamespaceAccessInterceptor(na NamespaceAccessChecker, stackID StackID
 			return err
 		}
 
-		err = na.CheckAccessForIdentitfier(caller, stackID)
+		err = na.CheckAccessByID(caller, stackID)
 		if err != nil {
 			return err
 		}
@@ -217,28 +215,4 @@ func getFirstMetadataValue(md metadata.MD, key string) (string, bool) {
 	}
 
 	return values[0], true
-}
-
-// checkEqualsNamespaceDisambiguous is a helper to temporarily navigate the issue with cloud namespace claims being ambiguous.
-// this helper **should not** be used for an ID token claim when expectedNamespace is "*", it will always fail
-func checkEqualsNamespaceDisambiguous(expectedNamespace, actualNamespace string, checkerType NamespaceAccessCheckerType) bool {
-	if checkerType == NamespaceAccessCheckerTypeOrg {
-		return expectedNamespace == actualNamespace
-	}
-
-	actualNamespaceParts := strings.Split(actualNamespace, "-")
-	if len(actualNamespaceParts) < 2 {
-		return false
-	}
-
-	expectedNamespaceParts := strings.Split(expectedNamespace, "-")
-	if len(expectedNamespaceParts) < 2 {
-		return false
-	}
-
-	if checkerType == NamespaceAccessCheckerTypeCloud && (actualNamespaceParts[0] == "stack" || actualNamespaceParts[0] == "stacks") && expectedNamespaceParts[0] == "stacks" {
-		return actualNamespaceParts[1] == expectedNamespaceParts[1]
-	}
-
-	return false
 }

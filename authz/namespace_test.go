@@ -73,7 +73,7 @@ func TestNamespaceAccessCheckerImpl_ValidateAccessTokenOnly(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			na := NewNamespaceAccessChecker(tt.checkerType)
-			require.ErrorIs(t, na.CheckAccessForIdentitfier(tt.caller, stackID), tt.wantErr)
+			require.ErrorIs(t, na.CheckAccessByID(tt.caller, stackID), tt.wantErr)
 		})
 	}
 }
@@ -126,7 +126,7 @@ func TestNamespaceAccessCheckerImpl_ValidateIDTokenOnly(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			na := NewNamespaceAccessChecker(tt.checkerType, WithIDTokenNamespaceAccessCheckerOption(true), WithDisableAccessTokenNamespaceAccessCheckerOption())
-			require.ErrorIs(t, na.CheckAccessForIdentitfier(tt.caller, identifier), tt.wantErr)
+			require.ErrorIs(t, na.CheckAccessByID(tt.caller, identifier), tt.wantErr)
 		})
 	}
 }

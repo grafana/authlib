@@ -12,7 +12,8 @@ import (
 type NamespaceFormatter func(int64) string
 
 func CloudNamespaceFormatter(id int64) string {
-	return fmt.Sprintf("stacks-%d", id)
+	// TODO: change this to stacks-X when all the other dependent pieces (gcom etc.) can validate both stack-x and stacks-X
+	return fmt.Sprintf("stack-%d", id)
 }
 
 // OrgNamespaceFormatter is the namespace format used in on-prem deployments
