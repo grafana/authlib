@@ -24,6 +24,21 @@ func OrgNamespaceFormatter(id int64) string {
 	return fmt.Sprintf("org-%d", id)
 }
 
+// disambiguateNamespace is a helper to temporarily navigate the issue with cloud namespace claims being ambiguous (stack vs stacks).
+func disambiguateNamespace(namespace string) string {
+	return strings.Replace(namespace, "stack-", "stacks-", 1)
+}
+
+func NamespaceMatches(c Namespaced, namespace string) bool {
+	actual := disambiguateNamespace(c.Namespace())
+	expected := disambiguateNamespace(namespace)
+	// actual should never be a "*" where ID token claims are concerned
+	if actual == "*" {
+		return true
+	}
+	return actual == expected
+}
+
 type NamespaceInfo struct {
 	// The original namespace string regardless the input
 	Value string

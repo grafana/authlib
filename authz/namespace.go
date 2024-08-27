@@ -92,7 +92,7 @@ func (na *NamespaceAccessCheckerImpl) CheckAccess(caller claims.AuthInfo, expect
 			// for else-if branch below,
 			// when id token claims are evaluated with an access token claims (with wildcard namespace) present
 			// but expectedNamespace is *, we skip the namespace equality check since it will always fail
-		} else if expectedNamespace != "*" && !idClaims.NamespaceMatches(expectedNamespace) {
+		} else if expectedNamespace != "*" && !claims.NamespaceMatches(idClaims, expectedNamespace) {
 			return ErrorIDTokenNamespaceMismatch
 		}
 	}
@@ -104,7 +104,7 @@ func (na *NamespaceAccessCheckerImpl) CheckAccess(caller claims.AuthInfo, expect
 		// for if branch below,
 		// when access token claims with a wildcard namespace are passed in, we skip the namespace equality check
 		// it **will fail** when checking on resources in specific namespaces, which we don't want
-		if !accessClaims.NamespaceMatches(expectedNamespace) {
+		if !claims.NamespaceMatches(accessClaims, expectedNamespace) {
 			return ErrorAccessTokenNamespaceMismatch
 		}
 	}

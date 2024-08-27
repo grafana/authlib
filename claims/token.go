@@ -113,8 +113,16 @@ type TokenClaims interface {
 	JTI() string
 }
 
+type Namespaced interface {
+	// Namespace takes the form of '<type>-<id>', '*' means all namespaces.
+	// In grafana the can be either org or stack.
+	// The claims are valid within this namespace
+	Namespace() string
+}
+
 type IdentityClaims interface {
 	TokenClaims
+	Namespaced
 
 	// Type indicates what kind of identity this is
 	IdentityType() IdentityType
@@ -122,11 +130,6 @@ type IdentityClaims interface {
 	// Identifier is a unique identifier for this IdentityType within a namespace.
 	// For some identity types this can be empty e.g. Anonymous.
 	Identifier() string
-
-	// Namespace takes the form of '<type>-<id>', '*' means all namespaces.
-	// In grafana the can be either org or stack.
-	// The claims are valid within this namespace
-	Namespace() string
 
 	// AuthenticatedBy is the method used to authenticate the identity.
 	// Examples: password, oauth_azuread, etc
@@ -144,18 +147,14 @@ type IdentityClaims interface {
 	// Display Name of the user (name attribute if it is set, otherwise the login or email)
 	DisplayName() string
 
-	NamespaceMatches(namespace string) bool
 	IsNil() bool
 }
 
 // Access claims indicate what the request can access independent from the identity
 type AccessClaims interface {
 	TokenClaims
+	Namespaced
 
-	// Namespace takes the form of '<type>-<id>', '*' means all namespaces.
-	// In grafana the can be either org or stack.
-	// The claims are valid within this namespace
-	Namespace() string
 	// Access policy scopes
 	Scopes() []string
 	// Grafana roles
@@ -163,6 +162,5 @@ type AccessClaims interface {
 	// On-behalf-of user
 	DelegatedPermissions() []string
 
-	NamespaceMatches(namespace string) bool
 	IsNil() bool
 }

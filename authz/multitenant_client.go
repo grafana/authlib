@@ -289,10 +289,10 @@ func (c *LegacyClientImpl) validateNamespace(caller claims.AuthInfo, stackID int
 	// Check both AccessToken and IDToken (if present) for namespace match
 	accessClaims := caller.GetAccess()
 	accessTokenMatch := !c.authCfg.accessTokenAuthEnabled ||
-		(accessClaims != nil && !accessClaims.IsNil() && accessClaims.NamespaceMatches(expectedNamespace))
+		(accessClaims != nil && !accessClaims.IsNil() && claims.NamespaceMatches(accessClaims, expectedNamespace))
 
 	idClaims := caller.GetIdentity()
-	idTokenMatch := idClaims == nil || idClaims.IsNil() || idClaims.NamespaceMatches(expectedNamespace)
+	idTokenMatch := idClaims == nil || idClaims.IsNil() || claims.NamespaceMatches(idClaims, expectedNamespace)
 
 	return accessTokenMatch && idTokenMatch
 }

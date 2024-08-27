@@ -43,13 +43,6 @@ func (c IDTokenClaims) getK8sName() string {
 	return c.Identifier
 }
 
-func (c IDTokenClaims) NamespaceMatches(namespace string) bool {
-	actual := disambiguateNamespace(c.Namespace)
-	expected := disambiguateNamespace(namespace)
-
-	return actual == expected
-}
-
 func NewIDTokenVerifier(cfg VerifierConfig, keys KeyRetriever) *IDTokenVerifier {
 	return &IDTokenVerifier{
 		v: NewVerifier[IDTokenClaims](cfg, TokenTypeID, keys),
