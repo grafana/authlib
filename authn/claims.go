@@ -170,11 +170,6 @@ func (c *Identity) Username() string {
 	return c.claims.Rest.Username
 }
 
-// NamespaceMatches implements claims.IdentityClaims.
-func (c *Identity) NamespaceMatches(namespace string) bool {
-	return c.claims.Rest.NamespaceMatches(namespace)
-}
-
 // IsNil implements claims.IdentityClaims.
 func (c *Identity) IsNil() bool {
 	return c == nil
@@ -245,11 +240,6 @@ func (c *Access) Permissions() []string {
 // Scopes implements claims.AccessClaims.
 func (c *Access) Scopes() []string {
 	return c.claims.Rest.Scopes
-}
-
-// NamespaceMatches implements claims.AccessClaims.
-func (c *Access) NamespaceMatches(namespace string) bool {
-	return c.claims.Rest.NamespaceMatches(namespace)
 }
 
 // IsNil implements claims.AccessClaims.

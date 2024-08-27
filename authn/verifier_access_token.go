@@ -2,7 +2,6 @@ package authn
 
 import (
 	"context"
-	"strings"
 )
 
 type AccessTokenClaims struct {
@@ -15,20 +14,6 @@ type AccessTokenClaims struct {
 	Permissions []string `json:"permissions"`
 	// On-behalf-of user
 	DelegatedPermissions []string `json:"delegatedPermissions"`
-}
-
-// disambiguateNamespace is a helper to temporarily navigate the issue with cloud namespace claims being ambiguous (stack vs stacks).
-func disambiguateNamespace(namespace string) string {
-	return strings.Replace(namespace, "stack-", "stacks-", 1)
-}
-
-func (c AccessTokenClaims) NamespaceMatches(namespace string) bool {
-	actual := disambiguateNamespace(c.Namespace)
-	expected := disambiguateNamespace(namespace)
-	if actual == "*" {
-		return true
-	}
-	return actual == expected
 }
 
 func NewAccessTokenVerifier(cfg VerifierConfig, keys KeyRetriever) *AccessTokenVerifier {
