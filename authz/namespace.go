@@ -26,13 +26,6 @@ var (
 	ErrorAccessTokenNamespaceMismatch = status.Errorf(codes.PermissionDenied, "unauthorized: access token namespace does not match expected namespace")
 )
 
-type NamespaceAccessCheckerType int
-
-const (
-	NamespaceAccessCheckerTypeCloud NamespaceAccessCheckerType = iota + 1
-	NamespaceAccessCheckerTypeOrg
-)
-
 type NamespaceAccessChecker interface {
 	CheckAccess(caller claims.AuthInfo, namespace string) error
 	CheckAccessByID(caller claims.AuthInfo, id int64) error
@@ -43,7 +36,6 @@ var _ NamespaceAccessChecker = &NamespaceAccessCheckerImpl{}
 type NamespaceAccessCheckerOption func(*NamespaceAccessCheckerImpl)
 
 type NamespaceAccessCheckerImpl struct {
-	checkerType NamespaceAccessCheckerType
 	// namespaceFmt is the namespace formatter used to generate the expected namespace.
 	// Ex: "stacks-%d" -> "stacks-12"
 	namespaceFmt claims.NamespaceFormatter
@@ -75,18 +67,8 @@ func WithDisableAccessTokenNamespaceAccessCheckerOption() NamespaceAccessChecker
 
 // NewNamespaceAuthorizer creates a new namespace authorizer.
 // If both ID token and access token are disabled, the authorizer will always return nil.
-func NewNamespaceAccessChecker(checkerType NamespaceAccessCheckerType, opts ...NamespaceAccessCheckerOption) *NamespaceAccessCheckerImpl {
-	var namespaceFmt claims.NamespaceFormatter
-
-	switch checkerType {
-	case NamespaceAccessCheckerTypeCloud:
-		namespaceFmt = claims.CloudNamespaceFormatter
-	default:
-		namespaceFmt = claims.OrgNamespaceFormatter
-	}
-
+func NewNamespaceAccessChecker(namespaceFmt claims.NamespaceFormatter, opts ...NamespaceAccessCheckerOption) *NamespaceAccessCheckerImpl {
 	na := &NamespaceAccessCheckerImpl{
-		checkerType:        checkerType,
 		namespaceFmt:       namespaceFmt,
 		idTokenEnabled:     false,
 		idTokenRequired:    false,
