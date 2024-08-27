@@ -57,15 +57,19 @@ func ParseNamespace(ns string) (NamespaceInfo, error) {
 		return info, nil
 	}
 
-	if strings.HasPrefix(ns, "org-") {
-		id, err := strconv.ParseInt(ns[4:], 10, 64)
-		if id < 1 {
+	if id, ok := strings.CutPrefix(ns, "org-"); ok {
+		orgID, err := strconv.ParseInt(id, 10, 64)
+		if err != nil {
 			return info, fmt.Errorf("invalid org id")
 		}
-		if id == 1 {
+
+		if orgID < 1 {
+			return info, fmt.Errorf("invalid org id")
+		}
+		if orgID == 1 {
 			return info, fmt.Errorf("use default rather than org-1")
 		}
-		info.OrgID = id
+		info.OrgID = orgID
 		return info, err
 	}
 
@@ -90,5 +94,6 @@ func ParseNamespace(ns string) (NamespaceInfo, error) {
 		return info, err
 	}
 
-	return info, fmt.Errorf("namespace didn't parse to a legal value: raw=%s", info.Value)
+	// NOTE: we can't return errors. This breaks things like cluster-scoped resources and discovery
+	return info, nil
 }

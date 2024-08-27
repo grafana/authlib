@@ -14,8 +14,7 @@ func TestParseNamespace(t *testing.T) {
 		expectErr bool
 	}{
 		{
-			name:      "empty namespace",
-			expectErr: true,
+			name: "empty namespace",
 			expected: claims.NamespaceInfo{
 				OrgID: -1,
 			},
@@ -129,7 +128,6 @@ func TestParseNamespace(t *testing.T) {
 				OrgID: -1,
 				Value: "anything",
 			},
-			expectErr: true,
 		},
 	}
 
