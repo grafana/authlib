@@ -14,7 +14,8 @@ func TestParseNamespace(t *testing.T) {
 		expectErr bool
 	}{
 		{
-			name: "empty namespace",
+			name:      "empty namespace",
+			expectErr: true,
 			expected: claims.NamespaceInfo{
 				OrgID: -1,
 			},
@@ -76,6 +77,14 @@ func TestParseNamespace(t *testing.T) {
 		{
 			name:      "invalid stack id (must be an int)",
 			expectErr: true,
+			namespace: "stacks-abcdef",
+			expected: claims.NamespaceInfo{
+				OrgID: -1,
+			},
+		},
+		{
+			name:      "invalid stack id in deprecated claim (must be an int)",
+			expectErr: true,
 			namespace: "stack-abcdef",
 			expected: claims.NamespaceInfo{
 				OrgID: -1,
@@ -83,7 +92,7 @@ func TestParseNamespace(t *testing.T) {
 		},
 		{
 			name:      "invalid stack id (must be provided)",
-			namespace: "stack-",
+			namespace: "stacks-",
 			expectErr: true,
 			expected: claims.NamespaceInfo{
 				OrgID: -1,
@@ -91,7 +100,7 @@ func TestParseNamespace(t *testing.T) {
 		},
 		{
 			name:      "invalid stack id (cannot be 0)",
-			namespace: "stack-0",
+			namespace: "stacks-0",
 			expectErr: true,
 			expected: claims.NamespaceInfo{
 				OrgID: -1,
@@ -99,6 +108,14 @@ func TestParseNamespace(t *testing.T) {
 		},
 		{
 			name:      "valid stack",
+			namespace: "stacks-1",
+			expected: claims.NamespaceInfo{
+				OrgID:   1,
+				StackID: 1,
+			},
+		},
+		{
+			name:      "valid stack is read from deprecated claim",
 			namespace: "stack-1",
 			expected: claims.NamespaceInfo{
 				OrgID:   1,
@@ -112,6 +129,7 @@ func TestParseNamespace(t *testing.T) {
 				OrgID: -1,
 				Value: "anything",
 			},
+			expectErr: true,
 		},
 	}
 

@@ -27,14 +27,17 @@ var (
 )
 
 type NamespaceAccessChecker interface {
-	CheckAccess(caller claims.AuthInfo, stackID int64) error
+	CheckAccess(caller claims.AuthInfo, namespace string) error
+	CheckAccessByID(caller claims.AuthInfo, id int64) error
 }
+
+var _ NamespaceAccessChecker = &NamespaceAccessCheckerImpl{}
 
 type NamespaceAccessCheckerOption func(*NamespaceAccessCheckerImpl)
 
 type NamespaceAccessCheckerImpl struct {
 	// namespaceFmt is the namespace formatter used to generate the expected namespace.
-	// Ex: "stack-%d" -> "stack-12"
+	// Ex: "stacks-%d" -> "stacks-12"
 	namespaceFmt claims.NamespaceFormatter
 
 	// idTokenEnabled is a flag to enable ID token namespace validation.
@@ -79,15 +82,17 @@ func NewNamespaceAccessChecker(namespaceFmt claims.NamespaceFormatter, opts ...N
 	return na
 }
 
-func (na *NamespaceAccessCheckerImpl) CheckAccess(caller claims.AuthInfo, stackID int64) error {
-	expectedNamespace := na.namespaceFmt(stackID)
+func (na *NamespaceAccessCheckerImpl) CheckAccess(caller claims.AuthInfo, expectedNamespace string) error {
 	if na.idTokenEnabled {
 		idClaims := caller.GetIdentity()
 		if idClaims == nil || idClaims.IsNil() {
 			if na.idTokenRequired {
 				return ErrorMissingIDToken
 			}
-		} else if idClaims.Namespace() != expectedNamespace {
+			// for else-if branch below,
+			// when id token claims are evaluated with an access token claims (with wildcard namespace) present
+			// but expectedNamespace is *, we skip the namespace equality check since it will always fail
+		} else if expectedNamespace != "*" && !idClaims.NamespaceMatches(expectedNamespace) {
 			return ErrorIDTokenNamespaceMismatch
 		}
 	}
@@ -96,12 +101,21 @@ func (na *NamespaceAccessCheckerImpl) CheckAccess(caller claims.AuthInfo, stackI
 		if accessClaims == nil || accessClaims.IsNil() {
 			return ErrorMissingAccessToken
 		}
-		namespace := accessClaims.Namespace()
-		if namespace != "*" && namespace != expectedNamespace {
+		// for if branch below,
+		// when access token claims with a wildcard namespace are passed in, we skip the namespace equality check
+		// it **will fail** when checking on resources in specific namespaces, which we don't want
+		if !accessClaims.NamespaceMatches(expectedNamespace) {
 			return ErrorAccessTokenNamespaceMismatch
 		}
 	}
 	return nil
+}
+
+// CheckAccessById uses the specified identifier to use with the namespace formatter
+// to generate the expected namespace which will be checked for access.
+func (na *NamespaceAccessCheckerImpl) CheckAccessByID(caller claims.AuthInfo, id int64) error {
+	expectedNamespace := na.namespaceFmt(id)
+	return na.CheckAccess(caller, expectedNamespace)
 }
 
 type StackIDExtractors func(context.Context) (int64, error)
@@ -140,7 +154,7 @@ func UnaryNamespaceAccessInterceptor(na NamespaceAccessChecker, stackID StackIDE
 			return nil, err
 		}
 
-		err = na.CheckAccess(caller, stackID)
+		err = na.CheckAccessByID(caller, stackID)
 		if err != nil {
 			return nil, err
 		}
@@ -164,7 +178,7 @@ func StreamNamespaceAccessInterceptor(na NamespaceAccessChecker, stackID StackID
 			return err
 		}
 
-		err = na.CheckAccess(caller, stackID)
+		err = na.CheckAccessByID(caller, stackID)
 		if err != nil {
 			return err
 		}

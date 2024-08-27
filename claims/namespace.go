@@ -12,6 +12,7 @@ import (
 type NamespaceFormatter func(int64) string
 
 func CloudNamespaceFormatter(id int64) string {
+	// TODO: change this to stacks-X when all the other dependent pieces (gcom etc.) can validate both stack-x and stacks-X
 	return fmt.Sprintf("stack-%d", id)
 }
 
@@ -53,15 +54,26 @@ func ParseNamespace(ns string) (NamespaceInfo, error) {
 		return info, err
 	}
 
-	if strings.HasPrefix(ns, "stack-") {
-		stackIDStr := ns[6:]
-		stackID, err := strconv.ParseInt(stackIDStr, 10, 64)
+	if id, ok := strings.CutPrefix(ns, "stacks-"); ok {
+		stackID, err := strconv.ParseInt(id, 10, 64)
 		if err != nil || stackID < 1 {
 			return info, fmt.Errorf("invalid stack id")
 		}
 		info.StackID = stackID
 		info.OrgID = 1
-		return info, nil
+		return info, err
 	}
-	return info, nil
+
+	// handle deprecated stack-X value
+	if id, ok := strings.CutPrefix(ns, "stack-"); ok {
+		stackID, err := strconv.ParseInt(id, 10, 64)
+		if err != nil || stackID < 1 {
+			return info, fmt.Errorf("invalid stack id")
+		}
+		info.StackID = stackID
+		info.OrgID = 1
+		return info, err
+	}
+
+	return info, fmt.Errorf("namespace didn't parse to a legal value: raw=%s", info.Value)
 }

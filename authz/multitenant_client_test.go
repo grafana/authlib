@@ -267,7 +267,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 				Caller: &authn.AuthInfo{
 					AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
-						Rest:   authn.AccessTokenClaims{Namespace: "stack-12"},
+						Rest:   authn.AccessTokenClaims{Namespace: "stacks-12"},
 					}),
 				},
 				StackID: 12,
@@ -281,7 +281,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 				Caller: &authn.AuthInfo{
 					AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
-						Rest:   authn.AccessTokenClaims{Namespace: "stack-12", Permissions: []string{"dashboards:read"}},
+						Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", Permissions: []string{"dashboards:read"}},
 					}),
 				},
 				StackID: 12,
@@ -295,7 +295,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 				Caller: &authn.AuthInfo{
 					AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
-						Rest:   authn.AccessTokenClaims{Namespace: "stack-13", Permissions: []string{"dashboards:read"}},
+						Rest:   authn.AccessTokenClaims{Namespace: "stacks-13", Permissions: []string{"dashboards:read"}},
 					}),
 				},
 				StackID: 12,
@@ -309,11 +309,11 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 				Caller: &authn.AuthInfo{
 					AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
-						Rest:   authn.AccessTokenClaims{Namespace: "stack-12"},
+						Rest:   authn.AccessTokenClaims{Namespace: "stacks-12"},
 					}),
 					IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{
 						Claims: &jwt.Claims{Subject: "user:1"},
-						Rest:   authn.IDTokenClaims{Namespace: "stack-12"},
+						Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 					}),
 				},
 				StackID: 12,
@@ -327,11 +327,11 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 				Caller: &authn.AuthInfo{
 					AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
-						Rest:   authn.AccessTokenClaims{Namespace: "stack-12", DelegatedPermissions: []string{"dashboards:read"}},
+						Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards:read"}},
 					}),
 					IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{
 						Claims: &jwt.Claims{Subject: "user:1"},
-						Rest:   authn.IDTokenClaims{Namespace: "stack-12"},
+						Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 					}),
 				},
 				StackID: 12,
@@ -345,11 +345,11 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 				Caller: &authn.AuthInfo{
 					AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
-						Rest:   authn.AccessTokenClaims{Namespace: "stack-12", DelegatedPermissions: []string{"dashboards:read"}},
+						Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards:read"}},
 					}),
 					IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{
 						Claims: &jwt.Claims{Subject: "user:1"},
-						Rest:   authn.IDTokenClaims{Namespace: "stack-12"},
+						Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 					}),
 				},
 				StackID: 12,
@@ -368,7 +368,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 					}),
 					IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{
 						Claims: &jwt.Claims{Subject: "user:1"},
-						Rest:   authn.IDTokenClaims{Namespace: "stack-13"},
+						Rest:   authn.IDTokenClaims{Namespace: "stacks-13"},
 					}),
 				},
 				StackID: 12,
@@ -382,11 +382,11 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 				Caller: &authn.AuthInfo{
 					AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
-						Rest:   authn.AccessTokenClaims{Namespace: "stack-12", DelegatedPermissions: []string{"dashboards:read"}},
+						Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards:read"}},
 					}),
 					IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{
 						Claims: &jwt.Claims{Subject: "user:1"},
-						Rest:   authn.IDTokenClaims{Namespace: "stack-12"},
+						Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 					}),
 				},
 				StackID:  12,
@@ -402,11 +402,11 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 				Caller: &authn.AuthInfo{
 					AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
-						Rest:   authn.AccessTokenClaims{Namespace: "stack-12", DelegatedPermissions: []string{"dashboards:read"}},
+						Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards:read"}},
 					}),
 					IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{
 						Claims: &jwt.Claims{Subject: "user:1"},
-						Rest:   authn.IDTokenClaims{Namespace: "stack-12"},
+						Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 					}),
 				},
 				StackID:  12,
@@ -422,11 +422,11 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 				Caller: &authn.AuthInfo{
 					AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
 						Claims: &jwt.Claims{Subject: "service"},
-						Rest:   authn.AccessTokenClaims{Namespace: "stack-12", DelegatedPermissions: []string{"dashboards:read"}},
+						Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards:read"}},
 					}),
 					IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{
 						Claims: &jwt.Claims{Subject: "user:1"},
-						Rest:   authn.IDTokenClaims{Namespace: "stack-12"},
+						Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 					}),
 				},
 				StackID:    12,
@@ -489,11 +489,11 @@ func TestLegacyClientImpl_Check_Cache(t *testing.T) {
 		Caller: &authn.AuthInfo{
 			AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
 				Claims: &jwt.Claims{Subject: "service"},
-				Rest:   authn.AccessTokenClaims{Namespace: "stack-12", DelegatedPermissions: []string{"dashboards:read"}},
+				Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards:read"}},
 			}),
 			IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{
 				Claims: &jwt.Claims{Subject: "user:1"},
-				Rest:   authn.IDTokenClaims{Namespace: "stack-12"},
+				Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 			}),
 		},
 		StackID:  12,
@@ -570,7 +570,7 @@ func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
 				Caller: &authn.AuthInfo{
 					IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{
 						Claims: &jwt.Claims{Subject: "user:1"},
-						Rest:   authn.IDTokenClaims{Namespace: "stack-12"},
+						Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 					}),
 				},
 				StackID:  12,
@@ -586,7 +586,7 @@ func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
 				Caller: &authn.AuthInfo{
 					IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{
 						Claims: &jwt.Claims{Subject: "user:1"},
-						Rest:   authn.IDTokenClaims{Namespace: "stack-12"},
+						Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 					}),
 				},
 				StackID:  12,
