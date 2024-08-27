@@ -8,7 +8,7 @@ import (
 
 // NamespaceFormatter defines a function that formats a stack or organization ID
 // into the expected namespace format based on the deployment environment (Cloud/On-prem).
-// Example: stacks-6481, org-12
+// Example: stack-6481, org-12
 type NamespaceFormatter func(int64) string
 
 func CloudNamespaceFormatter(id int64) string {
