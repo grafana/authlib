@@ -184,6 +184,27 @@ func TestVerifier_Verify(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, claims)
 	})
+
+	t.Run("unsafe mode/KeyRetriever not set", func(t *testing.T) {
+		verifier := NewVerifier[CustomClaims](
+			VerifierConfig{},
+			TokenTypeID,
+			WithUnsafeMode(),
+		)
+		claims, err := verifier.Verify(context.Background(), signFirst(t))
+		assert.NoError(t, err)
+		assert.NotNil(t, claims)
+	})
+
+	t.Run("safe mode/KeyRetriever not set", func(t *testing.T) {
+		verifier := NewVerifier[CustomClaims](
+			VerifierConfig{},
+			TokenTypeID,
+		)
+		claims, err := verifier.Verify(context.Background(), signFirst(t))
+		assert.Error(t, err)
+		assert.Nil(t, claims)
+	})
 }
 
 func signExpired(t *testing.T) string {
