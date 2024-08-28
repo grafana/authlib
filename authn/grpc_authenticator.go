@@ -113,7 +113,10 @@ func NewGrpcAuthenticator(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthenticato
 	}
 
 	if ga.cfg.idTokenAuthEnabled {
-		ga.idVerifier = NewIDTokenVerifier(cfg.VerifierConfig, ga.keyRetriever)
+		// Skip audience checks for ID tokens (reset AllowedAudiences)
+		verifierConfig := cfg.VerifierConfig
+		verifierConfig.AllowedAudiences = []string{}
+		ga.idVerifier = NewIDTokenVerifier(verifierConfig, ga.keyRetriever)
 	}
 
 	return ga, nil
