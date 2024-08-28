@@ -28,9 +28,9 @@ func (c *KeyRetrieverConfig) RegisterFlags(prefix string, fs *flag.FlagSet) {
 
 type TokenExchangeConfig struct {
 	// Token used to perform the exchange request.
-	Token string
+	Token string `yaml:"token"`
 	// Url called to perform exchange request.
-	TokenExchangeURL string
+	TokenExchangeURL string `yaml:"tokenExchangeUrl"`
 }
 
 func (c *TokenExchangeConfig) RegisterFlags(prefix string, fs *flag.FlagSet) {
