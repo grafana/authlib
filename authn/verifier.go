@@ -16,19 +16,41 @@ const (
 	TokenTypeAccess TokenType = "at+jwt"
 )
 
+type VerifierOption func(*VerifierBase[any])
+
+func WithKeyRetriever(keys KeyRetriever) VerifierOption {
+	return func(v *VerifierBase[any]) {
+		v.keys = keys
+	}
+}
+
+func WithUnsafeMode() VerifierOption {
+	return func(v *VerifierBase[any]) {
+		v.unsafeMode = true
+	}
+}
+
 type Verifier[T any] interface {
 	// Verify will parse and verify provided token, if `AllowedAudiences` was configured those will be validated as well.
 	Verify(ctx context.Context, token string) (*Claims[T], error)
 }
 
-func NewVerifier[T any](cfg VerifierConfig, typ TokenType, keys KeyRetriever) *VerifierBase[T] {
-	return &VerifierBase[T]{cfg, typ, keys}
+func NewVerifier[T any](cfg VerifierConfig, typ TokenType, opts ...VerifierOption) *VerifierBase[T] {
+	v := &VerifierBase[T]{
+		cfg:       cfg,
+		tokenType: typ,
+	}
+	for _, opt := range opts {
+		opt((*VerifierBase[any])(v))
+	}
+	return v
 }
 
 type VerifierBase[T any] struct {
-	cfg       VerifierConfig
-	tokenType TokenType
-	keys      KeyRetriever
+	cfg        VerifierConfig
+	tokenType  TokenType
+	keys       KeyRetriever
+	unsafeMode bool
 }
 
 // Verify will parse and verify provided token, if `AllowedAudiences` was configured those will be validated as well.
@@ -42,21 +64,32 @@ func (v *VerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T],
 		return nil, ErrInvalidTokenType
 	}
 
-	keyID, err := getKeyID(parsed.Headers)
-	if err != nil {
-		return nil, err
-	}
-
-	jwk, err := v.keys.Get(ctx, keyID)
-	if err != nil {
-		return nil, err
-	}
-
 	claims := Claims[T]{
 		token: token, // hold on to the original token
 	}
-	if err := parsed.Claims(jwk, &claims.Claims, &claims.Rest); err != nil {
-		return nil, err
+
+	if v.unsafeMode {
+		if err := parsed.UnsafeClaimsWithoutVerification(&claims.Claims, &claims.Rest); err != nil {
+			return nil, err
+		}
+	} else {
+		if v.keys == nil {
+			return nil, errors.New("KeyRetriever is required for safe mode")
+		}
+
+		keyID, err := getKeyID(parsed.Headers)
+		if err != nil {
+			return nil, err
+		}
+
+		jwk, err := v.keys.Get(ctx, keyID)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := parsed.Claims(jwk, &claims.Claims, &claims.Rest); err != nil {
+			return nil, err
+		}
 	}
 
 	if err := claims.Validate(jwt.Expected{

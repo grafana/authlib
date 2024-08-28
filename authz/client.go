@@ -77,7 +77,11 @@ func newClient(cfg Config, opts ...clientOption) (*clientImpl, error) {
 		})
 	}
 
-	client.verifier = authn.NewVerifier[customClaims](authn.VerifierConfig{}, authn.TokenTypeID, authn.NewKeyRetriever(authn.KeyRetrieverConfig{SigningKeysURL: cfg.JWKsURL}))
+	client.verifier = authn.NewVerifier[customClaims](
+		authn.VerifierConfig{},
+		authn.TokenTypeID,
+		authn.WithKeyRetriever(authn.NewKeyRetriever(authn.KeyRetrieverConfig{SigningKeysURL: cfg.JWKsURL})),
+	)
 
 	// create httpClient, if not already present
 	if client.client == nil {

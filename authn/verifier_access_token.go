@@ -16,9 +16,9 @@ type AccessTokenClaims struct {
 	DelegatedPermissions []string `json:"delegatedPermissions"`
 }
 
-func NewAccessTokenVerifier(cfg VerifierConfig, keys KeyRetriever) *AccessTokenVerifier {
+func NewAccessTokenVerifier(cfg VerifierConfig, opts ...VerifierOption) *AccessTokenVerifier {
 	return &AccessTokenVerifier{
-		v: NewVerifier[AccessTokenClaims](cfg, TokenTypeAccess, keys),
+		v: NewVerifier[AccessTokenClaims](cfg, TokenTypeAccess, opts...),
 	}
 }
 

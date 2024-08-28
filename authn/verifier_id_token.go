@@ -43,9 +43,9 @@ func (c IDTokenClaims) getK8sName() string {
 	return c.Identifier
 }
 
-func NewIDTokenVerifier(cfg VerifierConfig, keys KeyRetriever) *IDTokenVerifier {
+func NewIDTokenVerifier(cfg VerifierConfig, opts ...VerifierOption) *IDTokenVerifier {
 	return &IDTokenVerifier{
-		v: NewVerifier[IDTokenClaims](cfg, TokenTypeID, keys),
+		v: NewVerifier[IDTokenClaims](cfg, TokenTypeID, opts...),
 	}
 }
 
