@@ -30,7 +30,7 @@ type AuthInfo struct {
 
 // Extra implements claims.AuthInfo.
 func (c *AuthInfo) GetExtra() map[string][]string {
-	if c.IdentityClaims != nil && c.IdentityClaims.claims.token != "" {
+	if c.IdentityClaims != nil && !c.IdentityClaims.IsNil() && c.IdentityClaims.claims.token != "" {
 		// Currently required for external k8s aggregation
 		// but this should be removed in the not-to-distant future
 		return map[string][]string{"id-token": {c.IdentityClaims.claims.token}}
