@@ -34,7 +34,7 @@ type GrpcAuthenticatorConfig struct {
 	IDTokenMetadataKey string
 
 	// KeyRetrieverConfig holds the configuration for the key retriever.
-	// Ignored if KeyRetrieverOption is provided.
+	// Ignored if KeyRetrieverOption is provided or when unsafe verifiers are used via NewUnsafeGrpcAuthenticator.
 	KeyRetrieverConfig KeyRetrieverConfig
 	// VerifierConfig holds the configuration for the token verifiers.
 	VerifierConfig VerifierConfig
@@ -91,13 +91,11 @@ func setGrpcAuthenticatorCfgDefaults(cfg *GrpcAuthenticatorConfig) {
 	cfg.accessTokenAuthEnabled = true
 }
 
+// NewGrpcAuthenticator creates a new gRPC authenticator that uses safe verifiers (i.e. JWT signature is checked).
+// If a KeyRetriever is not provided via WithKeyRetrieverOption, a default one is created using the configuration
+// provided via GrpcAuthenticatorConfig.KeyRetrieverConfig.
 func NewGrpcAuthenticator(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthenticatorOption) (*GrpcAuthenticator, error) {
-	setGrpcAuthenticatorCfgDefaults(cfg)
-
-	ga := &GrpcAuthenticator{cfg: cfg}
-	for _, opt := range opts {
-		opt(ga)
-	}
+	ga := newGrpcAuthenticatorCommon(cfg, opts...)
 
 	if ga.keyRetriever == nil && (ga.cfg.accessTokenAuthEnabled || ga.cfg.idTokenAuthEnabled) {
 		if cfg.KeyRetrieverConfig.SigningKeysURL == "" {
@@ -117,6 +115,25 @@ func NewGrpcAuthenticator(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthenticato
 		verifierConfig := cfg.VerifierConfig
 		verifierConfig.AllowedAudiences = []string{}
 		ga.idVerifier = NewIDTokenVerifier(verifierConfig, ga.keyRetriever)
+	}
+
+	return ga, nil
+}
+
+// NewUnsafeGrpcAuthenticator creates a new gRPC authenticator that uses unsafe verifiers (i.e. JWT signature is not checked).
+// Unsafe verifiers do not perform key retrieval and JWT signtature validation. **Use with caution**.
+func NewUnsafeGrpcAuthenticator(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthenticatorOption) (*GrpcAuthenticator, error) {
+	ga := newGrpcAuthenticatorCommon(cfg, opts...)
+
+	if ga.cfg.accessTokenAuthEnabled {
+		ga.atVerifier = NewUnsafeAccessTokenVerifier(cfg.VerifierConfig)
+	}
+
+	if ga.cfg.idTokenAuthEnabled {
+		// Skip audience checks for ID tokens (reset AllowedAudiences)
+		verifierConfig := cfg.VerifierConfig
+		verifierConfig.AllowedAudiences = []string{}
+		ga.idVerifier = NewUnsafeIDTokenVerifier(verifierConfig)
 	}
 
 	return ga, nil
@@ -225,6 +242,17 @@ func getFirstMetadataValue(md metadata.MD, key string) (string, bool) {
 	}
 
 	return values[0], true
+}
+
+func newGrpcAuthenticatorCommon(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthenticatorOption) *GrpcAuthenticator {
+	setGrpcAuthenticatorCfgDefaults(cfg)
+
+	ga := &GrpcAuthenticator{cfg: cfg}
+	for _, opt := range opts {
+		opt(ga)
+	}
+
+	return ga
 }
 
 // ------
