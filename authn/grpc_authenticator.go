@@ -111,7 +111,7 @@ func NewGrpcAuthenticator(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthenticato
 	if ga.cfg.accessTokenAuthEnabled {
 		ga.atVerifier = NewAccessTokenVerifier(
 			cfg.VerifierConfig,
-			WithKeyRetriever(ga.keyRetriever),
+			ga.keyRetriever,
 		)
 	}
 
@@ -121,7 +121,7 @@ func NewGrpcAuthenticator(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthenticato
 		verifierConfig.AllowedAudiences = []string{}
 		ga.idVerifier = NewIDTokenVerifier(
 			verifierConfig,
-			WithKeyRetriever(ga.keyRetriever),
+			ga.keyRetriever,
 		)
 	}
 
