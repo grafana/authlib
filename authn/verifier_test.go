@@ -71,7 +71,7 @@ func TestVerifier_Verify(t *testing.T) {
 	verifier := NewVerifier[CustomClaims](
 		VerifierConfig{},
 		TokenTypeID,
-		WithKeyRetriever(NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL})),
+		NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
 	)
 
 	t.Run("invalid: wrong token format", func(t *testing.T) {
@@ -90,7 +90,7 @@ func TestVerifier_Verify(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](
 			VerifierConfig{},
 			TokenTypeID,
-			WithKeyRetriever(NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: "http://localhost:8000/v1/unknown"})),
+			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: "http://localhost:8000/v1/unknown"}),
 		)
 		claims, err := verifier.Verify(context.Background(), signFirst(t))
 		assert.ErrorIs(t, err, ErrFetchingSigningKey)
@@ -105,7 +105,7 @@ func TestVerifier_Verify(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](
 			VerifierConfig{},
 			TokenTypeID,
-			WithKeyRetriever(NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL})),
+			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
 		)
 		claims, err := verifier.Verify(context.Background(), signFirst(t))
 		assert.ErrorIs(t, err, ErrFetchingSigningKey)
@@ -127,7 +127,7 @@ func TestVerifier_Verify(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](
 			VerifierConfig{},
 			TokenTypeID,
-			WithKeyRetriever(NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL})),
+			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
 		)
 		claims, err := verifier.Verify(context.Background(), signSecond(t))
 		assert.ErrorIs(t, err, ErrInvalidSigningKey)
@@ -138,7 +138,7 @@ func TestVerifier_Verify(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](
 			VerifierConfig{AllowedAudiences: []string{"stack:2"}},
 			TokenTypeID,
-			WithKeyRetriever(NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL})),
+			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
 		)
 		claims, err := verifier.Verify(context.Background(), signFirst(t))
 		assert.ErrorIs(t, err, ErrInvalidAudience)
@@ -149,7 +149,7 @@ func TestVerifier_Verify(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](
 			VerifierConfig{},
 			TokenTypeID,
-			WithKeyRetriever(NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL})),
+			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
 		)
 		claims, err := verifier.Verify(context.Background(), signExpired(t))
 		assert.ErrorIs(t, err, ErrExpiredToken)
@@ -160,7 +160,7 @@ func TestVerifier_Verify(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](
 			VerifierConfig{},
 			TokenTypeAccess,
-			WithKeyRetriever(NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL})),
+			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
 		)
 		claims, err := verifier.Verify(context.Background(), signFirst(t))
 		assert.ErrorIs(t, err, ErrInvalidTokenType)
@@ -171,7 +171,7 @@ func TestVerifier_Verify(t *testing.T) {
 		verifier := NewVerifier[CustomClaims](
 			VerifierConfig{AllowedAudiences: []string{"stack:1"}},
 			TokenTypeID,
-			WithKeyRetriever(NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL})),
+			NewKeyRetriever(KeyRetrieverConfig{SigningKeysURL: server.URL}),
 		)
 		claims, err := verifier.Verify(context.Background(), signFirst(t))
 		assert.NoError(t, err)
@@ -183,27 +183,6 @@ func TestVerifier_Verify(t *testing.T) {
 		fmt.Println(claims.Claims)
 		assert.NoError(t, err)
 		assert.NotNil(t, claims)
-	})
-
-	t.Run("unsafe mode/KeyRetriever not set", func(t *testing.T) {
-		verifier := NewVerifier[CustomClaims](
-			VerifierConfig{},
-			TokenTypeID,
-			WithUnsafeMode(),
-		)
-		claims, err := verifier.Verify(context.Background(), signFirst(t))
-		assert.NoError(t, err)
-		assert.NotNil(t, claims)
-	})
-
-	t.Run("safe mode/KeyRetriever not set", func(t *testing.T) {
-		verifier := NewVerifier[CustomClaims](
-			VerifierConfig{},
-			TokenTypeID,
-		)
-		claims, err := verifier.Verify(context.Background(), signFirst(t))
-		assert.Error(t, err)
-		assert.Nil(t, claims)
 	})
 }
 
