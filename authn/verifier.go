@@ -42,14 +42,6 @@ func (v *VerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T],
 		return nil, ErrInvalidTokenType
 	}
 
-	claims := Claims[T]{
-		token: token, // hold on to the original token
-	}
-
-	if v.keys == nil {
-		return nil, errors.New("KeyRetriever is required for safe mode")
-	}
-
 	keyID, err := getKeyID(parsed.Headers)
 	if err != nil {
 		return nil, err
@@ -60,6 +52,9 @@ func (v *VerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T],
 		return nil, err
 	}
 
+	claims := Claims[T]{
+		token: token, // hold on to the original token
+	}
 	if err := parsed.Claims(jwk, &claims.Claims, &claims.Rest); err != nil {
 		return nil, err
 	}
