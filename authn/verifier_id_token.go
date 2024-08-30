@@ -49,6 +49,12 @@ func NewIDTokenVerifier(cfg VerifierConfig, keys KeyRetriever) *IDTokenVerifier 
 	}
 }
 
+func NewUnsafeIDTokenVerifier(cfg VerifierConfig) *IDTokenVerifier {
+	return &IDTokenVerifier{
+		v: NewUnsafeVerifier[IDTokenClaims](cfg, TokenTypeID),
+	}
+}
+
 // IDTokenVerifier is a convenient wrapper around `Verifier`
 // used to verify grafana issued id tokens.
 type IDTokenVerifier struct {

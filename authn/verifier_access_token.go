@@ -22,6 +22,12 @@ func NewAccessTokenVerifier(cfg VerifierConfig, keys KeyRetriever) *AccessTokenV
 	}
 }
 
+func NewUnsafeAccessTokenVerifier(cfg VerifierConfig) *AccessTokenVerifier {
+	return &AccessTokenVerifier{
+		v: NewUnsafeVerifier[AccessTokenClaims](cfg, TokenTypeAccess),
+	}
+}
+
 // AccessTokenVerifier is a convenient wrapper around `Verifier`
 // used to verify and authenticate Grafana issued AccessTokens.
 type AccessTokenVerifier struct {
