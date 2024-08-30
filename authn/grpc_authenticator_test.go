@@ -84,6 +84,45 @@ func TestGrpcAuthenticator_NewGrpcAuthenticator(t *testing.T) {
 	})
 }
 
+func TestGrpcAuthenticator_NewUnsafeGrpcAuthenticator(t *testing.T) {
+	t.Run("missing signing keys URL", func(t *testing.T) {
+		ga, err := NewUnsafeGrpcAuthenticator(&GrpcAuthenticatorConfig{})
+		require.NoError(t, err)
+		require.NotNil(t, ga)
+	})
+	t.Run("initialize authenticator with no option", func(t *testing.T) {
+		ga, err := NewUnsafeGrpcAuthenticator(&GrpcAuthenticatorConfig{})
+		require.NoError(t, err)
+		require.NotNil(t, ga)
+		require.Nil(t, ga.keyRetriever)
+		require.NotNil(t, ga.atVerifier)
+		// Config has default metadata keys
+		require.Equal(t, DefaultAccessTokenMetadataKey, ga.cfg.AccessTokenMetadataKey)
+		require.Equal(t, DefaultIdTokenMetadataKey, ga.cfg.IDTokenMetadataKey)
+		// ID token authentication is disabled by default
+		require.Nil(t, ga.idVerifier)
+	})
+	t.Run("initialize authenticator with id token option", func(t *testing.T) {
+		ga, err := NewUnsafeGrpcAuthenticator(
+			&GrpcAuthenticatorConfig{},
+			WithIDTokenAuthOption(true),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, ga)
+		// ID token authentication is enabled
+		require.NotNil(t, ga.idVerifier)
+		require.True(t, ga.cfg.idTokenAuthEnabled)
+		require.True(t, ga.cfg.idTokenAuthRequired)
+	})
+	t.Run("initialize authenticator with disabled access token", func(t *testing.T) {
+		emptyCfg := &GrpcAuthenticatorConfig{}
+		ga, err := NewUnsafeGrpcAuthenticator(emptyCfg, WithDisableAccessTokenAuthOption())
+		require.NoError(t, err)
+		require.NotNil(t, ga)
+		require.Nil(t, ga.atVerifier)
+	})
+}
+
 func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 	tests := []struct {
 		name    string
