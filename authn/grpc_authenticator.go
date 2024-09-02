@@ -122,7 +122,7 @@ func NewGrpcAuthenticator(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthenticato
 
 // NewUnsafeGrpcAuthenticator creates a new gRPC authenticator that uses unsafe verifiers (i.e. JWT signature is not checked).
 // Unsafe verifiers do not perform key retrieval and JWT signtature validation. **Use with caution**.
-func NewUnsafeGrpcAuthenticator(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthenticatorOption) (*GrpcAuthenticator, error) {
+func NewUnsafeGrpcAuthenticator(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthenticatorOption) *GrpcAuthenticator {
 	ga := newGrpcAuthenticatorCommon(cfg, opts...)
 
 	if ga.cfg.accessTokenAuthEnabled {
@@ -136,7 +136,7 @@ func NewUnsafeGrpcAuthenticator(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthen
 		ga.idVerifier = NewUnsafeIDTokenVerifier(verifierConfig)
 	}
 
-	return ga, nil
+	return ga
 }
 
 // Authenticate authenticates the incoming request based on the access token and ID token, and returns the context with the caller information.
