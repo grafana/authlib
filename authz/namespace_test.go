@@ -4,10 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/grafana/authlib/authn"
-	"github.com/grafana/authlib/claims"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
+
+	"github.com/grafana/authlib/authn"
+	"github.com/grafana/authlib/claims"
 )
 
 func TestNamespaceAccessCheckerImpl_ValidateAccessTokenOnly(t *testing.T) {
