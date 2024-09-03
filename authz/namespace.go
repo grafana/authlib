@@ -26,9 +26,11 @@ var (
 	ErrorAccessTokenNamespaceMismatch = status.Errorf(codes.PermissionDenied, "unauthorized: access token namespace does not match expected namespace")
 )
 
-type NamespaceAccessCheckerOverride interface {
-	CheckAccessByIdOverride(ctx context.Context) error
+type ServiceCheckAccessFuncOverride interface {
+	CheckAccessFuncOverride(ctx context.Context) error
 }
+
+type CheckAccessFunc func(ctx context.Context) error
 
 type NamespaceAccessChecker interface {
 	CheckAccess(caller claims.AuthInfo, namespace string) error
@@ -145,26 +147,31 @@ func MetadataStackIDExtractor(key string) StackIDExtractors {
 	}
 }
 
-// gRPC Unary Interceptor for namespace validation
-func UnaryNamespaceAccessInterceptor(na NamespaceAccessChecker, stackID StackIDExtractors) grpc.UnaryServerInterceptor {
+func NamespaceAccessFunc(na NamespaceAccessChecker, stackID StackIDExtractors) CheckAccessFunc {
+	return func(ctx context.Context) error {
+		caller, ok := claims.From(ctx)
+		if !ok {
+			return ErrorMissingCallerInfo
+		}
+
+		stackID, err := stackID(ctx)
+		if err != nil {
+			return err
+		}
+
+		return na.CheckAccessByID(caller, stackID)
+	}
+}
+
+func UnaryNamespaceAccessInterceptor(namespaceAccessFunc CheckAccessFunc) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
-		if overrideSrv, ok := info.Server.(NamespaceAccessCheckerOverride); ok {
-			err := overrideSrv.CheckAccessByIdOverride(ctx)
+		if overrideSrv, ok := info.Server.(ServiceCheckAccessFuncOverride); ok {
+			err := overrideSrv.CheckAccessFuncOverride(ctx)
 			if err != nil {
 				return nil, err
 			}
 		} else {
-			caller, ok := claims.From(ctx)
-			if !ok {
-				return nil, ErrMissingCaller
-			}
-
-			stackID, err := stackID(ctx)
-			if err != nil {
-				return nil, err
-			}
-
-			err = na.CheckAccessByID(caller, stackID)
+			err := namespaceAccessFunc(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -173,32 +180,20 @@ func UnaryNamespaceAccessInterceptor(na NamespaceAccessChecker, stackID StackIDE
 	}
 }
 
-// gRPC Stream Interceptor for namespace validation
-func StreamNamespaceAccessInterceptor(na NamespaceAccessChecker, stackID StackIDExtractors) grpc.StreamServerInterceptor {
+func StreamNamespaceAccessInterceptor(namespaceAccessFunc CheckAccessFunc) grpc.StreamServerInterceptor {
 	return func(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		ctx := stream.Context()
-		if overrideSrv, ok := srv.(NamespaceAccessCheckerOverride); ok {
-			err := overrideSrv.CheckAccessByIdOverride(ctx)
+		if overrideSrv, ok := srv.(ServiceCheckAccessFuncOverride); ok {
+			err := overrideSrv.CheckAccessFuncOverride(ctx)
 			if err != nil {
 				return err
 			}
 		} else {
-			caller, ok := claims.From(ctx)
-			if !ok {
-				return ErrMissingCaller
-			}
-
-			stackID, err := stackID(ctx)
-			if err != nil {
-				return err
-			}
-
-			err = na.CheckAccessByID(caller, stackID)
+			err := namespaceAccessFunc(ctx)
 			if err != nil {
 				return err
 			}
 		}
-
 		return handler(srv, stream)
 	}
 }
