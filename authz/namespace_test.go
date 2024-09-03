@@ -275,3 +275,36 @@ func TestMetadataStackIDExtractor(t *testing.T) {
 		})
 	}
 }
+
+func TestNamespaceAuthorizationFunc(t *testing.T) {
+	// New namespace access checker with ID claims verification
+	na := NewNamespaceAccessChecker(claims.CloudNamespaceFormatter, WithIDTokenNamespaceAccessCheckerOption(true))
+	stackIDExtractor := MetadataStackIDExtractor("X-Stack-ID")
+
+	authFunc := NamespaceAuthorizationFunc(na, stackIDExtractor)
+
+	t.Run("missing caller", func(t *testing.T) {
+		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("X-Stack-ID", "12"))
+		err := authFunc(ctx)
+		require.ErrorIs(t, err, ErrMissingCaller)
+	})
+
+	t.Run("missing stack-ID", func(t *testing.T) {
+		ctx := claims.WithClaims(context.Background(), &authn.AuthInfo{
+			AccessClaims:   authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stacks-12"}}),
+			IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stacks-12"}}),
+		})
+		err := authFunc(ctx)
+		require.ErrorIs(t, err, ErrorMissingMetadata)
+	})
+
+	t.Run("ok", func(t *testing.T) {
+		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(DefaultStackIDMetadataKey, "12"))
+		ctx = claims.WithClaims(ctx, &authn.AuthInfo{
+			AccessClaims:   authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stacks-12"}}),
+			IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stacks-12"}}),
+		})
+		err := authFunc(ctx)
+		require.NoError(t, err)
+	})
+}

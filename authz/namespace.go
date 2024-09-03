@@ -4,7 +4,6 @@ import (
 	"context"
 	"strconv"
 
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -18,7 +17,6 @@ const (
 
 var (
 	ErrorMissingMetadata              = status.Errorf(codes.Unauthenticated, "unauthenticated: missing metadata")
-	ErrorMissingCallerInfo            = status.Errorf(codes.Unauthenticated, "unauthenticated: missing caller auth info")
 	ErrorInvalidStackID               = status.Errorf(codes.Unauthenticated, "unauthenticated: invalid stack ID")
 	ErrorMissingIDToken               = status.Errorf(codes.Unauthenticated, "unauthenticated: missing id token")
 	ErrorMissingAccessToken           = status.Errorf(codes.Unauthenticated, "unauthenticated: missing access token")
@@ -141,33 +139,10 @@ func MetadataStackIDExtractor(key string) StackIDExtractors {
 	}
 }
 
-// gRPC Unary Interceptor for namespace validation
-func UnaryNamespaceAccessInterceptor(na NamespaceAccessChecker, stackID StackIDExtractors) grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
-		caller, ok := claims.From(ctx)
-		if !ok {
-			return nil, ErrMissingCaller
-		}
-
-		stackID, err := stackID(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		err = na.CheckAccessByID(caller, stackID)
-		if err != nil {
-			return nil, err
-		}
-
-		return handler(ctx, req)
-	}
-}
-
-// gRPC Stream Interceptor for namespace validation
-func StreamNamespaceAccessInterceptor(na NamespaceAccessChecker, stackID StackIDExtractors) grpc.StreamServerInterceptor {
-	return func(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		ctx := stream.Context()
-
+// NamespaceAuthorizationFunc returns a AuthorizeFunc that checks the caller claims access to a given namespace.
+// This function can be used with UnaryAuthorizeInterceptor and StreamAuthorizeInterceptor.
+func NamespaceAuthorizationFunc(na NamespaceAccessChecker, stackID StackIDExtractors) AuthorizeFunc {
+	return func(ctx context.Context) error {
 		caller, ok := claims.From(ctx)
 		if !ok {
 			return ErrMissingCaller
@@ -178,12 +153,7 @@ func StreamNamespaceAccessInterceptor(na NamespaceAccessChecker, stackID StackID
 			return err
 		}
 
-		err = na.CheckAccessByID(caller, stackID)
-		if err != nil {
-			return err
-		}
-
-		return handler(srv, stream)
+		return na.CheckAccessByID(caller, stackID)
 	}
 }
 
