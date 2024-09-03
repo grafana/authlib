@@ -26,6 +26,10 @@ var (
 	ErrorAccessTokenNamespaceMismatch = status.Errorf(codes.PermissionDenied, "unauthorized: access token namespace does not match expected namespace")
 )
 
+type NamespaceAccessCheckerOverride interface {
+	CheckAccessByIdOverride(ctx context.Context) error
+}
+
 type NamespaceAccessChecker interface {
 	CheckAccess(caller claims.AuthInfo, namespace string) error
 	CheckAccessByID(caller claims.AuthInfo, id int64) error
@@ -144,21 +148,27 @@ func MetadataStackIDExtractor(key string) StackIDExtractors {
 // gRPC Unary Interceptor for namespace validation
 func UnaryNamespaceAccessInterceptor(na NamespaceAccessChecker, stackID StackIDExtractors) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
-		caller, ok := claims.From(ctx)
-		if !ok {
-			return nil, ErrMissingCaller
-		}
+		if overrideSrv, ok := info.Server.(NamespaceAccessCheckerOverride); ok {
+			err := overrideSrv.CheckAccessByIdOverride(ctx)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			caller, ok := claims.From(ctx)
+			if !ok {
+				return nil, ErrMissingCaller
+			}
 
-		stackID, err := stackID(ctx)
-		if err != nil {
-			return nil, err
-		}
+			stackID, err := stackID(ctx)
+			if err != nil {
+				return nil, err
+			}
 
-		err = na.CheckAccessByID(caller, stackID)
-		if err != nil {
-			return nil, err
+			err = na.CheckAccessByID(caller, stackID)
+			if err != nil {
+				return nil, err
+			}
 		}
-
 		return handler(ctx, req)
 	}
 }
@@ -167,20 +177,26 @@ func UnaryNamespaceAccessInterceptor(na NamespaceAccessChecker, stackID StackIDE
 func StreamNamespaceAccessInterceptor(na NamespaceAccessChecker, stackID StackIDExtractors) grpc.StreamServerInterceptor {
 	return func(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
 		ctx := stream.Context()
+		if overrideSrv, ok := srv.(NamespaceAccessCheckerOverride); ok {
+			err := overrideSrv.CheckAccessByIdOverride(ctx)
+			if err != nil {
+				return err
+			}
+		} else {
+			caller, ok := claims.From(ctx)
+			if !ok {
+				return ErrMissingCaller
+			}
 
-		caller, ok := claims.From(ctx)
-		if !ok {
-			return ErrMissingCaller
-		}
+			stackID, err := stackID(ctx)
+			if err != nil {
+				return err
+			}
 
-		stackID, err := stackID(ctx)
-		if err != nil {
-			return err
-		}
-
-		err = na.CheckAccessByID(caller, stackID)
-		if err != nil {
-			return err
+			err = na.CheckAccessByID(caller, stackID)
+			if err != nil {
+				return err
+			}
 		}
 
 		return handler(srv, stream)
