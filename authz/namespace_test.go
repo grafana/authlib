@@ -283,25 +283,28 @@ func TestNamespaceAuthorizationFunc(t *testing.T) {
 
 	authFunc := NamespaceAuthorizationFunc(na, stackIDExtractor)
 
-	// Missing caller info
-	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("X-Stack-ID", "12"))
-	err := authFunc(ctx)
-	require.ErrorIs(t, err, ErrMissingCaller)
-
-	// Missing stack ID
-	ctx = claims.WithClaims(context.Background(), &authn.AuthInfo{
-		AccessClaims:   authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stacks-12"}}),
-		IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stacks-12"}}),
+	t.Run("missing caller", func(t *testing.T) {
+		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("X-Stack-ID", "12"))
+		err := authFunc(ctx)
+		require.ErrorIs(t, err, ErrMissingCaller)
 	})
-	err = authFunc(ctx)
-	require.ErrorIs(t, err, ErrorMissingMetadata)
 
-	// With caller info and stack ID
-	ctx = metadata.NewIncomingContext(context.Background(), metadata.Pairs(DefaultStackIDMetadataKey, "12"))
-	ctx = claims.WithClaims(ctx, &authn.AuthInfo{
-		AccessClaims:   authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stacks-12"}}),
-		IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stacks-12"}}),
+	t.Run("missing stack-ID", func(t *testing.T) {
+		ctx := claims.WithClaims(context.Background(), &authn.AuthInfo{
+			AccessClaims:   authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stacks-12"}}),
+			IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stacks-12"}}),
+		})
+		err := authFunc(ctx)
+		require.ErrorIs(t, err, ErrorMissingMetadata)
 	})
-	err = authFunc(ctx)
-	require.NoError(t, err)
+
+	t.Run("ok", func(t *testing.T) {
+		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(DefaultStackIDMetadataKey, "12"))
+		ctx = claims.WithClaims(ctx, &authn.AuthInfo{
+			AccessClaims:   authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stacks-12"}}),
+			IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stacks-12"}}),
+		})
+		err := authFunc(ctx)
+		require.NoError(t, err)
+	})
 }
