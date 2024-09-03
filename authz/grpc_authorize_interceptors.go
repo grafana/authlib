@@ -9,7 +9,7 @@ import (
 // AuthorizeFunc is the pluggable function that performs access control checks.
 //
 // The passed in `Context` will contain previous context values, such as grpc metadata
-// or even the caller's claims if the grpc_authenticator interceptor is used before the access interceptor.
+// or even the caller's claims if the grpc_authenticator interceptor is used before the authorize interceptor.
 // The function should return an error if the caller does not have access.
 //
 // If error is returned, its `grpc.Code()` will be returned to the user as well as the verbatim message.
