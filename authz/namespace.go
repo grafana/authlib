@@ -4,7 +4,6 @@ import (
 	"context"
 	"strconv"
 
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -25,12 +24,6 @@ var (
 	ErrorIDTokenNamespaceMismatch     = status.Errorf(codes.PermissionDenied, "unauthorized: id token namespace does not match expected namespace")
 	ErrorAccessTokenNamespaceMismatch = status.Errorf(codes.PermissionDenied, "unauthorized: access token namespace does not match expected namespace")
 )
-
-type ServiceCheckAccessFuncOverride interface {
-	CheckAccessFuncOverride(ctx context.Context) error
-}
-
-type CheckAccessFunc func(ctx context.Context) error
 
 type NamespaceAccessChecker interface {
 	CheckAccess(caller claims.AuthInfo, namespace string) error
@@ -147,7 +140,9 @@ func MetadataStackIDExtractor(key string) StackIDExtractors {
 	}
 }
 
-func NamespaceAccessFunc(na NamespaceAccessChecker, stackID StackIDExtractors) CheckAccessFunc {
+// NamespaceAuthorizationFunc returns a AuthorizeFunc that checks the caller claims access to a given namespace.
+// This function can be used with UnaryAuthorizeInterceptor and StreamAuthorizeInterceptor.
+func NamespaceAuthorizationFunc(na NamespaceAccessChecker, stackID StackIDExtractors) AuthorizeFunc {
 	return func(ctx context.Context) error {
 		caller, ok := claims.From(ctx)
 		if !ok {
@@ -160,41 +155,6 @@ func NamespaceAccessFunc(na NamespaceAccessChecker, stackID StackIDExtractors) C
 		}
 
 		return na.CheckAccessByID(caller, stackID)
-	}
-}
-
-func UnaryNamespaceAccessInterceptor(namespaceAccessFunc CheckAccessFunc) grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
-		if overrideSrv, ok := info.Server.(ServiceCheckAccessFuncOverride); ok {
-			err := overrideSrv.CheckAccessFuncOverride(ctx)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			err := namespaceAccessFunc(ctx)
-			if err != nil {
-				return nil, err
-			}
-		}
-		return handler(ctx, req)
-	}
-}
-
-func StreamNamespaceAccessInterceptor(namespaceAccessFunc CheckAccessFunc) grpc.StreamServerInterceptor {
-	return func(srv any, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		ctx := stream.Context()
-		if overrideSrv, ok := srv.(ServiceCheckAccessFuncOverride); ok {
-			err := overrideSrv.CheckAccessFuncOverride(ctx)
-			if err != nil {
-				return err
-			}
-		} else {
-			err := namespaceAccessFunc(ctx)
-			if err != nil {
-				return err
-			}
-		}
-		return handler(srv, stream)
 	}
 }
 
