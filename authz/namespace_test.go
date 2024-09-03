@@ -286,7 +286,7 @@ func TestNamespaceAuthorizationFunc(t *testing.T) {
 	// Missing caller info
 	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("X-Stack-ID", "12"))
 	err := authFunc(ctx)
-	require.ErrorIs(t, err, ErrorMissingCallerInfo)
+	require.ErrorIs(t, err, ErrMissingCaller)
 
 	// Missing stack ID
 	ctx = claims.WithClaims(context.Background(), &authn.AuthInfo{

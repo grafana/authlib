@@ -17,7 +17,6 @@ const (
 
 var (
 	ErrorMissingMetadata              = status.Errorf(codes.Unauthenticated, "unauthenticated: missing metadata")
-	ErrorMissingCallerInfo            = status.Errorf(codes.Unauthenticated, "unauthenticated: missing caller auth info")
 	ErrorInvalidStackID               = status.Errorf(codes.Unauthenticated, "unauthenticated: invalid stack ID")
 	ErrorMissingIDToken               = status.Errorf(codes.Unauthenticated, "unauthenticated: missing id token")
 	ErrorMissingAccessToken           = status.Errorf(codes.Unauthenticated, "unauthenticated: missing access token")
@@ -146,7 +145,7 @@ func NamespaceAuthorizationFunc(na NamespaceAccessChecker, stackID StackIDExtrac
 	return func(ctx context.Context) error {
 		caller, ok := claims.From(ctx)
 		if !ok {
-			return ErrorMissingCallerInfo
+			return ErrMissingCaller
 		}
 
 		stackID, err := stackID(ctx)
