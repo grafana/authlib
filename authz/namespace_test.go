@@ -297,7 +297,7 @@ func TestNamespaceAuthorizationFunc(t *testing.T) {
 	require.ErrorIs(t, err, ErrorMissingMetadata)
 
 	// With caller info and stack ID
-	ctx = metadata.NewIncomingContext(context.Background(), metadata.Pairs("X-Stack-ID", "12"))
+	ctx = metadata.NewIncomingContext(context.Background(), metadata.Pairs(DefaultStackIDMetadataKey, "12"))
 	ctx = claims.WithClaims(ctx, &authn.AuthInfo{
 		AccessClaims:   authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stacks-12"}}),
 		IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stacks-12"}}),
