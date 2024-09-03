@@ -32,12 +32,14 @@ func TestUnaryAuthorizeInterceptor(t *testing.T) {
 		return expectedErr
 	}
 
+	// Test the interceptor with a normal handler.
 	interceptor := UnaryAuthorizeInterceptor(accessFunc)
 	_, err := interceptor(context.Background(), nil, &grpc.UnaryServerInfo{}, handler)
 	require.NoError(t, err)
 	require.True(t, handlerCalled)
 	require.True(t, accessCalled)
 
+	// Test the interceptor with a service that overrides the access function.
 	accessCalled = false
 	handlerCalled = false
 	srv := &serviceWithOverride{}
@@ -47,6 +49,7 @@ func TestUnaryAuthorizeInterceptor(t *testing.T) {
 	require.False(t, accessCalled)
 	require.True(t, srv.called)
 
+	// Test the interceptor with an error.
 	accessCalled = false
 	handlerCalled = false
 	expectedErr = ErrInvalidQuery
@@ -55,6 +58,7 @@ func TestUnaryAuthorizeInterceptor(t *testing.T) {
 	require.False(t, handlerCalled)
 	require.True(t, accessCalled)
 
+	// Test the interceptor with a service that overrides the access function and returns an error.
 	accessCalled = false
 	handlerCalled = false
 	srv = &serviceWithOverride{expErr: ErrInvalidQuery}
