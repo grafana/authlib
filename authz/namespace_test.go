@@ -4,11 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc/metadata"
-
 	"github.com/grafana/authlib/authn"
 	"github.com/grafana/authlib/claims"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/metadata"
 )
 
 func TestNamespaceAccessCheckerImpl_ValidateAccessTokenOnly(t *testing.T) {
@@ -274,4 +273,34 @@ func TestMetadataStackIDExtractor(t *testing.T) {
 			require.ErrorIs(t, err, tt.err)
 		})
 	}
+}
+
+func TestNamespaceAuthorizationFunc(t *testing.T) {
+	// New namespace access checker with ID claims verification
+	na := NewNamespaceAccessChecker(claims.CloudNamespaceFormatter, WithIDTokenNamespaceAccessCheckerOption(true))
+	stackIDExtractor := MetadataStackIDExtractor("X-Stack-ID")
+
+	authFunc := NamespaceAuthorizationFunc(na, stackIDExtractor)
+
+	// Missing caller info
+	ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("X-Stack-ID", "12"))
+	err := authFunc(ctx)
+	require.ErrorIs(t, err, ErrorMissingCallerInfo)
+
+	// Missing stack ID
+	ctx = claims.WithClaims(context.Background(), &authn.AuthInfo{
+		AccessClaims:   authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stacks-12"}}),
+		IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stacks-12"}}),
+	})
+	err = authFunc(ctx)
+	require.ErrorIs(t, err, ErrorMissingMetadata)
+
+	// With caller info and stack ID
+	ctx = metadata.NewIncomingContext(context.Background(), metadata.Pairs("X-Stack-ID", "12"))
+	ctx = claims.WithClaims(ctx, &authn.AuthInfo{
+		AccessClaims:   authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stacks-12"}}),
+		IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stacks-12"}}),
+	})
+	err = authFunc(ctx)
+	require.NoError(t, err)
 }
