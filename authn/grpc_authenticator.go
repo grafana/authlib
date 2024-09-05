@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"strings"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -56,6 +59,7 @@ type GrpcAuthenticator struct {
 	keyRetriever KeyRetriever
 	atVerifier   Verifier[AccessTokenClaims]
 	idVerifier   Verifier[IDTokenClaims]
+	tracer       trace.Tracer
 }
 
 func WithKeyRetrieverOption(kr KeyRetriever) GrpcAuthenticatorOption {
@@ -78,6 +82,13 @@ func WithIDTokenAuthOption(required bool) GrpcAuthenticatorOption {
 func WithDisableAccessTokenAuthOption() GrpcAuthenticatorOption {
 	return func(ga *GrpcAuthenticator) {
 		ga.cfg.accessTokenAuthEnabled = false
+	}
+}
+
+// WithTracerAuthOption sets the tracer for the gRPC authenticator.
+func WithTracerAuthOption(tracer trace.Tracer) GrpcAuthenticatorOption {
+	return func(c *GrpcAuthenticator) {
+		c.tracer = tracer
 	}
 }
 
@@ -141,19 +152,26 @@ func NewUnsafeGrpcAuthenticator(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthen
 
 // Authenticate authenticates the incoming request based on the access token and ID token, and returns the context with the caller information.
 func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context, error) {
+	ctx, span := ga.tracer.Start(ctx, "GrpcAuthenticator.Authenticate")
+	defer span.End()
+
 	authInfo := AuthInfo{}
 
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
+		span.RecordError(ErrorMissingMetadata)
 		return nil, ErrorMissingMetadata
 	}
 
 	if ga.cfg.accessTokenAuthEnabled {
 		atClaims, err := ga.authenticateService(ctx, md)
 		if err != nil {
+			span.RecordError(err)
 			return nil, err
 		}
 		if atClaims != nil {
+			span.SetAttributes(attribute.Bool("with_accesstoken", true))
+			span.SetAttributes(attribute.String("service", atClaims.Subject))
 			authInfo.AccessClaims = &Access{claims: *atClaims}
 		}
 	}
@@ -161,9 +179,12 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 	if ga.cfg.idTokenAuthEnabled {
 		idClaims, err := ga.authenticateUser(ctx, md)
 		if err != nil {
+			span.RecordError(err)
 			return nil, err
 		}
 		if idClaims != nil {
+			span.SetAttributes(attribute.Bool("with_idtoken", true))
+			span.SetAttributes(attribute.String("user", idClaims.Subject))
 			authInfo.IdentityClaims = NewIdentityClaims(*idClaims)
 		}
 	}
@@ -175,6 +196,7 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 
 		if !accessToken.IsNil() && !identityToken.IsNil() {
 			if !claims.NamespaceMatches(accessToken, identityToken.Namespace()) {
+				span.RecordError(ErrorNamespacesMismatch)
 				return nil, ErrorNamespacesMismatch
 			}
 		}
@@ -250,6 +272,10 @@ func newGrpcAuthenticatorCommon(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthen
 	ga := &GrpcAuthenticator{cfg: cfg}
 	for _, opt := range opts {
 		opt(ga)
+	}
+
+	if ga.tracer == nil {
+		ga.tracer = otel.Tracer("authn.GrpcAuthenticator")
 	}
 
 	return ga

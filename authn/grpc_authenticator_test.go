@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/trace/noop"
 	"google.golang.org/grpc/metadata"
 
 	"github.com/grafana/authlib/claims"
@@ -29,6 +30,7 @@ func setupGrpcAuthenticator() *testEnv {
 		cfg:        &GrpcAuthenticatorConfig{idTokenAuthEnabled: true, idTokenAuthRequired: true},
 		atVerifier: env.atVerifier,
 		idVerifier: env.idVerifier,
+		tracer:     noop.NewTracerProvider().Tracer("noopTracer"),
 	}
 	setGrpcAuthenticatorCfgDefaults(env.authenticator.cfg)
 
