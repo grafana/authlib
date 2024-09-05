@@ -3,7 +3,11 @@ package authn
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
@@ -38,6 +42,7 @@ type GrpcClientInterceptor struct {
 	cfg                *GrpcClientConfig
 	tokenClient        TokenExchanger
 	metadataExtractors []ContextMetadataExtractor
+	tracer             trace.Tracer
 }
 
 type ContextMetadataExtractor func(context.Context) (key string, values []string, err error)
@@ -76,6 +81,13 @@ func WithDisableAccessTokenOption() GrpcClientInterceptorOption {
 	}
 }
 
+// WithTracerOption sets the tracer for the gRPC authenticator.
+func WithTracerOption(tracer trace.Tracer) GrpcClientInterceptorOption {
+	return func(c *GrpcClientInterceptor) {
+		c.tracer = tracer
+	}
+}
+
 func setGrpcClientCfgDefaults(cfg *GrpcClientConfig) {
 	if cfg.AccessTokenMetadataKey == "" {
 		cfg.AccessTokenMetadataKey = DefaultAccessTokenMetadataKey
@@ -92,6 +104,10 @@ func NewGrpcClientInterceptor(cfg *GrpcClientConfig, opts ...GrpcClientIntercept
 
 	for _, opt := range opts {
 		opt(gci)
+	}
+
+	if gci.tracer == nil {
+		gci.tracer = otel.Tracer("authn.GrpcClientInterceptor")
 	}
 
 	if gci.cfg.TokenRequest == nil && gci.cfg.accessTokenAuthEnabled {
@@ -114,6 +130,9 @@ func NewGrpcClientInterceptor(cfg *GrpcClientConfig, opts ...GrpcClientIntercept
 }
 
 func (gci *GrpcClientInterceptor) UnaryClientInterceptor(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+	ctx, span := gci.tracer.Start(ctx, "GrpcClientInterceptor.UnaryClientInterceptor")
+	defer span.End()
+
 	ctx, err := gci.wrapContext(ctx)
 	if err != nil {
 		return err
@@ -123,6 +142,9 @@ func (gci *GrpcClientInterceptor) UnaryClientInterceptor(ctx context.Context, me
 }
 
 func (gci *GrpcClientInterceptor) StreamClientInterceptor(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+	ctx, span := gci.tracer.Start(ctx, "GrpcClientInterceptor.StreamClientInterceptor")
+	defer span.End()
+
 	ctx, err := gci.wrapContext(ctx)
 	if err != nil {
 		return nil, err
@@ -132,23 +154,31 @@ func (gci *GrpcClientInterceptor) StreamClientInterceptor(ctx context.Context, d
 }
 
 func (gci *GrpcClientInterceptor) wrapContext(ctx context.Context) (context.Context, error) {
+	ctx, span := gci.tracer.Start(ctx, "GrpcClientInterceptor.wrapContext")
+	defer span.End()
+
 	md := metadata.Pairs()
 
 	if gci.cfg.accessTokenAuthEnabled {
 		token, err := gci.tokenClient.Exchange(ctx, *gci.cfg.TokenRequest)
 		if err != nil {
+			span.RecordError(err)
 			return ctx, err
 		}
 
 		md.Set(gci.cfg.AccessTokenMetadataKey, token.Token)
 	}
 
+	keys := make([]string, 0, len(gci.metadataExtractors))
 	for _, extract := range gci.metadataExtractors {
 		k, v, err := extract(ctx)
 		if err != nil {
+			span.RecordError(err)
 			return ctx, err
 		}
+		keys = append(keys, k)
 		md.Set(k, v...)
+		span.SetAttributes(attribute.String("keys", strings.Join(keys, ",")))
 	}
 
 	return metadata.NewOutgoingContext(ctx, md), nil
