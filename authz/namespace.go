@@ -89,7 +89,7 @@ func NewNamespaceAccessChecker(namespaceFmt claims.NamespaceFormatter, opts ...N
 	}
 
 	if na.tracer == nil {
-		na.tracer = noop.NewTracerProvider().Tracer("authn.NamespaceAccessChecker")
+		na.tracer = noop.Tracer{}
 	}
 
 	return na
