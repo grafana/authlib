@@ -4,8 +4,8 @@ import (
 	"context"
 	"strconv"
 
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
-	"go.opentelemetry.io/otel/trace/noop"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -88,7 +88,7 @@ func NewNamespaceAccessChecker(namespaceFmt claims.NamespaceFormatter, opts ...N
 	}
 
 	if na.tracer == nil {
-		na.tracer = noop.NewTracerProvider().Tracer("authn.NamespaceAccessChecker")
+		na.tracer = otel.Tracer("authn.NamespaceAccessChecker")
 	}
 
 	return na
