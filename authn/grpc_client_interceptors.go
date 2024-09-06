@@ -166,6 +166,7 @@ func (gci *GrpcClientInterceptor) wrapContext(ctx context.Context) (context.Cont
 			return ctx, err
 		}
 
+		span.SetAttributes(attribute.Bool("with_accesstoken", true))
 		md.Set(gci.cfg.AccessTokenMetadataKey, token.Token)
 	}
 
