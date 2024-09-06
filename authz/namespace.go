@@ -4,6 +4,7 @@ import (
 	"context"
 	"strconv"
 
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
 	"google.golang.org/grpc/codes"
@@ -97,6 +98,7 @@ func NewNamespaceAccessChecker(namespaceFmt claims.NamespaceFormatter, opts ...N
 func (na *NamespaceAccessCheckerImpl) CheckAccess(ctx context.Context, caller claims.AuthInfo, expectedNamespace string) error {
 	_, span := na.tracer.Start(ctx, "NamespaceAccessChecker.CheckAccess")
 	defer span.End()
+	span.SetAttributes(attribute.String("expectedNamespace", expectedNamespace))
 
 	if na.idTokenEnabled {
 		idClaims := caller.GetIdentity()
