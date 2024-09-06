@@ -8,9 +8,9 @@ import (
 	"fmt"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -145,7 +145,7 @@ func NewLegacyClient(cfg *MultiTenantClientConfig, opts ...LegacyClientOption) (
 	}
 
 	if client.tracer == nil {
-		client.tracer = otel.Tracer("authz.LegacyClient")
+		client.tracer = noop.Tracer{}
 	}
 
 	// Instantiate the client

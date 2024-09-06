@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
@@ -107,7 +107,7 @@ func NewGrpcClientInterceptor(cfg *GrpcClientConfig, opts ...GrpcClientIntercept
 	}
 
 	if gci.tracer == nil {
-		gci.tracer = otel.Tracer("authn.GrpcClientInterceptor")
+		gci.tracer = noop.Tracer{}
 	}
 
 	if gci.cfg.TokenRequest == nil && gci.cfg.accessTokenAuthEnabled {
