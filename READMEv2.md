@@ -11,7 +11,7 @@ The `Authlib` library provides a modular and secure approach to handling authent
 - **Modular Design:** Built with three core packages:
   - **`claims`:** Abstracts token formats.
   - **`authz`:** Handles authorization logic ([See Readme for more details](./authn/README.md)):
-    - Single-tenant RBAC client. For plugins to query Grafana for user permissions and control their access.
+    - Single-tenant RBAC client, typically used by plugins to query Grafana for user permissions and control their access.
     - **[unstable / under development]** Multi-tenant client, typically used by multi-tenant applications to enforce service and user access.
     - A composable namespace checker to authorize requests based on JWT namespaces
   - **`authn`:** Manages token retrieval and verification ([See Readme for more details](./authz/README.md)):
