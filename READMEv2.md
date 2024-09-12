@@ -7,7 +7,7 @@ The `Authlib` library provides a modular and secure approach to handling authent
 ### Key Features
 
 - **Composability:** Deploy in various configurations: in-process, on-premises gRPC, or Cloud gRPC.
-- **OAuth2-Inspired Security:** Leverage familiar JWT-based authentication and authorization for robust security.
+- **OAuth2-Inspired Security:** Leverages familiar JWT-based authentication and authorization for robust security.
 - **Modular Design:** Built with three core packages:
   - **`claims`:** Abstracts token formats.
   - **`authz`:** Handles authorization logic ([See Readme for more details](./authn/README.md)):
@@ -32,7 +32,7 @@ The library leverages JWT (JSON Web Token) for secure communication and authoriz
 ### How it works
 
 1. **Component Identification:** Grafana, applications, and services identify themselves using JWT access tokens.
-2. **Authentication:** Upon receiving requests, services verify the authenticity of the access token and also checks if its own identifier (e.g., service name) is present in the token's audience list. This confirms the caller is authorized to interact with this specific service.
+2. **Authentication:** Upon receiving requests, services verify the authenticity of the access token and also check if their own identifier (e.g., service name) is present in the token's audience list. This confirms the caller is authorized to interact with these specific services.
 3. **Service Authorization:** Upon receiving requests, services verify the caller is allowed to access the requested resources namespace. Access tokens, contain a list of permitted actions (e.g., `datasources:write`, `folders:create`), that allow for finer-grained access control.
 4. **Service Delegation:** Services can perform actions on behalf of users with provided access and ID tokens. Upon receiving requests, services verify both tokens namespace match the requested resources namespace. Access tokens, contain a list of permitted delegated actions (e.g. `teams:read`), that allow for finer-grained access control.
 
@@ -73,7 +73,7 @@ func main() {
     channel := &inprocgrpc.Channel{}
 
     // A grpc service
-    server := MyService{}
+    service := MyService{}
 
     // For in-process communications, this authenticator bypasses
     // ID token signature checks, requiring only a valid ID token.
@@ -90,7 +90,7 @@ func main() {
             auth.UnaryServerInterceptor(authenticator.Authenticate),
             auth.StreamServerInterceptor(authenticator.Authenticate),
         ),
-        server,
+        service,
     )
 
     // For in-process communications, the client side adds id-tokens
@@ -103,6 +103,8 @@ func main() {
 
     // Instantiate the client side of the grpc channel
     conn := grpchan.InterceptClientConn(channel, clientInt.UnaryClientInterceptor, clientInt.StreamClientInterceptor))
+
+    // ...
 }
 ```
 
@@ -110,32 +112,68 @@ func main() {
 
 **Diagram:**
 
-![cloud deployment](./assets/remote.png)
+![remote deployment](./assets/remote.png)
 
 **Code Example - Server side:**
 
 ```go
 import (
     authnlib "github.com/grafana/authlib/authn"
+    authzlib "github.com/grafana/authlib/authz"
     "github.com/grafana/authlib/claims"
     "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/auth"
     "google.golang.org/grpc"
 )
 
-func NewGrpcAuthenticator() (*authnlib.GrpcAuthenticator, error) {
-    grpcAuthCfg := authnlib.GrpcAuthenticatorConfig{
-        KeyRetrieverConfig: authnlib.KeyRetrieverConfig{
-            SigningKeysURL: "https://token-signer/v1/keys",
-        },
-        VerifierConfig: authnlib.VerifierConfig{
-            AllowedAudiences: []string{"MyService"},
-        },
-    }
+func main() (*authnlib.GrpcAuthenticator, error) {
+    // A grpc service
+    service := MyService{}
 
+    // For remote communication, this authenticator ensures secure access by:
+    //  1. Validating ID and access tokens against the signing server's keys.
+    //  2. Verifying this service's identifier is present in the access token's
+    //     audience list, confirming intended authorization.
     authenticator := authnlib.NewGrpcAuthenticator(
-        &grpcAuthCfg,
+        &authnlib.GrpcAuthenticatorConfig{
+            KeyRetrieverConfig: authnlib.KeyRetrieverConfig{
+                SigningKeysURL: "https://token-signer/v1/keys",
+            },
+            VerifierConfig: authnlib.VerifierConfig{
+                AllowedAudiences: []string{"MyService"},
+            },
+        },
         authnlib.WithIDTokenAuthOption(true),
     )
+
+    //  Beyond token verification, this enforces access control at the
+    //  namespace level. Only authorized users/services can access
+    //  resources within a given namespace.
+    namespaceAuthz = authzlib.NamespaceAuthorizationFunc(
+        // The checker will verify both access and id token
+        // are authorized to access the namespace.
+		authzlib.NewNamespaceAccessChecker(
+            claims.CloudNamespaceFormatter,
+            authzlib.WithIDTokenNamespaceAccessCheckerOption(true),
+        ),
+        // Method to extract the namespace that is being targeted.
+        // Here we use gRPC metadata.
+		authzlib.MetadataStackIDExtractor(authzlib.DefaultStackIDMetadataKey),
+	)
+
+    // Create a new grpc server
+    server = grpc.NewServer(
+        grpc.ChainUnaryInterceptor(
+            auth.UnaryServerInterceptor(authenticator.Authenticate),
+            authzlib.UnaryAuthorizeInterceptor(namespaceAuthz),
+        ),
+        grpc.ChainStreamInterceptor(
+            auth.StreamServerInterceptor(authenticator.Authenticate),
+            authzlib.StreamAuthorizeInterceptor(namespaceAuthz),
+        ),
+    )
+    server.RegisterService(&authzv1.MyService_ServiceDesc, service)
+
+    // ...
 }
 
 
