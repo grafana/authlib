@@ -7,7 +7,7 @@ The `Authlib` library provides a modular and secure approach to handling authent
 ### Key Features
 
 - **Composability:** Deploy in various configurations: in-process, on-premises gRPC, or Cloud gRPC.
-- **OAuth2-Inspired Security:** Leverages familiar JWT-based authentication and authorization for robust security.
+- **OAuth2-Inspired Security:** Leverage familiar JWT-based authentication and authorization for robust security.
 - **Modular Design:** Built with three core packages:
   - **`claims`:** Abstracts token formats.
   - **`authz`:** Handles authorization logic ([See Readme for more details](./authn/README.md)):
@@ -32,7 +32,7 @@ The library leverages JWT (JSON Web Token) for secure communication and authoriz
 ### How it works
 
 1. **Component Identification:** Grafana, applications, and services identify themselves using JWT access tokens.
-2. **Authentication:** Upon receiving requests, services verify the authenticity of the access token and ensure the caller (identified by the "audience" field) is authorized.
+2. **Authentication:** Upon receiving requests, services verify the authenticity of the access token and also checks if its own identifier (e.g., service name) is present in the token's audience list. This confirms the caller is authorized to interact with this specific service.
 3. **Service Authorization:** Upon receiving requests, services verify the caller is allowed to access the requested resources namespace. Access tokens, contain a list of permitted actions (e.g., `datasources:write`, `folders:create`), that allow for finer-grained access control.
 4. **Service Delegation:** Services can perform actions on behalf of users with provided access and ID tokens. Upon receiving requests, services verify both tokens namespace match the requested resources namespace. Access tokens, contain a list of permitted delegated actions (e.g. `teams:read`), that allow for finer-grained access control.
 
@@ -106,30 +106,39 @@ func main() {
 }
 ```
 
-#### 2. On-Premise gRPC Deployment
+#### 2. Remote gRPC Deployment
 
 **Diagram:**
 
-[Insert Diagram for On-Premise gRPC Deployment]
+![cloud deployment](./assets/remote.png)
 
-**Code Example:**
+**Code Example - Server side:**
 
-```
-// Example: On-premise gRPC communication using the library
-// ... Code snippet demonstrating on-premise gRPC communication ...
-```
+```go
+import (
+    authnlib "github.com/grafana/authlib/authn"
+    "github.com/grafana/authlib/claims"
+    "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/auth"
+    "google.golang.org/grpc"
+)
 
-#### 3. Cloud gRPC Deployment
+func NewGrpcAuthenticator() (*authnlib.GrpcAuthenticator, error) {
+    grpcAuthCfg := authnlib.GrpcAuthenticatorConfig{
+        KeyRetrieverConfig: authnlib.KeyRetrieverConfig{
+            SigningKeysURL: "https://token-signer/v1/keys",
+        },
+        VerifierConfig: authnlib.VerifierConfig{
+            AllowedAudiences: []string{"MyService"},
+        },
+    }
 
-**Diagram:**
+    authenticator := authnlib.NewGrpcAuthenticator(
+        &grpcAuthCfg,
+        authnlib.WithIDTokenAuthOption(true),
+    )
+}
 
-[Insert Diagram for Cloud gRPC Deployment]
 
-**Code Example:**
-
-```
-// Example: Cloud gRPC communication using the library
-// ... Code snippet demonstrating Cloud gRPC communication ...
 ```
 
 ### Getting Started
