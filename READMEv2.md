@@ -243,18 +243,6 @@ func main() {
 }
 ```
 
-### Getting Started
-
-[Provide concise and clear instructions on how to get started with the library, including installation, configuration, and usage examples.]
-
-### Documentation
-
-For detailed information and advanced usage, please refer to our comprehensive documentation: [Link to Documentation]
-
-### Contributing
-
-We welcome contributions! See our [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
 ### License
 
-This project is licensed under the [License Name] - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache-2.0 license - see the [LICENSE](LICENSE) file for details.
