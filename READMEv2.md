@@ -47,25 +47,25 @@ The library leverages JWT (JSON Web Token) for secure communication and authoriz
 ```go
 import (
     "github.com/fullstorydev/grpchan"
-	"github.com/fullstorydev/grpchan/inprocgrpc"
+    "github.com/fullstorydev/grpchan/inprocgrpc"
     authnlib "github.com/grafana/authlib/authn"
-	"github.com/grafana/authlib/claims"
+    "github.com/grafana/authlib/claims"
     "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/auth"
-	"google.golang.org/grpc"
+    "google.golang.org/grpc"
 )
 
 func idTokenExtractor(ctx context.Context) (string, error) {
-	authInfo, ok := claims.From(ctx)
-	if !ok {
-		return "", fmt.Errorf("no claims found")
-	}
+    authInfo, ok := claims.From(ctx)
+    if !ok {
+        return "", fmt.Errorf("no claims found")
+    }
 
-	extra := authInfo.GetExtra()
-	if token, exists := extra["id-token"]; exists && len(token) != 0 && token[0] != "" {
-		return token[0], nil
-	}
+    extra := authInfo.GetExtra()
+    if token, exists := extra["id-token"]; exists && len(token) != 0 && token[0] != "" {
+        return token[0], nil
+    }
 
-	return "", fmt.Errorf("id-token not found")
+    return "", fmt.Errorf("id-token not found")
 }
 
 func main() {
@@ -84,22 +84,22 @@ func main() {
     )
 
     // Instantiate the server side of the grpc channel
-	channel.RegisterService(
-		grpchan.InterceptServer(
-			&MyService_ServiceDesc,
-			auth.UnaryServerInterceptor(authenticator.Authenticate),
-			auth.StreamServerInterceptor(authenticator.Authenticate),
-		),
-		server,
-	)
+    channel.RegisterService(
+        grpchan.InterceptServer(
+            &MyService_ServiceDesc,
+            auth.UnaryServerInterceptor(authenticator.Authenticate),
+            auth.StreamServerInterceptor(authenticator.Authenticate),
+        ),
+        server,
+    )
 
     // For in-process communications, the client side adds id-tokens
     // to the metadata of the outgoing context
-	clientInt, _ := authnlib.NewGrpcClientInterceptor(
-		&authnlib.GrpcClientConfig{},
-		authnlib.WithDisableAccessTokenOption(),
-		authnlib.WithIDTokenExtractorOption(idTokenExtractor),
-	)
+    clientInt, _ := authnlib.NewGrpcClientInterceptor(
+        &authnlib.GrpcClientConfig{},
+        authnlib.WithDisableAccessTokenOption(),
+        authnlib.WithIDTokenExtractorOption(idTokenExtractor),
+    )
 
     // Instantiate the client side of the grpc channel
     conn := grpchan.InterceptClientConn(channel, clientInt.UnaryClientInterceptor, clientInt.StreamClientInterceptor))
