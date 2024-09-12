@@ -7,7 +7,7 @@ The `Authlib` library provides a modular and secure approach to handling authent
 ### Key Features
 
 - **Composability:** Deploy in various configurations: in-process, on-premises gRPC, or Cloud gRPC.
-- **OAuth2-Inspired Security:** Leverage familiar JWT-based authentication and authorization for robust security.
+- **OAuth2-Inspired Security:** Leverages familiar JWT-based authentication and authorization for robust security.
 - **Modular Design:** Built with three core packages:
   - **`claims`:** Abstracts token formats.
   - **`authz`:** Handles authorization logic ([See Readme for more details](./authn/README.md)):
