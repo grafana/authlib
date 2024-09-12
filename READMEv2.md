@@ -54,6 +54,7 @@ import (
     "google.golang.org/grpc"
 )
 
+// idTokenExtractor is a helper function to get the user ID Token from context
 func idTokenExtractor(ctx context.Context) (string, error) {
     authInfo, ok := claims.From(ctx)
     if !ok {
@@ -175,8 +176,71 @@ func main() (*authnlib.GrpcAuthenticator, error) {
 
     // ...
 }
+```
 
+**Code Example - Client side:**
 
+```go
+import (
+    authnlib "github.com/grafana/authlib/authn"
+    authzlib "github.com/grafana/authlib/authz"
+    "github.com/grafana/authlib/claims"
+    "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/auth"
+    "google.golang.org/grpc"
+)
+
+// idTokenExtractor is a helper function to get the user ID Token from context
+func idTokenExtractor(ctx context.Context) (string, error) {
+    authInfo, ok := claims.From(ctx)
+    if !ok {
+        return "", fmt.Errorf("no claims found")
+    }
+
+    extra := authInfo.GetExtra()
+    if token, exists := extra["id-token"]; exists && len(token) != 0 && token[0] != "" {
+        return token[0], nil
+    }
+
+    return "", fmt.Errorf("id-token not found")
+}
+
+// stackIdExtractor is a helper function used to populate gRPC metadata with the StackID
+func stackIdExtractor(stackID string) func(ctx context.Context) (key string, values []string, err error) {
+	return func(ctx context.Context) (key string, values []string, err error) {
+		return authzlib.DefaultStackIDMetadataKey, []string{stackID}, nil
+	}
+}
+
+func main() {
+    // The client interceptor authenticates requests to the gRPC server using
+	// the provided TokenExchangeConfig. It automatically handles token exchange
+	// and injects the ID token along with the extracted StackID into the request metadata.
+	clientInt, err := authnlib.NewGrpcClientInterceptor(
+        &authnlib.GrpcClientConfig{
+            TokenClientConfig: &authnlib.TokenExchangeConfig{
+                Token:            "myClientToken",
+                TokenExchangeURL: "https://token-signer/v1/sign-access-token",
+            },
+            TokenRequest: &authnlib.TokenExchangeRequest{
+                Namespace: "stacks-22",
+                Audiences: []string{"MyService"},
+            },
+        },
+		authnlib.WithIDTokenExtractorOption(idTokenExtractor),
+		authnlib.WithMetadataExtractorOption(stackIdExtractor(22)),
+    )
+	if err != nil {
+		os.Exit(1)
+	}
+
+	conn, err := grpc.NewClient(
+        "myService:10000",
+        grpc.WithUnaryInterceptor(clientInt.UnaryClientInterceptor),
+        grpc.WithStreamInterceptor(clientInt.StreamClientInterceptor),
+    )
+
+    // ...
+}
 ```
 
 ### Getting Started
