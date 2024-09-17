@@ -2,7 +2,6 @@ package authz
 
 import (
 	"context"
-	"strconv"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -139,44 +138,39 @@ func (na *NamespaceAccessCheckerImpl) CheckAccessByID(ctx context.Context, calle
 	return na.CheckAccess(ctx, caller, expectedNamespace)
 }
 
-type StackIDExtractors func(context.Context) (int64, error)
+type NamespaceExtractor func(context.Context) (string, error)
 
 // MetadataStackIDExtractor extracts the stack ID from the gRPC metadata.
-func MetadataStackIDExtractor(key string) StackIDExtractors {
-	return func(ctx context.Context) (int64, error) {
+func MetadataNamespaceExtractor(key string) NamespaceExtractor {
+	return func(ctx context.Context) (string, error) {
 		md, ok := metadata.FromIncomingContext(ctx)
 		if !ok {
-			return 0, ErrorMissingMetadata
+			return "", ErrorMissingMetadata
 		}
-		stackIDStr, ok := getFirstMetadataValue(md, key)
+		namespace, ok := getFirstMetadataValue(md, key)
 		if !ok {
-			return 0, ErrorMissingMetadata
+			return "", ErrorMissingMetadata
 		}
 
-		stackID, err := strconv.ParseInt(stackIDStr, 10, 64)
-		if err != nil {
-			return 0, ErrorInvalidStackID
-		}
-
-		return stackID, nil
+		return namespace, nil
 	}
 }
 
 // NamespaceAuthorizationFunc returns a AuthorizeFunc that checks the caller claims access to a given namespace.
 // This function can be used with UnaryAuthorizeInterceptor and StreamAuthorizeInterceptor.
-func NamespaceAuthorizationFunc(na NamespaceAccessChecker, stackID StackIDExtractors) AuthorizeFunc {
+func NamespaceAuthorizationFunc(na NamespaceAccessChecker, nsExtract NamespaceExtractor) AuthorizeFunc {
 	return func(ctx context.Context) error {
 		caller, ok := claims.From(ctx)
 		if !ok {
 			return ErrMissingCaller
 		}
 
-		stackID, err := stackID(ctx)
+		namespace, err := nsExtract(ctx)
 		if err != nil {
 			return err
 		}
 
-		return na.CheckAccessByID(ctx, caller, stackID)
+		return na.CheckAccess(ctx, caller, namespace)
 	}
 }
 
