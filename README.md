@@ -27,6 +27,8 @@ The `Authlib` library provides a modular and secure approach to handling authent
 
 ## How it works for Grafana Plugins
 
+<!-- TODO (gamab) Document and link -->
+
 ## How it works for Grafana Apps
 
 The library leverages JWT (JSON Web Token) for secure communication and authorization, ensuring only authorized entities access resources.

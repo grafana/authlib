@@ -48,12 +48,15 @@ This package simplifies the implementation of authentication within your gRPC se
 
 **Key Components:**
 
-- Client-Side Interceptor: Request access tokens from the Token Signing Server and enrich your gRPC requests with necessary metadata. This modular interceptor allows you to customize the added metadata based on your specific service requirements (e.g: user ID token, requested namespace).
-- Server-Side Authenticator: Easily verify the validity of access tokens (and optionally ID tokens) against the Token Signing Server's public keys. This authenticator integrates directly with the standard grpc-ecosystem/go-grpc-middleware/auth interceptor for straightforward implementation.
+- **Client-Side Interceptor**: Request access tokens from the Token Signing Server and enrich your gRPC requests with necessary metadata. This modular interceptor allows you to customize the added metadata based on your specific service requirements (e.g: user ID token, requested namespace).
+- **Server-Side Authenticator**: Easily verify the validity of access tokens (and optionally ID tokens) against the Token Signing Server's public keys. This authenticator integrates directly with the standard grpc-ecosystem/go-grpc-middleware/auth interceptor for straightforward implementation.
 
 ### Example 1: Full authentication example with ID and Access Tokens
 
-<!-- TODO(gamab) add comment -->
+In this first example:
+
+- We configure the client interceptor to interact with the `MyService` gRPC service. This interceptor uses its own `myClientToken` to request an access token from the token signing service at "/v1/sign-access-token". The requested access token will grant access to the `MyService` for the `stacks-22` namespace. The interceptor will also add the incoming user's ID token to the metadata, along with the stack ID using the `X-Stack-ID` key. We assume that `MyService` requires this additional Stack ID metadata to determine which stack is being queried.
+- On the server side, we set up the interceptor for the `MyService` service. This interceptor extracts the access and ID tokens from the gRPC metadata. It then populates the application context with an `AuthInfo` object. Functions within `MyService` can use this `AuthInfo` object to access information about the caller (such as their permissions).
 
 **Diagram:**
 
@@ -167,7 +170,10 @@ func main() (*authnlib.GrpcAuthenticator, error) {
 
 ### Example 2: Custom authentication flow with ID Token only and a custom metadata
 
-<!-- TODO(gamab) add comment -->
+In this second example:
+
+- We configure the client interceptor to interact with the `MyService` gRPC service. This interceptor does not request an access token to interact with the `MyService` service but still adds the incoming user's ID token to the metadata, along with the `namespace` using the `Custom-Namespace-Metadata` key. We assume that `MyService` requires this additional `namespace` metadata to determine which namespace is being queried.
+- On the server side, we set up the interceptor for the `MyService` service. This interceptor solely extracts the ID tokens from the gRPC metadata. It then populates the application context with an `AuthInfo` object. Functions within `MyService` can use this `AuthInfo` object to access information about the user.
 
 **Diagram:**
 
