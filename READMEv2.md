@@ -10,14 +10,14 @@ The `Authlib` library provides a modular and secure approach to handling authent
 - **OAuth2-Inspired Security:** Leverages familiar JWT-based authentication and authorization for robust security.
 - **Modular Design:** Built with three core packages:
   - **`claims`:** Abstracts token formats.
-  - **`authz`:** Handles authorization logic ([See Readme for more details](./authn/README.md)):
-    - Single-tenant RBAC client, typically used by plugins to query Grafana for user permissions and control their access.
-    - **[unstable / under development]** Multi-tenant client, typically used by multi-tenant applications to enforce service and user access.
-    - A composable namespace checker to authorize requests based on JWT namespaces
-  - **`authn`:** Manages token retrieval and verification ([See Readme for more details](./authz/README.md)):
+  - **[`authn`](./authn/README.md):** Manages token retrieval and verification:
     - Generic JWT verifier with support for custom claims
     - Specialized verifiers for Grafana ID Tokens and Access Tokens
     - Composable gRPC interceptors for retrieving/adding and verifying tokens in request metadata
+  - **[`authz`](./authz/README.md):** Handles authorization logic:
+    - Single-tenant RBAC client, typically used by plugins to query Grafana for user permissions and control their access.
+    - **[unstable / under development]** Multi-tenant client, typically used by multi-tenant applications to enforce service and user access.
+    - A composable namespace checker to authorize requests based on JWT namespaces
 
 ### Why Choose `Authlib`?
 
@@ -25,16 +25,16 @@ The `Authlib` library provides a modular and secure approach to handling authent
 - **Simplified Authentication & Authorization:** Focus on your application logic, not complex security implementations.
 - **Flexible Deployment:** Adapt to our various deployments with ease.
 
-## Deployment Scenarios & Examples
+## How it works for Grafana Plugins
+
+## How it works for Grafana Apps
 
 The library leverages JWT (JSON Web Token) for secure communication and authorization, ensuring only authorized entities access resources.
 
-### How it works
-
 1. **Component Identification:** Grafana, applications, and services identify themselves using JWT access tokens.
 2. **Authentication:** Upon receiving requests, services verify the authenticity of the access token and also check if their own identifier (e.g., service name) is present in the token's audience list. This confirms the caller is authorized to interact with these specific services.
-3. **Service Authorization:** Upon receiving requests, services verify the caller is allowed to access the requested resources namespace. Access tokens, contain a list of permitted actions (e.g., `datasources:write`, `folders:create`), that allow for finer-grained access control.
-4. **Service Delegation:** Services can perform actions on behalf of users with provided access and ID tokens. Upon receiving requests, services verify both tokens namespace match the requested resources namespace. Access tokens, contain a list of permitted delegated actions (e.g. `teams:read`), that allow for finer-grained access control.
+3. **Service Authorization:** Upon receiving requests, services verify the caller is allowed to access the requested resources namespace (e.g., `stacks-22`). Access tokens, contain a list of permitted actions (e.g., `datasources:write`, `folders:create`), that allow for finer-grained access control.
+4. **Service Delegation (aka On-Behalf-Of):** Services can perform actions on behalf of users with provided access and ID tokens. Upon receiving requests, services verify both tokens namespace match the requested resources namespace. Access tokens, contain a list of permitted delegated actions (e.g. `teams:read`), that allow for finer-grained access control.
 
 ### 1. In-Process Deployment
 
@@ -109,7 +109,7 @@ func main() {
 }
 ```
 
-#### 2. Remote gRPC Deployment
+### 2. Remote gRPC Deployment
 
 **Diagram:**
 
