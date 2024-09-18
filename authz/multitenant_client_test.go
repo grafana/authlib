@@ -64,6 +64,18 @@ func TestNewController(t *testing.T) {
 			},
 		},
 		{
+			name: "User has the action on a attribute specific wildcard",
+			resp: &authzv1.ReadResponse{
+				Found: true,
+				Data:  []*authzv1.ReadResponse_Data{{Object: "dashboards:uid:*"}},
+			},
+			want: &controller{
+				Found:    true,
+				Scopes:   map[string]bool{},
+				Wildcard: map[string]bool{"dashboards": true},
+			},
+		},
+		{
 			name: "User has the action on a wildcard and a specific scope",
 			resp: &authzv1.ReadResponse{
 				Found: true,
@@ -192,6 +204,15 @@ func TestController_Check(t *testing.T) {
 				Wildcard: map[string]bool{"*": true},
 			},
 			resources: []Resource{{Kind: "dashboards", Attr: "uid", ID: "1"}},
+			want:      true,
+		},
+		{
+			name: "User can access all resources of a kind thanks to wildcard",
+			ctrl: controller{
+				Found:    true,
+				Wildcard: map[string]bool{"dashboards": true},
+			},
+			resources: []Resource{{Kind: "dashboards", Attr: "*", ID: "*"}},
 			want:      true,
 		},
 		{
@@ -435,6 +456,47 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 				Contextual: []Resource{{Kind: "folders", Attr: "uid", ID: "2"}, {Kind: "folders", Attr: "uid", ID: "1"}},
 			},
 			res:  readRes{found: true, userPermissions: []string{"folders:uid:1"}},
+			want: true,
+		},
+		{
+			name: "On behalf of, wildcard check",
+			req: CheckRequest{
+				Caller: &authn.AuthInfo{
+					AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
+						Claims: &jwt.Claims{Subject: "service"},
+						Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards:read"}},
+					}),
+					IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{
+						Claims: &jwt.Claims{Subject: "user:1"},
+						Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+					}),
+				},
+				StackID:  12,
+				Action:   "dashboards:read",
+				Resource: &Resource{Kind: "dashboards", Attr: "*", ID: "*"},
+			},
+			res:  readRes{found: true, userPermissions: []string{"dashboards:uid:*"}},
+			want: true,
+		},
+		{
+			name: "On behalf of, contextual wildcard check",
+			req: CheckRequest{
+				Caller: &authn.AuthInfo{
+					AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
+						Claims: &jwt.Claims{Subject: "service"},
+						Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards:read"}},
+					}),
+					IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{
+						Claims: &jwt.Claims{Subject: "user:1"},
+						Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+					}),
+				},
+				StackID:    12,
+				Action:     "dashboards:read",
+				Resource:   &Resource{Kind: "dashboards", Attr: "*", ID: "*"},
+				Contextual: []Resource{{Kind: "folders", Attr: "*", ID: "*"}},
+			},
+			res:  readRes{found: true, userPermissions: []string{"folders:uid:*"}},
 			want: true,
 		},
 	}
