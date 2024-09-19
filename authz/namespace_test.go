@@ -230,7 +230,7 @@ func TestNamespaceAccessCheckerImpl_ValidateBoth(t *testing.T) {
 }
 
 func TestMetadataStackIDExtractor(t *testing.T) {
-	key := "X-Namespace"
+	key := DefaultNamespaceMetadataKey
 	tests := []struct {
 		name string
 		init func(context.Context) context.Context
@@ -272,12 +272,12 @@ func TestMetadataStackIDExtractor(t *testing.T) {
 func TestNamespaceAuthorizationFunc(t *testing.T) {
 	// New namespace access checker with ID claims verification
 	na := NewNamespaceAccessChecker(claims.CloudNamespaceFormatter, WithIDTokenNamespaceAccessCheckerOption(true))
-	nsExtractor := MetadataNamespaceExtractor("X-Namespace")
+	nsExtractor := MetadataNamespaceExtractor(DefaultNamespaceMetadataKey)
 
 	authFunc := NamespaceAuthorizationFunc(na, nsExtractor)
 
 	t.Run("missing caller", func(t *testing.T) {
-		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("X-Namespace", "stacks-12"))
+		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(DefaultNamespaceMetadataKey, "stacks-12"))
 		err := authFunc(ctx)
 		require.ErrorIs(t, err, ErrMissingCaller)
 	})
@@ -292,7 +292,7 @@ func TestNamespaceAuthorizationFunc(t *testing.T) {
 	})
 
 	t.Run("ok", func(t *testing.T) {
-		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs("X-Namespace", "stacks-12"))
+		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(DefaultNamespaceMetadataKey, "stacks-12"))
 		ctx = claims.WithClaims(ctx, &authn.AuthInfo{
 			AccessClaims:   authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stacks-12"}}),
 			IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stacks-12"}}),
