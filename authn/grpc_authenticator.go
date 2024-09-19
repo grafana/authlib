@@ -5,15 +5,19 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/grafana/authlib/claims"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-
-	"github.com/grafana/authlib/claims"
 )
+
+// ContextAuthenticator ensures that an claims.AuthInfo exists in the context
+type ContextAuthenticator interface {
+	Authenticate(ctx context.Context) (context.Context, error)
+}
 
 var (
 	ErrorMissingMetadata    = status.Error(codes.Unauthenticated, "unauthenticated: no metadata found")
@@ -22,6 +26,11 @@ var (
 	ErrorInvalidIDToken     = status.Error(codes.PermissionDenied, "unauthorized: invalid id token")
 	ErrorInvalidAccessToken = status.Error(codes.PermissionDenied, "unauthorized: invalid access token")
 	ErrorNamespacesMismatch = status.Error(codes.PermissionDenied, "unauthorized: access and id token namespaces mismatch")
+	ErrorMissingAuthInfo    = status.Error(codes.Unauthenticated, "unauthenticated: no auth info found in context")
+
+	// Make sure that both Grpc and Local authenticators implement Authenticate
+	_ ContextAuthenticator = (*GrpcAuthenticator)(nil)
+	_ ContextAuthenticator = (*LocalAuthenticator)(nil)
 )
 
 // GrpcAuthenticatorOptions
@@ -132,7 +141,7 @@ func NewGrpcAuthenticator(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthenticato
 }
 
 // NewUnsafeGrpcAuthenticator creates a new gRPC authenticator that uses unsafe verifiers (i.e. JWT signature is not checked).
-// Unsafe verifiers do not perform key retrieval and JWT signtature validation. **Use with caution**.
+// Unsafe verifiers do not perform key retrieval and JWT signature validation. **Use with caution**.
 func NewUnsafeGrpcAuthenticator(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthenticatorOption) *GrpcAuthenticator {
 	ga := newGrpcAuthenticatorCommon(cfg, opts...)
 
@@ -334,4 +343,15 @@ func parseSubject(str string) (subject, error) {
 	}
 
 	return subject, nil
+}
+
+// Simple almost no-op implementation for local use
+type LocalAuthenticator struct{}
+
+func (f *LocalAuthenticator) Authenticate(ctx context.Context) (context.Context, error) {
+	_, ok := claims.From(ctx)
+	if !ok {
+		return ctx, ErrorMissingAuthInfo
+	}
+	return ctx, nil
 }
