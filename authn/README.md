@@ -55,7 +55,7 @@ This package simplifies the implementation of authentication within your gRPC se
 
 In this first example:
 
-- We configure the client interceptor to interact with the `MyService` gRPC service. This interceptor uses its own `myClientToken` to request an access token from the token signing service at "/v1/sign-access-token". The requested access token will grant access to the `MyService` for the `stacks-22` namespace. The interceptor will also add the incoming user's ID token to the metadata, along with the stack ID using the `X-Stack-ID` key. We assume that `MyService` requires this additional Stack ID metadata to determine which stack is being queried.
+- We configure the client interceptor to interact with the `MyService` gRPC service. This interceptor uses its own `myClientToken` to request an access token from the token signing service at "/v1/sign-access-token". The requested access token will grant access to the `MyService` for the `stacks-22` namespace. The interceptor will also add the incoming user's ID token to the metadata, along with the query namespace using the `X-Namespace` key. We assume that `MyService` requires this additional Namespace metadata to determine which tenant is being queried.
 - On the server side, we set up the interceptor for the `MyService` service. This interceptor extracts the access and ID tokens from the gRPC metadata. It then populates the application context with an `AuthInfo` object. Functions within `MyService` can use this `AuthInfo` object to access information about the caller (such as their permissions).
 
 **Diagram:**
@@ -87,9 +87,9 @@ func idTokenExtractor(ctx context.Context) (string, error) {
 	return "", fmt.Errorf("id-token not found")
 }
 
-// stackIdExtractor is a helper function used to populate gRPC metadata with the StackID
-func stackIdExtractor(ctx context.Context) (key string, values []string, err error) {
-	return authzlib.DefaultStackIDMetadataKey, []string{"22"}, nil
+// namespaceExtractor is a helper function used to populate gRPC metadata with the namespace
+func namespaceExtractor(ctx context.Context) (key string, values []string, err error) {
+	return authzlib.DefaultNamespaceMetadataKey, []string{"stacks-22"}, nil
 }
 
 func main() {
@@ -108,7 +108,7 @@ func main() {
 			},
 		},
 		authnlib.WithIDTokenExtractorOption(idTokenExtractor),
-		authnlib.WithMetadataExtractorOption(stackIdExtractor),
+		authnlib.WithMetadataExtractorOption(namespaceExtractor),
 	)
 	if err != nil {
 		os.Exit(1)
@@ -172,7 +172,7 @@ func main() (*authnlib.GrpcAuthenticator, error) {
 
 In this second example:
 
-- We configure the client interceptor to interact with the `MyService` gRPC service. This interceptor does not request an access token to interact with the `MyService` service but still adds the incoming user's ID token to the metadata, along with the `namespace` using the `Custom-Namespace-Metadata` key. We assume that `MyService` requires this additional `namespace` metadata to determine which namespace is being queried.
+- We configure the client interceptor to interact with the `MyService` gRPC service. This interceptor does not request an access token to interact with the `MyService` service but still adds the incoming user's ID token to the metadata, along with the `origin` using the `X-Origin` key. We assume that `MyService` requires this additional `origin` metadata to determine where the call is coming from and enforce some additional rules.
 - On the server side, we set up the interceptor for the `MyService` service. This interceptor solely extracts the ID tokens from the gRPC metadata. It then populates the application context with an `AuthInfo` object. Functions within `MyService` can use this `AuthInfo` object to access information about the user.
 
 **Diagram:**
@@ -183,11 +183,17 @@ In this second example:
 
 ```go
 import (
+	context
+	errors
+
 	authnlib "github.com/grafana/authlib/authn"
 	authzlib "github.com/grafana/authlib/authz"
 	"github.com/grafana/authlib/claims"
 	"google.golang.org/grpc"
 )
+
+// In this example, OriginContextKey is the key used to store the origin in the context.
+type OriginContextKey struct{}
 
 // idTokenExtractor is a helper function to get the user ID Token from context
 func idTokenExtractor(ctx context.Context) (string, error) {
@@ -204,21 +210,25 @@ func idTokenExtractor(ctx context.Context) (string, error) {
 	return "", fmt.Errorf("id-token not found")
 }
 
-// namespaceExtractor is a helper function populate gRPC metadata with a custom Namespace metadata
-func namespaceExtractor(ctx context.Context) (key string, values []string, err error) {
-	return "Custom-Namespace-Metadata", []string{"MyNamespace"}, nil
+// originExtractor is a helper function populate gRPC metadata with a custom Origin metadata
+func originExtractor(ctx context.Context) (key string, values []string, err error) {
+	origin, ok := ctx.Value(OriginContextKey{}).(string)
+	if !ok {
+		return "", nil, errors.New("Missing origin from context")
+	}
+	return "X-Origin", []string{origin}, nil
 }
 
 func main() {
 	// The client interceptor authenticates requests to the gRPC server injecting
-	// the ID token along with a custom namespace metadata into the request metadata.
+	// the ID token along with a custom origin metadata into the request metadata.
 	// Since we explicitly disable it, the client interceptor won't add a service
 	// access token to the request.
 	clientInt, err := authnlib.NewGrpcClientInterceptor(
 		&authnlib.GrpcClientConfig{},
 		authnlib.WithDisableAccessTokenOption(),
 		authnlib.WithIDTokenExtractorOption(idTokenExtractor),
-		authnlib.WithMetadataExtractorOption(namespaceExtractor),
+		authnlib.WithMetadataExtractorOption(originExtractor),
 	)
 	if err != nil {
 		os.Exit(1)
@@ -264,11 +274,11 @@ func main() (*authnlib.GrpcAuthenticator, error) {
 	server = grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			auth.UnaryServerInterceptor(authenticator.Authenticate),
-			// TODO - Add custom metadata handler
+			// TODO - Add origin handler
 		),
 		grpc.ChainStreamInterceptor(
 			auth.StreamServerInterceptor(authenticator.Authenticate),
-			// TODO - Add custom metadata handler
+			// TODO - Add origin handler
 		),
 	)
 	server.RegisterService(&authzv1.MyService_ServiceDesc, service)

@@ -164,7 +164,7 @@ func main() (*authnlib.GrpcAuthenticator, error) {
         ),
         // Method to extract the namespace that is being targeted.
         // Here we use gRPC metadata.
-		authzlib.MetadataStackIDExtractor(authzlib.DefaultStackIDMetadataKey),
+		authzlib.MetadataNamespaceExtractor(authzlib.DefaultNamespaceMetadataKey),
 	)
 
     // Create a new grpc server
@@ -209,15 +209,15 @@ func idTokenExtractor(ctx context.Context) (string, error) {
     return "", fmt.Errorf("id-token not found")
 }
 
-// stackIdExtractor is a helper function used to populate gRPC metadata with the StackID
-func stackIdExtractor(ctx context.Context) (key string, values []string, err error) {
-	return authzlib.DefaultStackIDMetadataKey, []string{"22"}, nil
+// namespaceExtractor is a helper function used to populate gRPC metadata with the namespace
+func namespaceExtractor(ctx context.Context) (key string, values []string, err error) {
+	return authzlib.DefaultNamespaceMetadataKey, []string{"stacks-22"}, nil
 }
 
 func main() {
     // The client interceptor authenticates requests to the gRPC server using
 	// the provided TokenExchangeConfig. It automatically handles token exchange
-	// and injects the ID token along with the extracted StackID into the request metadata.
+	// and injects the ID token along with the extracted namespace into the request metadata.
 	clientInt, err := authnlib.NewGrpcClientInterceptor(
         &authnlib.GrpcClientConfig{
             TokenClientConfig: &authnlib.TokenExchangeConfig{
@@ -230,7 +230,7 @@ func main() {
             },
         },
 		authnlib.WithIDTokenExtractorOption(idTokenExtractor),
-		authnlib.WithMetadataExtractorOption(stackIdExtractor),
+		authnlib.WithMetadataExtractorOption(namespaceExtractor),
     )
 	if err != nil {
 		os.Exit(1)
