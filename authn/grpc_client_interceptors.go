@@ -17,6 +17,8 @@ const (
 	DefaultIdTokenMetadataKey     = "X-Id-Token"
 )
 
+type GrpcContextWrapper = func(context.Context) (context.Context, error)
+
 // GrpcClientConfig holds the configuration for the gRPC client interceptor.
 type GrpcClientConfig struct {
 	// AccessTokenMetadataKey is the key used to store the access token in the outgoing context metadata.
@@ -31,6 +33,8 @@ type GrpcClientConfig struct {
 	// TokenRequest is the token request to be used for token exchange.
 	// This assumes the token request is static and does not change.
 	TokenRequest *TokenExchangeRequest
+	// ContextWrapper allows modifying the request context before
+	ContextWrapper GrpcContextWrapper
 
 	// accessTokenAuthEnabled is a flag to enable access token authentication.
 	// If disabled, no service authentication will be performed. Defaults to true.
@@ -43,6 +47,7 @@ type GrpcClientInterceptor struct {
 	tokenClient        TokenExchanger
 	metadataExtractors []ContextMetadataExtractor
 	tracer             trace.Tracer
+	wrapper            GrpcContextWrapper
 }
 
 type ContextMetadataExtractor func(context.Context) (key string, values []string, err error)
@@ -70,6 +75,12 @@ func WithIDTokenExtractorOption(extractor func(context.Context) (string, error))
 func WithMetadataExtractorOption(extractors ...ContextMetadataExtractor) GrpcClientInterceptorOption {
 	return func(gci *GrpcClientInterceptor) {
 		gci.metadataExtractors = append(gci.metadataExtractors, extractors...)
+	}
+}
+
+func WithContextWrapper(wrapper GrpcContextWrapper) GrpcClientInterceptorOption {
+	return func(gci *GrpcClientInterceptor) {
+		gci.wrapper = wrapper
 	}
 }
 
@@ -126,6 +137,8 @@ func NewGrpcClientInterceptor(cfg *GrpcClientConfig, opts ...GrpcClientIntercept
 		gci.tokenClient = tokenClient
 	}
 
+	gci.wrapper = cfg.ContextWrapper
+
 	return gci, nil
 }
 
@@ -158,6 +171,14 @@ func (gci *GrpcClientInterceptor) wrapContext(ctx context.Context) (context.Cont
 	defer span.End()
 
 	md := metadata.Pairs()
+
+	var err error
+	if gci.wrapper != nil {
+		ctx, err = gci.wrapper(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	if gci.cfg.accessTokenAuthEnabled {
 		token, err := gci.tokenClient.Exchange(ctx, *gci.cfg.TokenRequest)
