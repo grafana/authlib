@@ -180,7 +180,6 @@ func TestVerifier_Verify(t *testing.T) {
 
 	t.Run("valid: token", func(t *testing.T) {
 		claims, err := verifier.Verify(context.Background(), signFirst(t))
-		fmt.Println(claims.Claims)
 		assert.NoError(t, err)
 		assert.NotNil(t, claims)
 	})

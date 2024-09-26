@@ -2,7 +2,6 @@ package authn
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -64,7 +63,6 @@ func TestUnsafeVerifier_Verify(t *testing.T) {
 
 	t.Run("valid: token", func(t *testing.T) {
 		claims, err := verifier.Verify(context.Background(), signFirst(t))
-		fmt.Println(claims.Claims)
 		assert.NoError(t, err)
 		assert.NotNil(t, claims)
 	})

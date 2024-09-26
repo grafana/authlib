@@ -2,6 +2,8 @@ package claims
 
 import (
 	"errors"
+	"fmt"
+	"strings"
 )
 
 var (
@@ -25,6 +27,24 @@ const (
 
 func (n IdentityType) String() string {
 	return string(n)
+}
+
+func NewTypeID(typ IdentityType, identifier string) string {
+	return fmt.Sprintf("%s:%s", typ, identifier)
+}
+
+func ParseTypeID(str string) (IdentityType, string, error) {
+	parts := strings.Split(str, ":")
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("expected id to have 2 parts: %w", ErrInvalidTypedID)
+	}
+
+	typ, err := ParseType(parts[0])
+	if err != nil {
+		return "", "", fmt.Errorf("got invalid type: %w", err)
+	}
+
+	return typ, parts[1], nil
 }
 
 func ParseType(str string) (IdentityType, error) {

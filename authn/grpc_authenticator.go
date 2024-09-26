@@ -3,7 +3,6 @@ package authn
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -22,6 +21,8 @@ var (
 	ErrorInvalidIDToken     = status.Error(codes.PermissionDenied, "unauthorized: invalid id token")
 	ErrorInvalidAccessToken = status.Error(codes.PermissionDenied, "unauthorized: invalid access token")
 	ErrorNamespacesMismatch = status.Error(codes.PermissionDenied, "unauthorized: access and id token namespaces mismatch")
+	ErrorInvalidSubject     = status.Error(codes.PermissionDenied, "unauthorized: invalid subject")
+	ErrorInvalidSubjectType = status.Error(codes.PermissionDenied, "unauthorized: invalid subject type")
 )
 
 // GrpcAuthenticatorOptions
@@ -211,21 +212,21 @@ func (ga *GrpcAuthenticator) authenticateService(ctx context.Context, md metadat
 		return nil, ErrorMissingAccessToken
 	}
 
-	claims, err := ga.atVerifier.Verify(ctx, at)
+	atClaims, err := ga.atVerifier.Verify(ctx, at)
 	if err != nil {
 		return nil, fmt.Errorf("%v: %w", err, ErrorInvalidAccessToken)
 	}
 
-	subject, err := parseSubject(claims.Subject)
+	typ, _, err := claims.ParseTypeID(atClaims.Subject)
 	if err != nil {
-		return nil, fmt.Errorf("access token subject '%s' is not valid: %w", claims.Subject, err)
+		return nil, fmt.Errorf("access token subject '%s' is not valid: %w", atClaims.Subject, ErrorInvalidSubject)
 	}
 
-	if subject.Type != typeAccessPolicy {
-		return nil, fmt.Errorf("access token subject '%s' type is not allowed: %w", subject.Type, ErrorInvalidSubjectType)
+	if typ != claims.TypeAccessPolicy {
+		return nil, fmt.Errorf("access token subject '%s' type is not allowed: %w", typ, ErrorInvalidSubjectType)
 	}
 
-	return claims, nil
+	return atClaims, nil
 }
 
 func (ga *GrpcAuthenticator) authenticateUser(ctx context.Context, md metadata.MD) (*Claims[IDTokenClaims], error) {
@@ -237,21 +238,21 @@ func (ga *GrpcAuthenticator) authenticateUser(ctx context.Context, md metadata.M
 		return nil, nil
 	}
 
-	claims, err := ga.idVerifier.Verify(ctx, id)
+	idClaims, err := ga.idVerifier.Verify(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("%v: %w", err, ErrorInvalidIDToken)
 	}
 
-	subject, err := parseSubject(claims.Subject)
+	typ, _, err := claims.ParseTypeID(idClaims.Subject)
 	if err != nil {
-		return nil, fmt.Errorf("id token subject '%s' is not valid: %w", claims.Subject, err)
+		return nil, fmt.Errorf("id token subject '%s' is not valid: %w", idClaims.Subject, ErrorInvalidSubject)
 	}
 
-	if subject.Type != typeUser && subject.Type != typeServiceAccount {
-		return nil, fmt.Errorf("id token subject '%s' type is not allowed: %w", subject.Type, ErrorInvalidSubjectType)
+	if typ != claims.TypeUser && typ != claims.TypeServiceAccount {
+		return nil, fmt.Errorf("id token subject '%s' type is not allowed: %w", typ, ErrorInvalidSubjectType)
 	}
 
-	return claims, nil
+	return idClaims, nil
 }
 
 func getFirstMetadataValue(md metadata.MD, key string) (string, bool) {
@@ -279,59 +280,4 @@ func newGrpcAuthenticatorCommon(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthen
 	}
 
 	return ga
-}
-
-// ------
-// Subject
-// FIXME: This is a duplicate of Grafana's identity namespaces and namespacedID. It should be moved to a shared package.
-// ------
-const (
-	typeUser           subjectType = "user"
-	typeAPIKey         subjectType = "api-key"
-	typeServiceAccount subjectType = "service-account"
-	typeAnonymous      subjectType = "anonymous"
-	typeRenderService  subjectType = "render"
-	typeAccessPolicy   subjectType = "access-policy"
-	typeProvisioning   subjectType = "provisioning"
-	typeEmpty          subjectType = ""
-)
-
-var (
-	ErrorInvalidSubject     = status.Error(codes.PermissionDenied, "unauthorized: invalid subject")
-	ErrorInvalidSubjectType = status.Error(codes.PermissionDenied, "unauthorized: invalid subject type")
-)
-
-type subjectType string
-
-func (n subjectType) isValid() error {
-	switch n {
-	case typeUser, typeAPIKey, typeServiceAccount, typeAnonymous, typeRenderService, typeAccessPolicy, typeProvisioning, typeEmpty:
-		return nil
-	default:
-		return fmt.Errorf("invalid type %s: %w", n, ErrorInvalidSubjectType)
-	}
-}
-
-type subject struct {
-	ID   string      // Ex: 1234567890
-	Type subjectType // Ex: user, service-account, api-key
-}
-
-func parseSubject(str string) (subject, error) {
-	var subject subject
-
-	parts := strings.Split(str, ":")
-	if len(parts) != 2 {
-		return subject, fmt.Errorf("expected subject to have 2 parts: %w", ErrorInvalidSubject)
-	}
-
-	subject.ID = parts[1]
-	subject.Type = subjectType(parts[0])
-
-	err := subject.Type.isValid()
-	if err != nil {
-		return subject, err
-	}
-
-	return subject, nil
 }
