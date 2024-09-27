@@ -57,14 +57,14 @@ type ListRequest struct {
 	// For non-resource requests, this will be the requested URL path
 	Path string
 
+	// tenant isolation
+	Namespace string
+
 	// ~Kind eg dashboards
 	Resource string
 
 	// ContextualResources are additional resources that can be checked to gain access to the resource.
 	ContextualResources []string
-
-	// tenant isolation
-	Namespace string
 }
 
 type ListResponse struct {
