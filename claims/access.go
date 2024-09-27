@@ -2,6 +2,14 @@ package claims
 
 import "context"
 
+type Contextual struct {
+	// ~Kind eg dashboards
+	Resource string
+	// The specific resource
+	// In grafana, this was historically called "UID", but in k8s, it is the name
+	Name string
+}
+
 // CheckRequest describes the requested access.
 // This is designed bo to play nicely with the kubernetes authorization system:
 // https://github.com/kubernetes/kubernetes/blob/v1.30.3/staging/src/k8s.io/apiserver/pkg/authorization/authorizer/interfaces.go#L28
@@ -29,6 +37,10 @@ type CheckRequest struct {
 
 	// For non-resource requests, this will be the requested URL path
 	Path string
+
+	// Contextuals are additional resource + name that should be checked.
+	// E.g. for dashboards this can be the folder that a it belong to.
+	Contextuals []Contextual
 }
 
 type CheckResponse struct {
