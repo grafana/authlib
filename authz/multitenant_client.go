@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"strings"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel/attribute"
@@ -21,20 +22,21 @@ import (
 )
 
 var (
-	ErrMissingConfig  = errors.New("missing config")
-	ErrMissingStackID = status.Errorf(codes.InvalidArgument, "missing stack ID")
-	ErrMissingAction  = status.Errorf(codes.InvalidArgument, "missing action")
-	ErrMissingCaller  = status.Errorf(codes.Unauthenticated, "missing caller")
-	ErrMissingSubject = status.Errorf(codes.Unauthenticated, "missing subject")
-	ErrReadPermission = status.Errorf(codes.PermissionDenied, "read permission failed")
+	ErrMissingConfig    = errors.New("missing config")
+	ErrMissingNamespace = status.Errorf(codes.InvalidArgument, "missing namespace")
+	ErrInvalidNamespace = status.Errorf(codes.InvalidArgument, "invalid namespace")
+	ErrMissingAction    = status.Errorf(codes.InvalidArgument, "missing action")
+	ErrMissingCaller    = status.Errorf(codes.Unauthenticated, "missing caller")
+	ErrMissingSubject   = status.Errorf(codes.Unauthenticated, "missing subject")
+	ErrReadPermission   = status.Errorf(codes.PermissionDenied, "read permission failed")
 )
 
 type CheckRequest struct {
-	Caller     claims.AuthInfo
-	StackID    int64
-	Action     string
-	Resource   *Resource
-	Contextual []Resource
+	Caller    claims.AuthInfo
+	Namespace string
+	Action    string
+	Object    *string
+	Parent    *string
 }
 
 type MultiTenantClient interface {
@@ -178,9 +180,16 @@ func NewLegacyClient(cfg *MultiTenantClientConfig, opts ...LegacyClientOption) (
 // -----
 
 func (r *CheckRequest) Validate(accessTokenEnabled bool) error {
-	if r.StackID <= 0 {
-		return ErrMissingStackID
+	if r.Namespace == "" {
+		return ErrMissingNamespace
 	}
+	// TODO (gamab) disambiguate the namespace validation
+	if !strings.HasPrefix(r.Namespace, "stacks-") &&
+		!strings.HasPrefix(r.Namespace, "orgs-") &&
+		r.Namespace != "default" {
+		return ErrInvalidTokenNamespace
+	}
+
 	if r.Action == "" {
 		return ErrMissingAction
 	}
@@ -204,7 +213,7 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 		return false, err
 	}
 
-	if !c.validateNamespace(req.Caller, req.StackID) {
+	if !c.validateCallerNamespace(req.Caller, req.Namespace) {
 		return false, nil
 	}
 
@@ -214,11 +223,13 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 	if c.authCfg.accessTokenAuthEnabled && accessClaims != nil && !accessClaims.IsNil() {
 		span.SetAttributes(attribute.String("service", accessClaims.Subject()))
 	}
-	span.SetAttributes(attribute.Int64("stack_id", req.StackID))
+	span.SetAttributes(attribute.String("namespace", req.Namespace))
 	span.SetAttributes(attribute.String("action", req.Action))
-	if req.Resource != nil {
-		span.SetAttributes(attribute.String("resource", req.Resource.Scope()))
-		span.SetAttributes(attribute.Int("contextual", len(req.Contextual)))
+	if req.Object != nil {
+		span.SetAttributes(attribute.String("object", *req.Object))
+	}
+	if req.Parent != nil {
+		span.SetAttributes(attribute.String("parent", *req.Parent))
 	}
 	span.SetAttributes(attribute.Bool("with_user", identityClaims != nil && !identityClaims.IsNil()))
 
@@ -263,29 +274,17 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 		}
 	}
 
-	res, err := c.retrievePermissions(ctx, req.StackID, identityClaims.Subject(), req.Action)
+	res, err := c.check(ctx, *req)
 	if err != nil {
 		span.RecordError(err)
 		return false, err
 	}
 
-	// No permissions found
-	if !res.Found {
-		return false, nil
-	}
-
-	// Action check only
-	if req.Resource == nil {
-		return true, nil
-	}
-
 	// Check if the user has access to any of the requested resources
-	return res.Check(append(req.Contextual, *req.Resource)...), nil
+	return res, nil
 }
 
-func (c *LegacyClientImpl) validateNamespace(caller claims.AuthInfo, stackID int64) bool {
-	expectedNamespace := c.namespaceFmt(stackID)
-
+func (c *LegacyClientImpl) validateCallerNamespace(caller claims.AuthInfo, expectedNamespace string) bool {
 	// Check both AccessToken and IDToken (if present) for namespace match
 	accessClaims := caller.GetAccess()
 	accessTokenMatch := !c.authCfg.accessTokenAuthEnabled ||
@@ -297,39 +296,46 @@ func (c *LegacyClientImpl) validateNamespace(caller claims.AuthInfo, stackID int
 	return accessTokenMatch && idTokenMatch
 }
 
-func (c *LegacyClientImpl) retrievePermissions(ctx context.Context, stackID int64, subject, action string) (*controller, error) {
-	ctx, span := c.tracer.Start(ctx, "LegacyClientImpl.retrievePermissions")
+func (c *LegacyClientImpl) check(ctx context.Context, req CheckRequest) (bool, error) {
+	ctx, span := c.tracer.Start(ctx, "LegacyClientImpl.check")
 	defer span.End()
 
-	span.SetAttributes(attribute.Int64("stack_id", stackID))
+	// Replace nil pointers with empty strings
+	if req.Object == nil {
+		req.Object = new(string)
+	}
+	if req.Parent == nil {
+		req.Parent = new(string)
+	}
 
 	// Check the cache
-	key := controllerCacheKey(stackID, subject, action)
-	ctrl, err := c.getCachedController(ctx, key)
+	key := checkCacheKey(req.Namespace, req.Caller.GetIdentity().Subject(), req.Action, *req.Object, *req.Parent)
+	ctrl, err := c.getCachedCheck(ctx, key)
 	if err == nil || !errors.Is(err, cache.ErrNotFound) {
 		return ctrl, err
+	}
+
+	checkReq := &authzv1.CheckRequest{
+		Namespace: req.Namespace,
+		Subject:   req.Caller.GetIdentity().Subject(),
+		Action:    req.Action,
+		Object:    *req.Object,
+		Parent:    *req.Parent,
 	}
 
 	// Instantiate a new context for the request
 	outCtx := newOutgoingContext(ctx)
 
-	readReq := &authzv1.ReadRequest{
-		StackId: stackID,
-		Action:  action,
-		Subject: subject,
-	}
-
 	// Query the authz service
-	resp, err := c.clientV1.Read(outCtx, readReq)
+	resp, err := c.clientV1.Check(outCtx, checkReq)
 	if err != nil {
-		return nil, ErrReadPermission
+		return false, err
 	}
-
-	res := newController(resp)
 
 	// Cache the result
-	err = c.cacheController(ctx, key, res)
-	return res, err
+	err = c.cacheCheck(ctx, key, resp.Allowed)
+
+	return resp.Allowed, err
 }
 
 // newOutgoingContext creates a new context that will be canceled when the input context is canceled.
@@ -355,87 +361,19 @@ func newOutgoingContext(ctx context.Context) context.Context {
 }
 
 // -----
-// RESULT
-// -----
-
-type controller struct {
-	// Whether the requested action was found in the users' permissions
-	Found bool
-	// All the scopes the user has access to for the requested action
-	Scopes map[string]bool
-	// Wildcard per kinds
-	Wildcard map[string]bool
-}
-
-func newController(resp *authzv1.ReadResponse) *controller {
-	if resp == nil || !resp.Found {
-		return &controller{Found: false}
-	}
-
-	res := &controller{
-		Found:    true,
-		Scopes:   make(map[string]bool, len(resp.Data)),
-		Wildcard: make(map[string]bool, 2),
-	}
-	for _, o := range resp.Data {
-		kind, _, id := splitScope(o.Object)
-		if id == "*" {
-			res.Wildcard[kind] = true
-		} else {
-			res.Scopes[o.Object] = true
-		}
-	}
-	return res
-}
-
-func (r *controller) Check(resources ...Resource) bool {
-	// the user has no permissions
-	if !r.Found {
-		return false
-	}
-
-	// it's an action check only
-	if len(resources) == 0 {
-		return true
-	}
-
-	// the user has no permissions
-	if len(r.Scopes) == 0 && len(r.Wildcard) == 0 {
-		return false
-	}
-
-	// the user has access to all resources
-	if r.Wildcard["*"] {
-		return true
-	}
-
-	// the user has access to the requested resources
-	for _, res := range resources {
-		if r.Wildcard[res.Kind] || r.Scopes[res.Scope()] {
-			return true
-		}
-	}
-	return false
-}
-
-// -----
 // CACHE
 // -----
 
-func controllerCacheKey(stackID int64, subject, action string) string {
-	return fmt.Sprintf("read-%d-%s-%s", stackID, subject, action)
+func checkCacheKey(namespace, subject, action, object, parent string) string {
+	return fmt.Sprintf("read-%s-%s-%s-%s-%s", namespace, subject, action, object, parent)
 }
 
-func (c *LegacyClientImpl) cacheController(ctx context.Context, key string, ctrl *controller) error {
-	ctx, span := c.tracer.Start(ctx, "LegacyClientImpl.cacheController")
+func (c *LegacyClientImpl) cacheCheck(ctx context.Context, key string, allowed bool) error {
+	ctx, span := c.tracer.Start(ctx, "LegacyClientImpl.cacheCheck")
 	defer span.End()
 
-	if ctrl == nil {
-		return nil
-	}
-
 	buf := bytes.Buffer{}
-	err := gob.NewEncoder(&buf).Encode(*ctrl)
+	err := gob.NewEncoder(&buf).Encode(allowed)
 	if err != nil {
 		return err
 	}
@@ -444,19 +382,19 @@ func (c *LegacyClientImpl) cacheController(ctx context.Context, key string, ctrl
 	return c.cache.Set(ctx, key, buf.Bytes(), cache.DefaultExpiration)
 }
 
-func (c *LegacyClientImpl) getCachedController(ctx context.Context, key string) (*controller, error) {
-	ctx, span := c.tracer.Start(ctx, "LegacyClientImpl.getCachedController")
+func (c *LegacyClientImpl) getCachedCheck(ctx context.Context, key string) (bool, error) {
+	ctx, span := c.tracer.Start(ctx, "LegacyClientImpl.getCachedCheck")
 	defer span.End()
 
 	data, err := c.cache.Get(ctx, key)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
 
-	var ctrl controller
-	err = gob.NewDecoder(bytes.NewReader(data)).Decode(&ctrl)
+	var allowed bool
+	err = gob.NewDecoder(bytes.NewReader(data)).Decode(&allowed)
 	if err != nil {
-		return nil, err
+		return false, err
 	}
-	return &ctrl, nil
+	return allowed, nil
 }

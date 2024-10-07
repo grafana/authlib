@@ -16,7 +16,61 @@
     "application/json"
   ],
   "paths": {
-    "/v1/stack/{stackId}/read": {
+    "/v1/namespace/{namespace}/check": {
+      "post": {
+        "summary": "Check access for subject on resource given parent",
+        "description": "The check API will check if a subject is allowed to perform an action on an object.",
+        "operationId": "Check",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1CheckResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "namespace",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "subject": {
+                  "type": "string"
+                },
+                "action": {
+                  "type": "string"
+                },
+                "object": {
+                  "type": "string"
+                },
+                "parent": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "tags": [
+          "Check"
+        ]
+      }
+    },
+    "/v1/namespace/{namespace}/read": {
       "post": {
         "summary": "Read permissions for subject",
         "description": "The read API will read permissions for subject",
@@ -37,11 +91,10 @@
         },
         "parameters": [
           {
-            "name": "stackId",
+            "name": "namespace",
             "in": "path",
             "required": true,
-            "type": "string",
-            "format": "int64"
+            "type": "string"
           },
           {
             "name": "body",
@@ -99,6 +152,14 @@
           "items": {
             "$ref": "#/definitions/protobufAny"
           }
+        }
+      }
+    },
+    "v1CheckResponse": {
+      "type": "object",
+      "properties": {
+        "allowed": {
+          "type": "boolean"
         }
       }
     },

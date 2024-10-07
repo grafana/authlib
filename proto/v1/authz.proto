@@ -8,7 +8,7 @@ import "protoc-gen-openapiv2/options/annotations.proto";
 service AuthzService {
   rpc Read(ReadRequest) returns (ReadResponse) {
     option (google.api.http) = {
-      post: "/v1/stack/{stack_id}/read"
+      post: "/v1/namespace/{namespace}/read"
       body: "*"
     };
 
@@ -19,12 +19,25 @@ service AuthzService {
       description: "The read API will read permissions for subject"
     };
   }
+  rpc Check(CheckRequest) returns (CheckResponse) {
+    option (google.api.http) = {
+      post: "/v1/namespace/{namespace}/check"
+      body: "*"
+    };
+
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Check access for subject on resource given parent"
+      tags: ["Check"]
+      operation_id: "Check"
+      description: "The check API will check if a subject is allowed to perform an action on an object."
+    };
+  }
 }
 
 message ReadRequest {
   string subject = 1;
   string action = 2;
-  int64 stack_id = 3;
+  string namespace = 3;
 }
 
 message ReadResponse {
@@ -34,3 +47,16 @@ message ReadResponse {
   repeated Data data = 1;
   bool Found = 2;
 }
+
+message CheckRequest {
+  string namespace = 1;
+  string subject = 2;
+  string action = 3;
+  string object = 4;
+  string parent = 5;
+}
+
+message CheckResponse {
+  bool allowed = 1;
+}
+

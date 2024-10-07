@@ -22,12 +22,12 @@ import (
 var _ client = &clientImpl{}
 
 var (
-	ErrInvalidQuery     = errors.New("invalid query")
-	ErrInvalidIDToken   = errors.New("invalid id token: cannot extract namespaced ID")
-	ErrInvalidToken     = errors.New("invalid token: cannot query server")
-	ErrInvalidResponse  = errors.New("invalid response from server")
-	ErrUnexpectedStatus = errors.New("unexpected response status")
-	ErrInvalidNamespace = errors.New("invalid token: can only query server for users and service-accounts")
+	ErrInvalidQuery          = errors.New("invalid query")
+	ErrInvalidIDToken        = errors.New("invalid id token: cannot extract namespaced ID")
+	ErrInvalidToken          = errors.New("invalid token: cannot query server")
+	ErrInvalidResponse       = errors.New("invalid response from server")
+	ErrUnexpectedStatus      = errors.New("unexpected response status")
+	ErrInvalidTokenNamespace = errors.New("invalid token: can only query server for users and service-accounts")
 )
 
 const (
@@ -124,7 +124,7 @@ func (query *searchQuery) processIDToken(c *clientImpl) error {
 		query.NamespacedID = claims.Subject
 		if !(strings.HasPrefix(query.NamespacedID, NamespaceServiceAccount) || strings.HasPrefix(query.NamespacedID, NamespaceUser)) {
 			// return an error if we attempt to query an `api-key` - currently not supported by the /search endpoint
-			return ErrInvalidNamespace
+			return ErrInvalidTokenNamespace
 		}
 	}
 	return nil
