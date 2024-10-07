@@ -32,8 +32,10 @@ var (
 )
 
 type CheckRequest struct {
+	// The namespace in which the request is made (e.g. "stacks-12")
 	Namespace string
-	Action    string
+	// The requested action (e.g. "dashboards:read")
+	Action string
 	// ~Kind eg dashboards
 	Resource string
 	// Attribute used to identify the resource in the legacy RBAC system (e.g. uid).
