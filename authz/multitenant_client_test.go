@@ -17,29 +17,57 @@ import (
 func TestLegacyClientImpl_Check(t *testing.T) {
 	tests := []struct {
 		name     string
+		caller   *authn.AuthInfo
 		req      CheckRequest
 		checkRes bool
 		want     bool
 		wantErr  bool
 	}{
 		{
-			name: "No Caller",
+			name: "No Action",
 			req: CheckRequest{
-				Caller:    &authn.AuthInfo{},
+				Namespace: "stacks-12",
+			},
+			wantErr: true,
+		},
+		{
+			name:   "No Caller",
+			caller: &authn.AuthInfo{},
+			req: CheckRequest{
 				Namespace: "stacks-12",
 				Action:    "dashboards:read",
 			},
 			wantErr: true,
 		},
 		{
-			name: "Service does not have the action",
+			name: "Missing attribute",
 			req: CheckRequest{
-				Caller: &authn.AuthInfo{
-					AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
-						Claims: &jwt.Claims{Subject: "service"},
-						Rest:   authn.AccessTokenClaims{Namespace: "stacks-12"},
-					}),
-				},
+				Namespace: "stacks-12",
+				Action:    "dashboards:read",
+				Name:      "xxyy",
+				Resource:  "dashboards",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Missing resource (kind)",
+			req: CheckRequest{
+				Namespace: "stacks-12",
+				Action:    "dashboards:read",
+				Name:      "xxyy",
+				Attribute: "uid",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Service does not have the action",
+			caller: &authn.AuthInfo{
+				AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
+					Claims: &jwt.Claims{Subject: "service"},
+					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12"},
+				}),
+			},
+			req: CheckRequest{
 				Namespace: "stacks-12",
 				Action:    "dashboards:read",
 			},
@@ -47,13 +75,13 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		},
 		{
 			name: "Service has the action",
+			caller: &authn.AuthInfo{
+				AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
+					Claims: &jwt.Claims{Subject: "service"},
+					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", Permissions: []string{"dashboards:read"}},
+				}),
+			},
 			req: CheckRequest{
-				Caller: &authn.AuthInfo{
-					AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
-						Claims: &jwt.Claims{Subject: "service"},
-						Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", Permissions: []string{"dashboards:read"}},
-					}),
-				},
 				Namespace: "stacks-12",
 				Action:    "dashboards:read",
 			},
@@ -61,13 +89,13 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		},
 		{
 			name: "Service has the action but in the wrong namespace",
+			caller: &authn.AuthInfo{
+				AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
+					Claims: &jwt.Claims{Subject: "service"},
+					Rest:   authn.AccessTokenClaims{Namespace: "stacks-13", Permissions: []string{"dashboards:read"}},
+				}),
+			},
 			req: CheckRequest{
-				Caller: &authn.AuthInfo{
-					AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
-						Claims: &jwt.Claims{Subject: "service"},
-						Rest:   authn.AccessTokenClaims{Namespace: "stacks-13", Permissions: []string{"dashboards:read"}},
-					}),
-				},
 				Namespace: "stacks-12",
 				Action:    "dashboards:read",
 			},
@@ -75,17 +103,17 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		},
 		{
 			name: "On behalf of, service does not have the action",
+			caller: &authn.AuthInfo{
+				AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
+					Claims: &jwt.Claims{Subject: "service"},
+					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12"},
+				}),
+				IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{
+					Claims: &jwt.Claims{Subject: "user:1"},
+					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+				}),
+			},
 			req: CheckRequest{
-				Caller: &authn.AuthInfo{
-					AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
-						Claims: &jwt.Claims{Subject: "service"},
-						Rest:   authn.AccessTokenClaims{Namespace: "stacks-12"},
-					}),
-					IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{
-						Claims: &jwt.Claims{Subject: "user:1"},
-						Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
-					}),
-				},
 				Namespace: "stacks-12",
 				Action:    "dashboards:read",
 			},
@@ -93,17 +121,17 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		},
 		{
 			name: "On behalf of, service does have the action, but user not",
+			caller: &authn.AuthInfo{
+				AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
+					Claims: &jwt.Claims{Subject: "service"},
+					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards:read"}},
+				}),
+				IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{
+					Claims: &jwt.Claims{Subject: "user:1"},
+					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+				}),
+			},
 			req: CheckRequest{
-				Caller: &authn.AuthInfo{
-					AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
-						Claims: &jwt.Claims{Subject: "service"},
-						Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards:read"}},
-					}),
-					IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{
-						Claims: &jwt.Claims{Subject: "user:1"},
-						Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
-					}),
-				},
 				Namespace: "stacks-12",
 				Action:    "dashboards:read",
 			},
@@ -111,17 +139,17 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		},
 		{
 			name: "On behalf of, service and user have the action",
+			caller: &authn.AuthInfo{
+				AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
+					Claims: &jwt.Claims{Subject: "service"},
+					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards:read"}},
+				}),
+				IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{
+					Claims: &jwt.Claims{Subject: "user:1"},
+					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+				}),
+			},
 			req: CheckRequest{
-				Caller: &authn.AuthInfo{
-					AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
-						Claims: &jwt.Claims{Subject: "service"},
-						Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards:read"}},
-					}),
-					IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{
-						Claims: &jwt.Claims{Subject: "user:1"},
-						Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
-					}),
-				},
 				Namespace: "stacks-12",
 				Action:    "dashboards:read",
 			},
@@ -134,7 +162,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 			client, authz := setupLegacyClient()
 			authz.checkRes = &authzv1.CheckResponse{Allowed: tt.checkRes}
 
-			got, err := client.Check(context.Background(), &tt.req)
+			got, err := client.Check(context.Background(), tt.caller, &tt.req)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -149,26 +177,27 @@ func TestLegacyClientImpl_Check_OnPremFmt(t *testing.T) {
 	client, authz := setupLegacyClient()
 
 	authz.checkRes = &authzv1.CheckResponse{Allowed: true}
-
-	req := CheckRequest{
-		Caller: &authn.AuthInfo{
-			AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
-				Claims: &jwt.Claims{Subject: "service"},
-				Rest:   authn.AccessTokenClaims{Namespace: "default", DelegatedPermissions: []string{"dashboards:read"}},
-			}),
-			IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{
-				Claims: &jwt.Claims{Subject: "user:1"},
-				Rest:   authn.IDTokenClaims{Namespace: "default"},
-			}),
-		},
-		Namespace: "default",
-		Action:    "dashboards:read",
-		// TODO (gamab): Should we remove the attribute?
-		Object: "dashboards:uid:2",
-		Parent: "folders:uid:1",
+	caller := &authn.AuthInfo{
+		AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
+			Claims: &jwt.Claims{Subject: "service"},
+			Rest:   authn.AccessTokenClaims{Namespace: "default", DelegatedPermissions: []string{"dashboards:read"}},
+		}),
+		IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{
+			Claims: &jwt.Claims{Subject: "user:1"},
+			Rest:   authn.IDTokenClaims{Namespace: "default"},
+		}),
 	}
 
-	got, err := client.Check(context.Background(), &req)
+	req := CheckRequest{
+		Namespace: "default",
+		Action:    "dashboards:read",
+		Resource:  "dashboards",
+		Attribute: "uid",
+		Name:      "rrss",
+		Parent:    "ttuu",
+	}
+
+	got, err := client.Check(context.Background(), caller, &req)
 	require.NoError(t, err)
 	require.True(t, got)
 }
@@ -177,30 +206,33 @@ func TestLegacyClientImpl_Check_Cache(t *testing.T) {
 	client, authz := setupLegacyClient()
 	authz.checkRes = &authzv1.CheckResponse{Allowed: true}
 
+	caller := &authn.AuthInfo{
+		AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
+			Claims: &jwt.Claims{Subject: "service"},
+			Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards:read"}},
+		}),
+		IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{
+			Claims: &jwt.Claims{Subject: "user:1"},
+			Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+		}),
+	}
+
 	req := CheckRequest{
-		Caller: &authn.AuthInfo{
-			AccessClaims: authn.NewAccessClaims(authn.Claims[authn.AccessTokenClaims]{
-				Claims: &jwt.Claims{Subject: "service"},
-				Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards:read"}},
-			}),
-			IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{
-				Claims: &jwt.Claims{Subject: "user:1"},
-				Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
-			}),
-		},
 		Namespace: "stacks-12",
 		Action:    "dashboards:read",
-		Object:    "dashboards:uid:2",
-		Parent:    "folders:uid:1",
+		Resource:  "dashboards",
+		Attribute: "uid",
+		Name:      "rrss",
+		Parent:    "ttuu",
 	}
 
 	// First call should populate the cache
-	got, err := client.Check(context.Background(), &req)
+	got, err := client.Check(context.Background(), caller, &req)
 	require.NoError(t, err)
 	require.True(t, got)
 
 	// Check that the cache was populated correctly
-	ctrl, err := client.getCachedCheck(context.Background(), checkCacheKey("stacks-12", "user:1", "dashboards:read", "dashboards:uid:2", "folders:uid:1"))
+	ctrl, err := client.getCachedCheck(context.Background(), checkCacheKey("stacks-12", "user:1", "dashboards:read", "dashboards:uid:rrss", "folders:uid:ttuu"))
 	require.NoError(t, err)
 	require.True(t, ctrl)
 
@@ -208,7 +240,7 @@ func TestLegacyClientImpl_Check_Cache(t *testing.T) {
 	authz.checkRes = &authzv1.CheckResponse{Allowed: false}
 
 	// Second call should still be true as we hit the cache
-	got, err = client.Check(context.Background(), &req)
+	got, err = client.Check(context.Background(), caller, &req)
 	require.NoError(t, err)
 	require.True(t, got)
 }
@@ -216,15 +248,16 @@ func TestLegacyClientImpl_Check_Cache(t *testing.T) {
 func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
 	tests := []struct {
 		name     string
+		caller   *authn.AuthInfo
 		req      CheckRequest
 		checkRes bool
 		want     bool
 		wantErr  bool
 	}{
 		{
-			name: "No user assume the service is allowed",
+			name:   "No user assume the service is allowed",
+			caller: &authn.AuthInfo{},
 			req: CheckRequest{
-				Caller:    &authn.AuthInfo{},
 				Namespace: "stacks-12",
 				Action:    "dashboards:read",
 			},
@@ -232,13 +265,13 @@ func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
 		},
 		{
 			name: "User has the action",
+			caller: &authn.AuthInfo{
+				IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{
+					Claims: &jwt.Claims{Subject: "user:1"},
+					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+				}),
+			},
 			req: CheckRequest{
-				Caller: &authn.AuthInfo{
-					IdentityClaims: authn.NewIdentityClaims(authn.Claims[authn.IDTokenClaims]{
-						Claims: &jwt.Claims{Subject: "user:1"},
-						Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
-					}),
-				},
 				Namespace: "stacks-12",
 				Action:    "dashboards:read",
 			},
@@ -253,7 +286,7 @@ func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
 
 			authz.checkRes = &authzv1.CheckResponse{Allowed: tt.checkRes}
 
-			got, err := client.Check(context.Background(), &tt.req)
+			got, err := client.Check(context.Background(), tt.caller, &tt.req)
 			if tt.wantErr {
 				require.Error(t, err)
 				return

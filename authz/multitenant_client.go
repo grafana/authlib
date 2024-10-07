@@ -25,6 +25,8 @@ var (
 	ErrMissingConfig    = errors.New("missing config")
 	ErrMissingNamespace = status.Errorf(codes.InvalidArgument, "missing namespace")
 	ErrInvalidNamespace = status.Errorf(codes.InvalidArgument, "invalid namespace")
+	ErrMissingAttribute = status.Errorf(codes.InvalidArgument, "missing attribute")
+	ErrMissingResource  = status.Errorf(codes.InvalidArgument, "missing resource")
 	ErrMissingAction    = status.Errorf(codes.InvalidArgument, "missing action")
 	ErrMissingCaller    = status.Errorf(codes.Unauthenticated, "missing caller")
 	ErrMissingSubject   = status.Errorf(codes.Unauthenticated, "missing subject")
@@ -32,22 +34,21 @@ var (
 )
 
 type CheckRequest struct {
-	Caller    claims.AuthInfo
 	Namespace string
 	Action    string
 	// ~Kind eg dashboards
 	Resource string
-	// Attribute used to identify the resource in the legacy RBAC system.
+	// Attribute used to identify the resource in the legacy RBAC system (e.g. uid).
 	Attribute string
 	// The specific resource
 	// In grafana, this was historically called "UID", but in k8s, it is the name
 	Name string
 	// The Name of the parent folder of the resource
-	Parent    string
+	Parent string
 }
 
 type MultiTenantClient interface {
-	Check(ctx context.Context, req *CheckRequest) (bool, error)
+	Check(ctx context.Context, Caller claims.AuthInfo, req *CheckRequest) (bool, error)
 }
 
 type MultiTenantClientConfig struct {
@@ -175,7 +176,7 @@ func NewLegacyClient(cfg *MultiTenantClientConfig, opts ...LegacyClientOption) (
 // Implementation
 // -----
 
-func (r *CheckRequest) Validate(accessTokenEnabled bool) error {
+func (r *CheckRequest) Validate() error {
 	if r.Namespace == "" {
 		return ErrMissingNamespace
 	}
@@ -189,40 +190,51 @@ func (r *CheckRequest) Validate(accessTokenEnabled bool) error {
 	if r.Action == "" {
 		return ErrMissingAction
 	}
-	accessClaims := r.Caller.GetAccess()
-	if accessTokenEnabled && (accessClaims == nil || accessClaims.IsNil()) {
-		return ErrMissingCaller
+
+	if r.Name != "" {
+		if r.Attribute == "" {
+			return ErrMissingAttribute
+		}
+		if r.Resource == "" {
+			return ErrMissingResource
+		}
 	}
-	idClaims := r.Caller.GetIdentity()
-	if idClaims != nil && !idClaims.IsNil() && idClaims.Subject() == "" {
-		return ErrMissingSubject
-	}
+
 	return nil
 }
 
-func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, error) {
+func (c *LegacyClientImpl) Check(ctx context.Context, caller claims.AuthInfo, req *CheckRequest) (bool, error) {
 	ctx, span := c.tracer.Start(ctx, "LegacyClientImpl.Check")
 	defer span.End()
 
-	if err := req.Validate(c.authCfg.accessTokenAuthEnabled); err != nil {
+	if err := req.Validate(); err != nil {
 		span.RecordError(err)
 		return false, err
 	}
 
-	if !c.validateCallerNamespace(req.Caller, req.Namespace) {
+	if err := c.validateCaller(caller); err != nil {
+		span.RecordError(err)
+		return false, err
+	}
+
+	if !c.validateCallerNamespace(caller, req.Namespace) {
 		return false, nil
 	}
 
-	accessClaims := req.Caller.GetAccess()
-	identityClaims := req.Caller.GetIdentity()
+	accessClaims := caller.GetAccess()
+	identityClaims := caller.GetIdentity()
 
 	if c.authCfg.accessTokenAuthEnabled && accessClaims != nil && !accessClaims.IsNil() {
 		span.SetAttributes(attribute.String("service", accessClaims.Subject()))
 	}
 	span.SetAttributes(attribute.String("namespace", req.Namespace))
 	span.SetAttributes(attribute.String("action", req.Action))
-	span.SetAttributes(attribute.String("object", req.Object))
-	span.SetAttributes(attribute.String("parent", req.Parent))
+	if req.Name != "" {
+		span.SetAttributes(attribute.String("object", fmt.Sprintf("%s:%s:%s", req.Resource, req.Attribute, req.Name)))
+	}
+	if req.Parent != "" {
+		span.SetAttributes(attribute.String("parent", req.Parent))
+	}
 	span.SetAttributes(attribute.Bool("with_user", identityClaims != nil && !identityClaims.IsNil()))
 
 	// No user => check on the service permissions
@@ -266,7 +278,7 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 		}
 	}
 
-	res, err := c.check(ctx, *req)
+	res, err := c.check(ctx, caller, req)
 	if err != nil {
 		span.RecordError(err)
 		return false, err
@@ -274,6 +286,18 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 
 	// Check if the user has access to any of the requested resources
 	return res, nil
+}
+
+func (c *LegacyClientImpl) validateCaller(caller claims.AuthInfo) error {
+	accessClaims := caller.GetAccess()
+	if c.authCfg.accessTokenAuthEnabled && (accessClaims == nil || accessClaims.IsNil()) {
+		return ErrMissingCaller
+	}
+	idClaims := caller.GetIdentity()
+	if idClaims != nil && !idClaims.IsNil() && idClaims.Subject() == "" {
+		return ErrMissingSubject
+	}
+	return nil
 }
 
 func (c *LegacyClientImpl) validateCallerNamespace(caller claims.AuthInfo, expectedNamespace string) bool {
@@ -288,12 +312,21 @@ func (c *LegacyClientImpl) validateCallerNamespace(caller claims.AuthInfo, expec
 	return accessTokenMatch && idTokenMatch
 }
 
-func (c *LegacyClientImpl) check(ctx context.Context, req CheckRequest) (bool, error) {
+func (c *LegacyClientImpl) check(ctx context.Context, caller claims.AuthInfo, req *CheckRequest) (bool, error) {
 	ctx, span := c.tracer.Start(ctx, "LegacyClientImpl.check")
 	defer span.End()
 
+	scope := ""
+	parentScope := ""
+	if req.Name != "" {
+		scope = fmt.Sprintf("%s:%s:%s", req.Resource, req.Attribute, req.Name)
+	}
+	if req.Parent != "" {
+		parentScope = fmt.Sprintf("%s:%s:%s", "folders", "uid", req.Parent)
+	}
+
 	// Check the cache
-	key := checkCacheKey(req.Namespace, req.Caller.GetIdentity().Subject(), req.Action, req.Object, req.Parent)
+	key := checkCacheKey(req.Namespace, caller.GetIdentity().Subject(), req.Action, scope, parentScope)
 	ctrl, err := c.getCachedCheck(ctx, key)
 	if err == nil || !errors.Is(err, cache.ErrNotFound) {
 		return ctrl, err
@@ -301,10 +334,10 @@ func (c *LegacyClientImpl) check(ctx context.Context, req CheckRequest) (bool, e
 
 	checkReq := &authzv1.CheckRequest{
 		Namespace: req.Namespace,
-		Subject:   req.Caller.GetIdentity().Subject(),
+		Subject:   caller.GetIdentity().Subject(),
 		Action:    req.Action,
-		Object:    req.Object,
-		Parent:    req.Parent,
+		Scope:     scope,
+		Parent:    parentScope,
 	}
 
 	// Instantiate a new context for the request

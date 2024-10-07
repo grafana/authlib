@@ -19,7 +19,7 @@
     "/v1/namespace/{namespace}/check": {
       "post": {
         "summary": "Check access for subject on resource given parent",
-        "description": "The check API will check if a subject is allowed to perform an action on an object.",
+        "description": "The check API will check if a subject is allowed to perform an action on a specific scope.",
         "operationId": "Check",
         "responses": {
           "200": {
@@ -55,7 +55,7 @@
                 "action": {
                   "type": "string"
                 },
-                "object": {
+                "scope": {
                   "type": "string"
                 },
                 "parent": {
@@ -123,7 +123,7 @@
     "ReadResponseData": {
       "type": "object",
       "properties": {
-        "object": {
+        "scope": {
           "type": "string"
         }
       }
