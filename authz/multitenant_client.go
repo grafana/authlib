@@ -35,7 +35,12 @@ type CheckRequest struct {
 	Caller    claims.AuthInfo
 	Namespace string
 	Action    string
-	Object    string
+	// ~Kind eg dashboards
+	Resource string
+	// The specific resource
+	// In grafana, this was historically called "UID", but in k8s, it is the name
+	Name string
+	// The Name of the parent folder of the resource
 	Parent    string
 }
 
