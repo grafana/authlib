@@ -35,8 +35,8 @@ type CheckRequest struct {
 	Caller    claims.AuthInfo
 	Namespace string
 	Action    string
-	Object    *string
-	Parent    *string
+	Object    string
+	Parent    string
 }
 
 type MultiTenantClient interface {
@@ -214,12 +214,8 @@ func (c *LegacyClientImpl) Check(ctx context.Context, req *CheckRequest) (bool, 
 	}
 	span.SetAttributes(attribute.String("namespace", req.Namespace))
 	span.SetAttributes(attribute.String("action", req.Action))
-	if req.Object != nil {
-		span.SetAttributes(attribute.String("object", *req.Object))
-	}
-	if req.Parent != nil {
-		span.SetAttributes(attribute.String("parent", *req.Parent))
-	}
+	span.SetAttributes(attribute.String("object", req.Object))
+	span.SetAttributes(attribute.String("parent", req.Parent))
 	span.SetAttributes(attribute.Bool("with_user", identityClaims != nil && !identityClaims.IsNil()))
 
 	// No user => check on the service permissions
@@ -289,16 +285,8 @@ func (c *LegacyClientImpl) check(ctx context.Context, req CheckRequest) (bool, e
 	ctx, span := c.tracer.Start(ctx, "LegacyClientImpl.check")
 	defer span.End()
 
-	// Replace nil pointers with empty strings
-	if req.Object == nil {
-		req.Object = new(string)
-	}
-	if req.Parent == nil {
-		req.Parent = new(string)
-	}
-
 	// Check the cache
-	key := checkCacheKey(req.Namespace, req.Caller.GetIdentity().Subject(), req.Action, *req.Object, *req.Parent)
+	key := checkCacheKey(req.Namespace, req.Caller.GetIdentity().Subject(), req.Action, req.Object, req.Parent)
 	ctrl, err := c.getCachedCheck(ctx, key)
 	if err == nil || !errors.Is(err, cache.ErrNotFound) {
 		return ctrl, err
@@ -308,8 +296,8 @@ func (c *LegacyClientImpl) check(ctx context.Context, req CheckRequest) (bool, e
 		Namespace: req.Namespace,
 		Subject:   req.Caller.GetIdentity().Subject(),
 		Action:    req.Action,
-		Object:    *req.Object,
-		Parent:    *req.Parent,
+		Object:    req.Object,
+		Parent:    req.Parent,
 	}
 
 	// Instantiate a new context for the request

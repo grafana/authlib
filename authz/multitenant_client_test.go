@@ -164,8 +164,8 @@ func TestLegacyClientImpl_Check_OnPremFmt(t *testing.T) {
 		Namespace: "default",
 		Action:    "dashboards:read",
 		// TODO (gamab): Should we remove the attribute?
-		Object: NewString("dashboards:uid:2"),
-		Parent: NewString("folders:uid:1"),
+		Object: "dashboards:uid:2",
+		Parent: "folders:uid:1",
 	}
 
 	got, err := client.Check(context.Background(), &req)
@@ -190,8 +190,8 @@ func TestLegacyClientImpl_Check_Cache(t *testing.T) {
 		},
 		Namespace: "stacks-12",
 		Action:    "dashboards:read",
-		Object:    NewString("dashboards:uid:2"),
-		Parent:    NewString("folders:uid:1"),
+		Object:    "dashboards:uid:2",
+		Parent:    "folders:uid:1",
 	}
 
 	// First call should populate the cache
@@ -284,8 +284,4 @@ func (f *FakeAuthzServiceClient) Read(ctx context.Context, in *authzv1.ReadReque
 }
 func (f *FakeAuthzServiceClient) Check(ctx context.Context, in *authzv1.CheckRequest, opts ...grpc.CallOption) (*authzv1.CheckResponse, error) {
 	return f.checkRes, nil
-}
-
-func NewString(s string) *string {
-	return &s
 }
