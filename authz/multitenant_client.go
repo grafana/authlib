@@ -6,7 +6,6 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
-	"strings"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel/attribute"
@@ -22,15 +21,14 @@ import (
 )
 
 var (
-	ErrMissingConfig    = errors.New("missing config")
-	ErrMissingNamespace = status.Errorf(codes.InvalidArgument, "missing namespace")
-	ErrInvalidNamespace = status.Errorf(codes.InvalidArgument, "invalid namespace")
-	ErrMissingAttribute = status.Errorf(codes.InvalidArgument, "missing attribute")
-	ErrMissingResource  = status.Errorf(codes.InvalidArgument, "missing resource")
-	ErrMissingAction    = status.Errorf(codes.InvalidArgument, "missing action")
-	ErrMissingCaller    = status.Errorf(codes.Unauthenticated, "missing caller")
-	ErrMissingSubject   = status.Errorf(codes.Unauthenticated, "missing subject")
-	ErrReadPermission   = status.Errorf(codes.PermissionDenied, "read permission failed")
+	ErrMissingConfig           = errors.New("missing config")
+	ErrMissingRequestNamespace = status.Errorf(codes.InvalidArgument, "missing request namespace")
+	ErrInvalidRequestNamespace = status.Errorf(codes.InvalidArgument, "invalid request namespace")
+	ErrMissingRequestAttribute = status.Errorf(codes.InvalidArgument, "missing request attribute")
+	ErrMissingRequestResource  = status.Errorf(codes.InvalidArgument, "missing request resource")
+	ErrMissingRequestAction    = status.Errorf(codes.InvalidArgument, "missing request action")
+	ErrMissingCaller           = status.Errorf(codes.Unauthenticated, "missing caller")
+	ErrMissingSubject          = status.Errorf(codes.Unauthenticated, "missing subject")
 )
 
 type CheckRequest struct {
@@ -178,25 +176,23 @@ func NewLegacyClient(cfg *MultiTenantClientConfig, opts ...LegacyClientOption) (
 
 func (r *CheckRequest) Validate() error {
 	if r.Namespace == "" {
-		return ErrMissingNamespace
+		return ErrMissingRequestNamespace
 	}
-	// TODO (gamab) disambiguate the namespace validation
-	if !strings.HasPrefix(r.Namespace, "stacks-") &&
-		!strings.HasPrefix(r.Namespace, "orgs-") &&
-		r.Namespace != "default" {
-		return ErrInvalidTokenNamespace
+
+	if _, err := claims.ParseNamespace(r.Namespace); err != nil {
+		return ErrInvalidRequestNamespace
 	}
 
 	if r.Action == "" {
-		return ErrMissingAction
+		return ErrMissingRequestAction
 	}
 
 	if r.Name != "" {
 		if r.Attribute == "" {
-			return ErrMissingAttribute
+			return ErrMissingRequestAttribute
 		}
 		if r.Resource == "" {
-			return ErrMissingResource
+			return ErrMissingRequestResource
 		}
 	}
 
