@@ -12,7 +12,6 @@ import (
 	"github.com/grafana/authlib/authn"
 	authzv1 "github.com/grafana/authlib/authz/proto/v1"
 	"github.com/grafana/authlib/cache"
-	"github.com/grafana/authlib/claims"
 )
 
 func TestLegacyClientImpl_Check(t *testing.T) {
@@ -148,7 +147,6 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 
 func TestLegacyClientImpl_Check_OnPremFmt(t *testing.T) {
 	client, authz := setupLegacyClient()
-	client.namespaceFmt = claims.OrgNamespaceFormatter
 
 	authz.checkRes = &authzv1.CheckResponse{Allowed: true}
 
@@ -269,11 +267,10 @@ func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
 func setupLegacyClient() (*LegacyClientImpl, *FakeAuthzServiceClient) {
 	fakeClient := &FakeAuthzServiceClient{}
 	return &LegacyClientImpl{
-		authCfg:      &MultiTenantClientConfig{accessTokenAuthEnabled: true},
-		clientV1:     fakeClient,
-		cache:        cache.NewLocalCache(cache.Config{}),
-		namespaceFmt: claims.CloudNamespaceFormatter,
-		tracer:       noop.NewTracerProvider().Tracer("noopTracer"),
+		authCfg:  &MultiTenantClientConfig{accessTokenAuthEnabled: true},
+		clientV1: fakeClient,
+		cache:    cache.NewLocalCache(cache.Config{}),
+		tracer:   noop.NewTracerProvider().Tracer("noopTracer"),
 	}, fakeClient
 }
 

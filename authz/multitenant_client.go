@@ -57,13 +57,12 @@ var _ MultiTenantClient = (*LegacyClientImpl)(nil)
 type LegacyClientOption func(*LegacyClientImpl)
 
 type LegacyClientImpl struct {
-	authCfg      *MultiTenantClientConfig
-	clientV1     authzv1.AuthzServiceClient
-	cache        cache.Cache
-	grpcConn     grpc.ClientConnInterface
-	grpcOptions  []grpc.DialOption
-	namespaceFmt claims.NamespaceFormatter
-	tracer       trace.Tracer
+	authCfg     *MultiTenantClientConfig
+	clientV1    authzv1.AuthzServiceClient
+	cache       cache.Cache
+	grpcConn    grpc.ClientConnInterface
+	grpcOptions []grpc.DialOption
+	tracer      trace.Tracer
 }
 
 type tracerProvider struct {
@@ -104,12 +103,6 @@ func WithGrpcConnectionLCOption(conn grpc.ClientConnInterface) LegacyClientOptio
 func WithTracerLCOption(tracer trace.Tracer) LegacyClientOption {
 	return func(c *LegacyClientImpl) {
 		c.tracer = tracer
-	}
-}
-
-func WithNamespaceFormatterLCOption(fmt claims.NamespaceFormatter) LegacyClientOption {
-	return func(c *LegacyClientImpl) {
-		c.namespaceFmt = fmt
 	}
 }
 
@@ -167,10 +160,6 @@ func NewLegacyClient(cfg *MultiTenantClientConfig, opts ...LegacyClientOption) (
 		client.grpcConn = conn
 	}
 	client.clientV1 = authzv1.NewAuthzServiceClient(client.grpcConn)
-
-	if client.namespaceFmt == nil {
-		client.namespaceFmt = claims.CloudNamespaceFormatter
-	}
 
 	return client, nil
 }
