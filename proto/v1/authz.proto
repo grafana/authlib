@@ -59,4 +59,3 @@ message CheckRequest {
 message CheckResponse {
   bool allowed = 1;
 }
-
