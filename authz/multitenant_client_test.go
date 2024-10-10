@@ -168,7 +168,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			require.Equal(t, tt.want, got)
+			require.Equal(t, tt.want, got.Allowed)
 		})
 	}
 }
@@ -199,7 +199,7 @@ func TestLegacyClientImpl_Check_OnPremFmt(t *testing.T) {
 
 	got, err := client.Check(context.Background(), caller, &req)
 	require.NoError(t, err)
-	require.True(t, got)
+	require.True(t, got.Allowed)
 }
 
 func TestLegacyClientImpl_Check_Cache(t *testing.T) {
@@ -229,7 +229,7 @@ func TestLegacyClientImpl_Check_Cache(t *testing.T) {
 	// First call should populate the cache
 	got, err := client.Check(context.Background(), caller, &req)
 	require.NoError(t, err)
-	require.True(t, got)
+	require.True(t, got.Allowed)
 
 	// Check that the cache was populated correctly
 	ctrl, err := client.getCachedCheck(context.Background(), checkCacheKey("stacks-12", "user:1", "dashboards:read", "dashboards:uid:rrss", "folders:uid:ttuu"))
@@ -242,7 +242,7 @@ func TestLegacyClientImpl_Check_Cache(t *testing.T) {
 	// Second call should still be true as we hit the cache
 	got, err = client.Check(context.Background(), caller, &req)
 	require.NoError(t, err)
-	require.True(t, got)
+	require.True(t, got.Allowed)
 }
 
 func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
@@ -292,7 +292,7 @@ func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			require.Equal(t, tt.want, got)
+			require.Equal(t, tt.want, got.Allowed)
 		})
 	}
 }

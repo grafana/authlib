@@ -27,6 +27,9 @@ var (
 	ErrMissingRequestAction    = errors.New("missing request action")
 	ErrMissingCaller           = errors.New("missing caller")
 	ErrMissingSubject          = errors.New("missing subject")
+
+	checkResponseDenied  = CheckResponse{Allowed: false}
+	checkResponseAllowed = CheckResponse{Allowed: true}
 )
 
 type CheckRequest struct {
@@ -45,8 +48,25 @@ type CheckRequest struct {
 	Parent string
 }
 
+type CheckResponse struct {
+	// Whether the caller is allowed to perform the requested action
+	Allowed bool
+}
+
+// Client is the interface for the Grafana app-platform authorization client.
+// This client can be used by Multi-tenant applications.
 type Client interface {
-	Check(ctx context.Context, Caller claims.AuthInfo, req *CheckRequest) (bool, error)
+	// Check verifies if the Caller has access to specific resources within a namespace.
+	//
+	// Caller represents the authentication information of the entity
+	// initiating the request, which can be a service or a user.
+	//
+	// CheckRequest contains the details of the request, including the namespace, action, resource, parent.
+	//
+	// The method returns a CheckResponse containing weather the caller is authorized.
+	// An error is returned if the authorization check cannot be completed,
+	// for example, due to an unreachable authorization service.
+	Check(ctx context.Context, Caller claims.AuthInfo, req *CheckRequest) (CheckResponse, error)
 }
 
 type ClientConfig struct {
@@ -199,22 +219,22 @@ func (r *CheckRequest) Validate() error {
 	return nil
 }
 
-func (c *LegacyClientImpl) Check(ctx context.Context, caller claims.AuthInfo, req *CheckRequest) (bool, error) {
+func (c *LegacyClientImpl) Check(ctx context.Context, caller claims.AuthInfo, req *CheckRequest) (CheckResponse, error) {
 	ctx, span := c.tracer.Start(ctx, "LegacyClientImpl.Check")
 	defer span.End()
 
 	if err := req.Validate(); err != nil {
 		span.RecordError(err)
-		return false, err
+		return checkResponseDenied, err
 	}
 
 	if err := c.validateCaller(caller); err != nil {
 		span.RecordError(err)
-		return false, err
+		return checkResponseDenied, err
 	}
 
 	if !c.validateCallerNamespace(caller, req.Namespace) {
-		return false, nil
+		return checkResponseDenied, nil
 	}
 
 	accessClaims := caller.GetAccess()
@@ -237,20 +257,20 @@ func (c *LegacyClientImpl) Check(ctx context.Context, caller claims.AuthInfo, re
 	if identityClaims == nil || identityClaims.IsNil() {
 		// access token check is disabled => we can skip the authz service
 		if !c.authCfg.accessTokenAuthEnabled {
-			return true, nil
+			return checkResponseAllowed, nil
 		}
 
 		if accessClaims == nil || accessClaims.IsNil() {
-			return false, ErrMissingCaller
+			return checkResponseDenied, ErrMissingCaller
 		}
 
 		perms := accessClaims.Permissions()
 		for _, p := range perms {
 			if p == req.Action {
-				return true, nil
+				return checkResponseAllowed, nil
 			}
 		}
-		return false, nil
+		return checkResponseDenied, nil
 	}
 
 	span.SetAttributes(attribute.String("subject", identityClaims.Subject()))
@@ -258,7 +278,7 @@ func (c *LegacyClientImpl) Check(ctx context.Context, caller claims.AuthInfo, re
 	// Only check the service permissions if the access token check is enabled
 	if c.authCfg.accessTokenAuthEnabled {
 		if accessClaims == nil || accessClaims.IsNil() {
-			return false, ErrMissingCaller
+			return checkResponseDenied, ErrMissingCaller
 		}
 
 		// Make sure the service is allowed to perform the requested action
@@ -270,18 +290,18 @@ func (c *LegacyClientImpl) Check(ctx context.Context, caller claims.AuthInfo, re
 			}
 		}
 		if !serviceIsAllowedAction {
-			return false, nil
+			return checkResponseDenied, nil
 		}
 	}
 
 	res, err := c.check(ctx, caller, req)
 	if err != nil {
 		span.RecordError(err)
-		return false, err
+		return checkResponseDenied, err
 	}
 
 	// Check if the user has access to any of the requested resources
-	return res, nil
+	return CheckResponse{Allowed: res}, nil
 }
 
 func (c *LegacyClientImpl) validateCaller(caller claims.AuthInfo) error {
