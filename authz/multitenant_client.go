@@ -12,8 +12,6 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	authzv1 "github.com/grafana/authlib/authz/proto/v1"
 	"github.com/grafana/authlib/cache"
@@ -22,13 +20,13 @@ import (
 
 var (
 	ErrMissingConfig           = errors.New("missing config")
-	ErrMissingRequestNamespace = status.Errorf(codes.InvalidArgument, "missing request namespace")
-	ErrInvalidRequestNamespace = status.Errorf(codes.InvalidArgument, "invalid request namespace")
-	ErrMissingRequestAttribute = status.Errorf(codes.InvalidArgument, "missing request attribute")
-	ErrMissingRequestResource  = status.Errorf(codes.InvalidArgument, "missing request resource")
-	ErrMissingRequestAction    = status.Errorf(codes.InvalidArgument, "missing request action")
-	ErrMissingCaller           = status.Errorf(codes.Unauthenticated, "missing caller")
-	ErrMissingSubject          = status.Errorf(codes.Unauthenticated, "missing subject")
+	ErrMissingRequestNamespace = errors.New("missing request namespace")
+	ErrInvalidRequestNamespace = errors.New("invalid request namespace")
+	ErrMissingRequestAttribute = errors.New("missing request attribute")
+	ErrMissingRequestResource  = errors.New("missing request resource")
+	ErrMissingRequestAction    = errors.New("missing request action")
+	ErrMissingCaller           = errors.New("missing caller")
+	ErrMissingSubject          = errors.New("missing subject")
 )
 
 type CheckRequest struct {
