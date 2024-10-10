@@ -15,9 +15,9 @@ var (
 var _ EnforcementClient = &EnforcementClientImpl{}
 
 type EnforcementClientImpl struct {
-	client        client
+	client        searchClient
 	queryTemplate *searchQuery
-	clientOpts    []clientOption
+	clientOpts    []searchClientOption
 }
 
 func WithHTTPClient(doer HTTPRequestDoer) ClientOption {
@@ -56,7 +56,7 @@ func NewEnforcementClient(cfg Config, opt ...ClientOption) (*EnforcementClientIm
 	}
 
 	var err error
-	if s.client, err = newClient(cfg, s.clientOpts...); err != nil {
+	if s.client, err = newSearchClient(cfg, s.clientOpts...); err != nil {
 		return nil, err
 	}
 
