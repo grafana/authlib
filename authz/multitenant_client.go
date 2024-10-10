@@ -47,11 +47,11 @@ type CheckRequest struct {
 	Parent string
 }
 
-type MultiTenantClient interface {
+type Client interface {
 	Check(ctx context.Context, Caller claims.AuthInfo, req *CheckRequest) (bool, error)
 }
 
-type MultiTenantClientConfig struct {
+type ClientConfig struct {
 	// RemoteAddress is the address of the authz service. It should be in the format "host:port".
 	RemoteAddress string
 
@@ -60,12 +60,12 @@ type MultiTenantClientConfig struct {
 	accessTokenAuthEnabled bool
 }
 
-var _ MultiTenantClient = (*LegacyClientImpl)(nil)
+var _ Client = (*LegacyClientImpl)(nil)
 
 type LegacyClientOption func(*LegacyClientImpl)
 
 type LegacyClientImpl struct {
-	authCfg     *MultiTenantClientConfig
+	authCfg     *ClientConfig
 	clientV1    authzv1.AuthzServiceClient
 	cache       cache.Cache
 	grpcConn    grpc.ClientConnInterface
@@ -126,7 +126,7 @@ func WithDisableAccessTokenLCOption() LegacyClientOption {
 // Initialization
 // -----
 
-func NewLegacyClient(cfg *MultiTenantClientConfig, opts ...LegacyClientOption) (*LegacyClientImpl, error) {
+func NewLegacyClient(cfg *ClientConfig, opts ...LegacyClientOption) (*LegacyClientImpl, error) {
 	if cfg == nil {
 		return nil, ErrMissingConfig
 	}

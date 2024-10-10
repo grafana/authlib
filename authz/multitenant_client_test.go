@@ -300,7 +300,7 @@ func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
 func setupLegacyClient() (*LegacyClientImpl, *FakeAuthzServiceClient) {
 	fakeClient := &FakeAuthzServiceClient{}
 	return &LegacyClientImpl{
-		authCfg:  &MultiTenantClientConfig{accessTokenAuthEnabled: true},
+		authCfg:  &ClientConfig{accessTokenAuthEnabled: true},
 		clientV1: fakeClient,
 		cache:    cache.NewLocalCache(cache.Config{}),
 		tracer:   noop.NewTracerProvider().Tracer("noopTracer"),
