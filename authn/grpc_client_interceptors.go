@@ -130,9 +130,6 @@ func NewGrpcClientInterceptor(cfg *GrpcClientConfig, opts ...GrpcClientIntercept
 }
 
 func (gci *GrpcClientInterceptor) UnaryClientInterceptor(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
-	ctx, span := gci.tracer.Start(ctx, "GrpcClientInterceptor.UnaryClientInterceptor")
-	defer span.End()
-
 	ctx, err := gci.wrapContext(ctx)
 	if err != nil {
 		return err
@@ -142,9 +139,6 @@ func (gci *GrpcClientInterceptor) UnaryClientInterceptor(ctx context.Context, me
 }
 
 func (gci *GrpcClientInterceptor) StreamClientInterceptor(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
-	ctx, span := gci.tracer.Start(ctx, "GrpcClientInterceptor.StreamClientInterceptor")
-	defer span.End()
-
 	ctx, err := gci.wrapContext(ctx)
 	if err != nil {
 		return nil, err
