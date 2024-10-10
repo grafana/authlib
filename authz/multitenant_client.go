@@ -63,7 +63,7 @@ type Client interface {
 	//
 	// CheckRequest contains the details of the request, including the namespace, action, resource, parent.
 	//
-	// The method returns true if the Caller is authorized, false otherwise.
+	// The method returns a CheckResponse containing true if the Caller is authorized, false otherwise.
 	// An error is returned if the authorization check cannot be completed,
 	// for example, due to an unreachable authorization service.
 	Check(ctx context.Context, Caller claims.AuthInfo, req *CheckRequest) (CheckResponse, error)
