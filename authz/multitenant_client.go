@@ -45,12 +45,10 @@ type CheckRequest struct {
 	Parent string
 }
 
-// Client is the interface for the authorization client
-// This client can be used with Multi-tenant applications.
-// It is used to check if a service or a user has access to specific resources within a namespace.
+// Client is the interface for the Grafana app-platform authorization client.
+// This client can be used by Multi-tenant applications.
 type Client interface {
-	// Check verifies if the Caller has permission to perform the action
-	// specified in the CheckRequest.
+	// Check verifies if the Caller has access to specific resources within a namespace.
 	//
 	// Caller represents the authentication information of the entity
 	// initiating the request, which can be a service or a user.
@@ -59,7 +57,7 @@ type Client interface {
 	//
 	// The method returns true if the Caller is authorized, false otherwise.
 	// An error is returned if the authorization check cannot be completed,
-	// for example, due to an authentication failure or an unreachable authorization service.
+	// for example, due to an unreachable authorization service.
 	Check(ctx context.Context, Caller claims.AuthInfo, req *CheckRequest) (bool, error)
 }
 
