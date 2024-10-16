@@ -49,11 +49,14 @@ message ReadResponse {
 }
 
 message CheckRequest {
-  string namespace = 1;
-  string subject = 2;
-  string action = 3;
-  string scope = 4;
-  string parent = 5;
+  string subject = 1;
+  string verb = 2;
+  string group = 3;
+  string resource = 4;
+  string namespace = 5;
+  string name = 6;
+  string subresource = 7;
+  string path = 8;
 }
 
 message CheckResponse {

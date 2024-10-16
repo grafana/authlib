@@ -52,13 +52,22 @@
                 "subject": {
                   "type": "string"
                 },
-                "action": {
+                "verb": {
                   "type": "string"
                 },
-                "scope": {
+                "group": {
                   "type": "string"
                 },
-                "parent": {
+                "resource": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "subresource": {
+                  "type": "string"
+                },
+                "path": {
                   "type": "string"
                 }
               }
