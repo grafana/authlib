@@ -19,7 +19,7 @@ import (
 	"github.com/grafana/authlib/internal/httpclient"
 )
 
-var _ client = &clientImpl{}
+var _ searchclient = &searchClientImpl{}
 
 var (
 	ErrInvalidQuery          = errors.New("invalid query")
@@ -39,8 +39,8 @@ const (
 
 // withHTTPClient allows overriding the default Doer, which is
 // automatically created using http.Client. This is useful for tests.
-func withHTTPClient(doer HTTPRequestDoer) clientOption {
-	return func(c *clientImpl) error {
+func withHTTPClient(doer HTTPRequestDoer) searchClientOption {
+	return func(c *searchClientImpl) error {
 		c.client = doer
 
 		return nil
@@ -48,16 +48,16 @@ func withHTTPClient(doer HTTPRequestDoer) clientOption {
 }
 
 // withCache allows overriding the default cache, which is a local cache.
-func withCache(cache cache.Cache) clientOption {
-	return func(c *clientImpl) error {
+func withCache(cache cache.Cache) searchClientOption {
+	return func(c *searchClientImpl) error {
 		c.cache = cache
 
 		return nil
 	}
 }
 
-func newClient(cfg Config, opts ...clientOption) (*clientImpl, error) {
-	client := &clientImpl{
+func newClient(cfg Config, opts ...searchClientOption) (*searchClientImpl, error) {
+	client := &searchClientImpl{
 		singlef: singleflight.Group{},
 		client:  nil,
 		cache:   nil,
@@ -91,7 +91,7 @@ func newClient(cfg Config, opts ...clientOption) (*clientImpl, error) {
 	return client, nil
 }
 
-type clientImpl struct {
+type searchClientImpl struct {
 	cache    cache.Cache
 	cfg      Config
 	client   HTTPRequestDoer
@@ -112,7 +112,7 @@ func (query *searchQuery) processResource() {
 }
 
 // processIDToken verifies the id token is legit and extracts its subject in the query.NamespacedID.
-func (query *searchQuery) processIDToken(c *clientImpl) error {
+func (query *searchQuery) processIDToken(c *searchClientImpl) error {
 	if query.IdToken != "" {
 		claims, err := c.verifier.Verify(context.Background(), query.IdToken)
 		if err != nil {
@@ -145,7 +145,7 @@ func (query *searchQuery) validateQuery() error {
 }
 
 // Search returns the permissions for the given query.
-func (c *clientImpl) Search(ctx context.Context, query searchQuery) (*searchResponse, error) {
+func (c *searchClientImpl) Search(ctx context.Context, query searchQuery) (*searchResponse, error) {
 	// set scope if resource is provided
 	query.processResource()
 
@@ -222,7 +222,7 @@ func (c *clientImpl) Search(ctx context.Context, query searchQuery) (*searchResp
 	return &searchResponse{Data: &perms}, nil
 }
 
-func (c *clientImpl) cacheValue(ctx context.Context, perms permissionsByID, key string) error {
+func (c *searchClientImpl) cacheValue(ctx context.Context, perms permissionsByID, key string) error {
 	buf := bytes.Buffer{}
 	err := gob.NewEncoder(&buf).Encode(perms)
 	if err != nil {

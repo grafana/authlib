@@ -11,8 +11,8 @@ type HTTPRequestDoer interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-// client performs requests to the authorization server.
-type client interface {
+// searchclient performs requests to the authorization server.
+type searchclient interface {
 	// Search returns the permissions for the given query.
 	Search(ctx context.Context, query searchQuery) (*searchResponse, error)
 }
@@ -37,7 +37,7 @@ type Checker func(resources ...Resource) bool
 type ClientOption func(*EnforcementClientImpl) error
 
 // ClientOption allows setting custom parameters during construction.
-type clientOption func(*clientImpl) error
+type searchClientOption func(*searchClientImpl) error
 type response[T any] struct {
 	Data  *T     `json:"data"`
 	Error string `json:"error"`
