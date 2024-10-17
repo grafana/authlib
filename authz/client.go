@@ -75,11 +75,6 @@ type AccessChecker interface {
 }
 
 type ListRequest struct {
-	// The requested access verb.
-	// this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy,
-	// or the lowercased HTTP verb associated with non-API requests (this includes get, put, post, patch, and delete)
-	Verb string
-
 	// API group (dashboards.grafana.app)
 	Group string
 
