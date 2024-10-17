@@ -28,8 +28,8 @@ var (
 	ErrMissingCaller           = errors.New("missing caller")
 	ErrMissingSubject          = errors.New("missing subject")
 
-	checkAllowed = claims.CheckResponse{Allowed: true}
-	checkDenied  = claims.CheckResponse{Allowed: false}
+	checkResponseDenied  = claims.CheckResponse{Allowed: false}
+	checkResponseAllowed = claims.CheckResponse{Allowed: true}
 )
 
 type ClientConfig struct {
@@ -225,16 +225,16 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req claims.C
 
 	if err := validateAccessRequest(req); err != nil {
 		span.RecordError(err)
-		return checkDenied, err
+		return checkResponseDenied, err
 	}
 
 	if err := c.validateCaller(id); err != nil {
 		span.RecordError(err)
-		return checkDenied, err
+		return checkResponseDenied, err
 	}
 
 	if !c.validateCallerNamespace(id, req.Namespace) {
-		return checkDenied, nil
+		return checkResponseDenied, nil
 	}
 
 	accessClaims := id.GetAccess()
@@ -256,21 +256,21 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req claims.C
 	if identityClaims == nil || identityClaims.IsNil() {
 		// access token check is disabled => we can skip the authz service
 		if !c.authCfg.accessTokenAuthEnabled {
-			return checkAllowed, nil
+			return checkResponseAllowed, nil
 		}
 
 		if accessClaims == nil || accessClaims.IsNil() {
-			return checkDenied, ErrMissingCaller
+			return checkResponseDenied, ErrMissingCaller
 		}
 
 		action := fmt.Sprintf("%s/%s:%s", req.Group, req.Resource, req.Verb)
 		perms := accessClaims.Permissions()
 		for _, p := range perms {
 			if p == action {
-				return checkAllowed, nil
+				return checkResponseAllowed, nil
 			}
 		}
-		return checkDenied, nil
+		return checkResponseDenied, nil
 	}
 
 	span.SetAttributes(attribute.String("subject", identityClaims.Subject()))
@@ -278,7 +278,7 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req claims.C
 	// Only check the service permissions if the access token check is enabled
 	if c.authCfg.accessTokenAuthEnabled {
 		if accessClaims == nil || accessClaims.IsNil() {
-			return checkDenied, ErrMissingCaller
+			return checkResponseDenied, ErrMissingCaller
 		}
 
 		// Make sure the service is allowed to perform the requested action
@@ -291,14 +291,14 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req claims.C
 			}
 		}
 		if !serviceIsAllowedAction {
-			return checkDenied, nil
+			return checkResponseDenied, nil
 		}
 	}
 
 	res, err := c.check(ctx, id, &req)
 	if err != nil {
 		span.RecordError(err)
-		return checkDenied, err
+		return checkResponseDenied, err
 	}
 
 	// Check if the user has access to any of the requested resources
