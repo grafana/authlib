@@ -26,10 +26,10 @@ service AuthzService {
     };
 
     option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
-      summary: "Check access for subject on resource given parent"
+      summary: "Check access for subject on resource given its parent folder"
       tags: ["Check"]
       operation_id: "Check"
-      description: "The check API will check if a subject is allowed to perform an action on a specific scope."
+      description: "The check API will check if a subject is allowed to perform an action on a specific resource."
     };
   }
 }
@@ -57,7 +57,7 @@ message CheckRequest {
   string name = 6;
   string subresource = 7;
   string path = 8;
-  string parent = 9;
+  string folder = 9;
 }
 
 message CheckResponse {

@@ -18,8 +18,8 @@
   "paths": {
     "/v1/namespace/{namespace}/check": {
       "post": {
-        "summary": "Check access for subject on resource given parent",
-        "description": "The check API will check if a subject is allowed to perform an action on a specific scope.",
+        "summary": "Check access for subject on resource given its parent folder",
+        "description": "The check API will check if a subject is allowed to perform an action on a specific resource.",
         "operationId": "Check",
         "responses": {
           "200": {
@@ -70,7 +70,7 @@
                 "path": {
                   "type": "string"
                 },
-                "parent": {
+                "folder": {
                   "type": "string"
                 }
               }

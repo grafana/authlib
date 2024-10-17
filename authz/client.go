@@ -228,7 +228,7 @@ func validateAccessRequest(req claims.CheckRequest) error {
 	return nil
 }
 
-func (c *ClientImpl) hasAccess(ctx context.Context, id claims.AuthInfo, req *claims.CheckRequest) (bool, error) {
+func (c *ClientImpl) check(ctx context.Context, id claims.AuthInfo, req *claims.CheckRequest) (bool, error) {
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.hasAccess")
 	defer span.End()
 
@@ -247,6 +247,7 @@ func (c *ClientImpl) hasAccess(ctx context.Context, id claims.AuthInfo, req *cla
 		Name:        req.Name,
 		Subresource: req.Subresource,
 		Path:        req.Path,
+		Folder:      req.Folder,
 	}
 
 	// Instantiate a new context for the request
@@ -341,7 +342,7 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req claims.C
 		}
 	}
 
-	res, err := c.hasAccess(ctx, id, &req)
+	res, err := c.check(ctx, id, &req)
 	if err != nil {
 		span.RecordError(err)
 		return checkDenied, err
