@@ -39,6 +39,11 @@ type AccessChecker interface {
 	Check(ctx context.Context, id AuthInfo, req CheckRequest) (CheckResponse, error)
 }
 
+type CheckResponse struct {
+	// Allowed is true if the request is allowed, false otherwise.
+	Allowed bool
+}
+
 type ListRequest struct {
 	// The requested access verb.
 	// this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy,
@@ -58,10 +63,10 @@ type ListRequest struct {
 	Subresource string
 }
 
-type CheckResponse struct {
-	// Allowed is true if the request is allowed, false otherwise.
-	Allowed bool
-}
+// TODO: Should the namespace be specified in the request instead.
+// I don't think we'll be able to Compile over multiple namespaces.
+// Checks access while iterating within a resource
+type ItemChecker func(namespace string, name string) bool
 
 type AccessClient interface {
 	AccessChecker
@@ -71,8 +76,3 @@ type AccessClient interface {
 	// Returns nil if there is no access to any matching items
 	Compile(ctx context.Context, id AuthInfo, req ListRequest) (ItemChecker, error)
 }
-
-// TODO: Should the namespace be specified in the request instead.
-// I don't think we'll be able to Compile over multiple namespaces.
-// Checks access while iterating within a resource
-type ItemChecker func(namespace string, name string) bool
