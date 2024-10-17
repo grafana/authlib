@@ -12,21 +12,20 @@ import (
 	"github.com/grafana/authlib/authn"
 	authzv1 "github.com/grafana/authlib/authz/proto/v1"
 	"github.com/grafana/authlib/cache"
-	"github.com/grafana/authlib/claims"
 )
 
 func TestLegacyClientImpl_Check(t *testing.T) {
 	tests := []struct {
 		name     string
 		caller   *authn.AuthInfo
-		req      claims.CheckRequest
+		req      CheckRequest
 		checkRes bool
 		want     bool
 		wantErr  bool
 	}{
 		{
 			name: "No Action",
-			req: claims.CheckRequest{
+			req: CheckRequest{
 				Namespace: "stacks-12",
 			},
 			wantErr: true,
@@ -34,7 +33,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		{
 			name:   "No Caller",
 			caller: &authn.AuthInfo{},
-			req: claims.CheckRequest{
+			req: CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -44,7 +43,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		},
 		{
 			name: "Missing group",
-			req: claims.CheckRequest{
+			req: CheckRequest{
 				Namespace: "stacks-12",
 				Resource:  "dashboards",
 				Verb:      "list",
@@ -54,7 +53,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		},
 		{
 			name: "Missing resource (kind)",
-			req: claims.CheckRequest{
+			req: CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Verb:      "list",
@@ -70,7 +69,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12"},
 				}),
 			},
-			req: claims.CheckRequest{
+			req: CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -86,7 +85,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", Permissions: []string{"dashboards.grafana.app/dashboards:list"}},
 				}),
 			},
-			req: claims.CheckRequest{
+			req: CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -102,7 +101,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 					Rest:   authn.AccessTokenClaims{Namespace: "stacks-13", Permissions: []string{"dashboards.grafana.app/dashboards:list"}},
 				}),
 			},
-			req: claims.CheckRequest{
+			req: CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -122,7 +121,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 				}),
 			},
-			req: claims.CheckRequest{
+			req: CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -142,7 +141,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 				}),
 			},
-			req: claims.CheckRequest{
+			req: CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -162,7 +161,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 				}),
 			},
-			req: claims.CheckRequest{
+			req: CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -203,7 +202,7 @@ func TestLegacyClientImpl_Check_OnPremFmt(t *testing.T) {
 		}),
 	}
 
-	req := claims.CheckRequest{
+	req := CheckRequest{
 		Namespace: "default",
 		Group:     "dashboards.grafana.app",
 		Resource:  "dashboards",
@@ -231,7 +230,7 @@ func TestLegacyClientImpl_Check_Cache(t *testing.T) {
 		}),
 	}
 
-	req := claims.CheckRequest{
+	req := CheckRequest{
 		Namespace: "stacks-12",
 		Group:     "dashboards.grafana.app",
 		Resource:  "dashboards",
@@ -262,7 +261,7 @@ func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
 	tests := []struct {
 		name     string
 		caller   *authn.AuthInfo
-		req      claims.CheckRequest
+		req      CheckRequest
 		checkRes bool
 		want     bool
 		wantErr  bool
@@ -270,7 +269,7 @@ func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
 		{
 			name:   "No user assume the service is allowed",
 			caller: &authn.AuthInfo{},
-			req: claims.CheckRequest{
+			req: CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -286,7 +285,7 @@ func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
 					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 				}),
 			},
-			req: claims.CheckRequest{
+			req: CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
