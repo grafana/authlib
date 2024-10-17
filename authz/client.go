@@ -118,7 +118,7 @@ type ClientConfig struct {
 // Once we are able to deal with folder permissions expansion.
 var _ AccessChecker = (*ClientImpl)(nil)
 
-type LegacyClientOption func(*ClientImpl)
+type AuthzClientOption func(*ClientImpl)
 
 type ClientImpl struct {
 	authCfg     *ClientConfig
@@ -142,7 +142,7 @@ func (tp *tracerProvider) Tracer(name string, options ...trace.TracerOption) tra
 // Options
 // -----
 
-func WithCacheClientOption(cache cache.Cache) LegacyClientOption {
+func WithCacheClientOption(cache cache.Cache) AuthzClientOption {
 	return func(c *ClientImpl) {
 		c.cache = cache
 	}
@@ -150,7 +150,7 @@ func WithCacheClientOption(cache cache.Cache) LegacyClientOption {
 
 // WithGrpcDialOptionsClientOption sets the gRPC dial options for client connection setup.
 // Useful for adding client interceptors. These options are ignored if WithGrpcConnection is used.
-func WithGrpcDialOptionsClientOption(opts ...grpc.DialOption) LegacyClientOption {
+func WithGrpcDialOptionsClientOption(opts ...grpc.DialOption) AuthzClientOption {
 	return func(c *ClientImpl) {
 		c.grpcOptions = opts
 	}
@@ -158,13 +158,13 @@ func WithGrpcDialOptionsClientOption(opts ...grpc.DialOption) LegacyClientOption
 
 // WithGrpcConnectionClientOption sets the gRPC client connection directly.
 // Useful for running the client in the same process as the authorization service.
-func WithGrpcConnectionClientOption(conn grpc.ClientConnInterface) LegacyClientOption {
+func WithGrpcConnectionClientOption(conn grpc.ClientConnInterface) AuthzClientOption {
 	return func(c *ClientImpl) {
 		c.grpcConn = conn
 	}
 }
 
-func WithTracerClientOption(tracer trace.Tracer) LegacyClientOption {
+func WithTracerClientOption(tracer trace.Tracer) AuthzClientOption {
 	return func(c *ClientImpl) {
 		c.tracer = tracer
 	}
@@ -172,7 +172,7 @@ func WithTracerClientOption(tracer trace.Tracer) LegacyClientOption {
 
 // WithDisableAccessTokenClientOption is an option to disable access token authorization.
 // Warning: Using this option means there won't be any service authorization.
-func WithDisableAccessTokenClientOption() LegacyClientOption {
+func WithDisableAccessTokenClientOption() AuthzClientOption {
 	return func(c *ClientImpl) {
 		c.authCfg.accessTokenAuthEnabled = false
 	}
@@ -182,7 +182,7 @@ func WithDisableAccessTokenClientOption() LegacyClientOption {
 // Initialization
 // -----
 
-func NewClient(cfg *ClientConfig, opts ...LegacyClientOption) (*ClientImpl, error) {
+func NewClient(cfg *ClientConfig, opts ...AuthzClientOption) (*ClientImpl, error) {
 	if cfg == nil {
 		return nil, ErrMissingConfig
 	}
@@ -291,7 +291,6 @@ func (c *ClientImpl) check(ctx context.Context, id claims.AuthInfo, req *CheckRe
 	return resp.Allowed, err
 }
 
-// HasAccess implements claims.AccessClient.
 func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckRequest) (CheckResponse, error) {
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.Check")
 	defer span.End()
