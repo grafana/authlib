@@ -19,14 +19,14 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 	tests := []struct {
 		name     string
 		caller   *authn.AuthInfo
-		req      claims.AccessRequest
+		req      claims.CheckRequest
 		checkRes bool
 		want     bool
 		wantErr  bool
 	}{
 		{
 			name: "No Action",
-			req: claims.AccessRequest{
+			req: claims.CheckRequest{
 				Namespace: "stacks-12",
 			},
 			wantErr: true,
@@ -34,7 +34,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		{
 			name:   "No Caller",
 			caller: &authn.AuthInfo{},
-			req: claims.AccessRequest{
+			req: claims.CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -44,7 +44,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		},
 		{
 			name: "Missing group",
-			req: claims.AccessRequest{
+			req: claims.CheckRequest{
 				Namespace: "stacks-12",
 				Resource:  "dashboards",
 				Verb:      "list",
@@ -54,7 +54,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		},
 		{
 			name: "Missing resource (kind)",
-			req: claims.AccessRequest{
+			req: claims.CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Verb:      "list",
@@ -70,7 +70,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12"},
 				}),
 			},
-			req: claims.AccessRequest{
+			req: claims.CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -86,7 +86,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", Permissions: []string{"dashboards.grafana.app/dashboards:list"}},
 				}),
 			},
-			req: claims.AccessRequest{
+			req: claims.CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -102,7 +102,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 					Rest:   authn.AccessTokenClaims{Namespace: "stacks-13", Permissions: []string{"dashboards.grafana.app/dashboards:list"}},
 				}),
 			},
-			req: claims.AccessRequest{
+			req: claims.CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -122,7 +122,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 				}),
 			},
-			req: claims.AccessRequest{
+			req: claims.CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -142,7 +142,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 				}),
 			},
-			req: claims.AccessRequest{
+			req: claims.CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -162,7 +162,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 				}),
 			},
-			req: claims.AccessRequest{
+			req: claims.CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -177,13 +177,13 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 			client, authz := setupLegacyClient()
 			authz.checkRes = &authzv1.CheckResponse{Allowed: tt.checkRes}
 
-			got, err := client.HasAccess(context.Background(), tt.caller, tt.req)
+			got, err := client.Check(context.Background(), tt.caller, tt.req)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
-			require.Equal(t, tt.want, got)
+			require.Equal(t, tt.want, got.Allowed)
 		})
 	}
 }
@@ -203,7 +203,7 @@ func TestLegacyClientImpl_Check_OnPremFmt(t *testing.T) {
 		}),
 	}
 
-	req := claims.AccessRequest{
+	req := claims.CheckRequest{
 		Namespace: "default",
 		Group:     "dashboards.grafana.app",
 		Resource:  "dashboards",
@@ -211,9 +211,9 @@ func TestLegacyClientImpl_Check_OnPremFmt(t *testing.T) {
 		Name:      "rrss",
 	}
 
-	got, err := client.HasAccess(context.Background(), caller, req)
+	got, err := client.Check(context.Background(), caller, req)
 	require.NoError(t, err)
-	require.True(t, got)
+	require.True(t, got.Allowed)
 }
 
 func TestLegacyClientImpl_Check_Cache(t *testing.T) {
@@ -231,7 +231,7 @@ func TestLegacyClientImpl_Check_Cache(t *testing.T) {
 		}),
 	}
 
-	req := claims.AccessRequest{
+	req := claims.CheckRequest{
 		Namespace: "stacks-12",
 		Group:     "dashboards.grafana.app",
 		Resource:  "dashboards",
@@ -240,9 +240,9 @@ func TestLegacyClientImpl_Check_Cache(t *testing.T) {
 	}
 
 	// First call should populate the cache
-	got, err := client.HasAccess(context.Background(), caller, req)
+	got, err := client.Check(context.Background(), caller, req)
 	require.NoError(t, err)
-	require.True(t, got)
+	require.True(t, got.Allowed)
 
 	// Check that the cache was populated correctly
 	ctrl, err := client.getCachedCheck(context.Background(), checkCacheKey("user:1", &req))
@@ -253,16 +253,16 @@ func TestLegacyClientImpl_Check_Cache(t *testing.T) {
 	authz.checkRes = &authzv1.CheckResponse{Allowed: false}
 
 	// Second call should still be true as we hit the cache
-	got, err = client.HasAccess(context.Background(), caller, req)
+	got, err = client.Check(context.Background(), caller, req)
 	require.NoError(t, err)
-	require.True(t, got)
+	require.True(t, got.Allowed)
 }
 
 func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
 	tests := []struct {
 		name     string
 		caller   *authn.AuthInfo
-		req      claims.AccessRequest
+		req      claims.CheckRequest
 		checkRes bool
 		want     bool
 		wantErr  bool
@@ -270,7 +270,7 @@ func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
 		{
 			name:   "No user assume the service is allowed",
 			caller: &authn.AuthInfo{},
-			req: claims.AccessRequest{
+			req: claims.CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -286,7 +286,7 @@ func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
 					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 				}),
 			},
-			req: claims.AccessRequest{
+			req: claims.CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -303,13 +303,13 @@ func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
 
 			authz.checkRes = &authzv1.CheckResponse{Allowed: tt.checkRes}
 
-			got, err := client.HasAccess(context.Background(), tt.caller, tt.req)
+			got, err := client.Check(context.Background(), tt.caller, tt.req)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
-			require.Equal(t, tt.want, got)
+			require.Equal(t, tt.want, got.Allowed)
 		})
 	}
 }

@@ -57,6 +57,7 @@ message CheckRequest {
   string name = 6;
   string subresource = 7;
   string path = 8;
+  string parent = 9;
 }
 
 message CheckResponse {

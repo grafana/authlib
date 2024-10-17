@@ -29,6 +29,9 @@ var (
 	ErrMissingRequestGroup     = errors.New("missing request group")
 	ErrMissingCaller           = errors.New("missing caller")
 	ErrMissingSubject          = errors.New("missing subject")
+
+	checkAllowed = claims.CheckResponse{Allowed: true}
+	checkDenied  = claims.CheckResponse{Allowed: false}
 )
 
 type CheckRequest struct {
@@ -60,7 +63,9 @@ type ClientConfig struct {
 	accessTokenAuthEnabled bool
 }
 
-var _ claims.AccessClient = (*ClientImpl)(nil)
+// ClientImpl will implement the claims.AccessClient interface
+// Once we are able to deal with folder permissions expansion.
+var _ claims.AccessChecker = (*ClientImpl)(nil)
 
 type LegacyClientOption func(*ClientImpl)
 
@@ -201,12 +206,7 @@ func (r *CheckRequest) Validate() error {
 	return nil
 }
 
-// Compile implements claims.AccessClient.
-func (c *ClientImpl) Compile(ctx context.Context, id claims.AuthInfo, req claims.AccessRequest) (claims.AccessChecker, error) {
-	panic("unimplemented")
-}
-
-func validateAccessRequest(req claims.AccessRequest) error {
+func validateAccessRequest(req claims.CheckRequest) error {
 	if req.Namespace == "" {
 		return ErrMissingRequestNamespace
 	}
@@ -228,7 +228,7 @@ func validateAccessRequest(req claims.AccessRequest) error {
 	return nil
 }
 
-func (c *ClientImpl) hasAccess(ctx context.Context, id claims.AuthInfo, req *claims.AccessRequest) (bool, error) {
+func (c *ClientImpl) hasAccess(ctx context.Context, id claims.AuthInfo, req *claims.CheckRequest) (bool, error) {
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.hasAccess")
 	defer span.End()
 
@@ -265,22 +265,22 @@ func (c *ClientImpl) hasAccess(ctx context.Context, id claims.AuthInfo, req *cla
 }
 
 // HasAccess implements claims.AccessClient.
-func (c *ClientImpl) HasAccess(ctx context.Context, id claims.AuthInfo, req claims.AccessRequest) (bool, error) {
-	ctx, span := c.tracer.Start(ctx, "ClientImpl.HasAccess")
+func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req claims.CheckRequest) (claims.CheckResponse, error) {
+	ctx, span := c.tracer.Start(ctx, "ClientImpl.Check")
 	defer span.End()
 
 	if err := validateAccessRequest(req); err != nil {
 		span.RecordError(err)
-		return false, err
+		return checkDenied, err
 	}
 
 	if err := c.validateCaller(id); err != nil {
 		span.RecordError(err)
-		return false, err
+		return checkDenied, err
 	}
 
 	if !c.validateCallerNamespace(id, req.Namespace) {
-		return false, nil
+		return checkDenied, nil
 	}
 
 	accessClaims := id.GetAccess()
@@ -302,21 +302,21 @@ func (c *ClientImpl) HasAccess(ctx context.Context, id claims.AuthInfo, req clai
 	if identityClaims == nil || identityClaims.IsNil() {
 		// access token check is disabled => we can skip the authz service
 		if !c.authCfg.accessTokenAuthEnabled {
-			return true, nil
+			return checkAllowed, nil
 		}
 
 		if accessClaims == nil || accessClaims.IsNil() {
-			return false, ErrMissingCaller
+			return checkDenied, ErrMissingCaller
 		}
 
 		action := fmt.Sprintf("%s/%s:%s", req.Group, req.Resource, req.Verb)
 		perms := accessClaims.Permissions()
 		for _, p := range perms {
 			if p == action {
-				return true, nil
+				return checkAllowed, nil
 			}
 		}
-		return false, nil
+		return checkDenied, nil
 	}
 
 	span.SetAttributes(attribute.String("subject", identityClaims.Subject()))
@@ -324,7 +324,7 @@ func (c *ClientImpl) HasAccess(ctx context.Context, id claims.AuthInfo, req clai
 	// Only check the service permissions if the access token check is enabled
 	if c.authCfg.accessTokenAuthEnabled {
 		if accessClaims == nil || accessClaims.IsNil() {
-			return false, ErrMissingCaller
+			return checkDenied, ErrMissingCaller
 		}
 
 		// Make sure the service is allowed to perform the requested action
@@ -337,18 +337,18 @@ func (c *ClientImpl) HasAccess(ctx context.Context, id claims.AuthInfo, req clai
 			}
 		}
 		if !serviceIsAllowedAction {
-			return false, nil
+			return checkDenied, nil
 		}
 	}
 
 	res, err := c.hasAccess(ctx, id, &req)
 	if err != nil {
 		span.RecordError(err)
-		return false, err
+		return checkDenied, err
 	}
 
 	// Check if the user has access to any of the requested resources
-	return res, nil
+	return claims.CheckResponse{Allowed: res}, nil
 }
 
 func (c *ClientImpl) validateCaller(caller claims.AuthInfo) error {
@@ -401,8 +401,8 @@ func newOutgoingContext(ctx context.Context) context.Context {
 // CACHE
 // -----
 
-func checkCacheKey(subj string, req *claims.AccessRequest) string {
-	return fmt.Sprintf("check-%s-%s-%s-%s-%s-%s-%s-%s", req.Namespace, subj, req.Group, req.Resource, req.Verb, req.Name, req.Subresource, req.Path)
+func checkCacheKey(subj string, req *claims.CheckRequest) string {
+	return fmt.Sprintf("check-%s-%s-%s-%s-%s-%s-%s-%s-%s", req.Namespace, subj, req.Group, req.Resource, req.Verb, req.Name, req.Subresource, req.Path, req.Folder)
 }
 
 func (c *ClientImpl) cacheCheck(ctx context.Context, key string, allowed bool) error {
