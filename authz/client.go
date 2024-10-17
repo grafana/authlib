@@ -22,11 +22,9 @@ var (
 	ErrMissingConfig           = errors.New("missing config")
 	ErrMissingRequestNamespace = errors.New("missing request namespace")
 	ErrInvalidRequestNamespace = errors.New("invalid request namespace")
-	ErrMissingRequestAttribute = errors.New("missing request attribute")
-	ErrMissingRequestResource  = errors.New("missing request resource")
-	ErrMissingRequestAction    = errors.New("missing request action")
-	ErrMissingRequestVerb      = errors.New("missing request verb")
 	ErrMissingRequestGroup     = errors.New("missing request group")
+	ErrMissingRequestResource  = errors.New("missing request resource")
+	ErrMissingRequestVerb      = errors.New("missing request verb")
 	ErrMissingCaller           = errors.New("missing caller")
 	ErrMissingSubject          = errors.New("missing subject")
 
@@ -34,26 +32,6 @@ var (
 	checkDenied  = claims.CheckResponse{Allowed: false}
 )
 
-type CheckRequest struct {
-	// The namespace in which the request is made (e.g. "stacks-12")
-	Namespace string
-	// The requested action (e.g. "dashboards:read")
-	Action string
-	// ~Kind eg dashboards
-	Resource string
-	// Attribute used to identify the resource in the legacy RBAC system (e.g. uid).
-	Attribute string
-	// The specific resource
-	// In grafana, this was historically called "UID", but in k8s, it is the name
-	Name string
-	// The Name of the parent folder of the resource
-	Parent string
-}
-
-type CheckResponse struct {
-	// Whether the caller is allowed to perform the requested action
-	Allowed bool
-}
 type ClientConfig struct {
 	// RemoteAddress is the address of the authz service. It should be in the format "host:port".
 	RemoteAddress string
@@ -180,31 +158,6 @@ func NewClient(cfg *ClientConfig, opts ...LegacyClientOption) (*ClientImpl, erro
 // -----
 // Implementation
 // -----
-
-func (r *CheckRequest) Validate() error {
-	if r.Namespace == "" {
-		return ErrMissingRequestNamespace
-	}
-
-	if _, err := claims.ParseNamespace(r.Namespace); err != nil {
-		return ErrInvalidRequestNamespace
-	}
-
-	if r.Action == "" {
-		return ErrMissingRequestAction
-	}
-
-	if r.Name != "" {
-		if r.Attribute == "" {
-			return ErrMissingRequestAttribute
-		}
-		if r.Resource == "" {
-			return ErrMissingRequestResource
-		}
-	}
-
-	return nil
-}
 
 func validateAccessRequest(req claims.CheckRequest) error {
 	if req.Namespace == "" {
