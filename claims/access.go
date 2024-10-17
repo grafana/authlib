@@ -34,14 +34,14 @@ type CheckRequest struct {
 	Folder string
 }
 
-type AccessChecker interface {
-	// Check checks whether the user can perform the given action for all requests
-	Check(ctx context.Context, id AuthInfo, req CheckRequest) (CheckResponse, error)
-}
-
 type CheckResponse struct {
 	// Allowed is true if the request is allowed, false otherwise.
 	Allowed bool
+}
+
+type AccessChecker interface {
+	// Check checks whether the user can perform the given action for all requests
+	Check(ctx context.Context, id AuthInfo, req CheckRequest) (CheckResponse, error)
 }
 
 type ListRequest struct {
