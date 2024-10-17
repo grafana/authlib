@@ -22,9 +22,9 @@ var (
 	ErrMissingConfig           = errors.New("missing config")
 	ErrMissingRequestNamespace = errors.New("missing request namespace")
 	ErrInvalidRequestNamespace = errors.New("invalid request namespace")
-	ErrMissingRequestAttribute = errors.New("missing request attribute")
+	ErrMissingRequestGroup     = errors.New("missing request group")
 	ErrMissingRequestResource  = errors.New("missing request resource")
-	ErrMissingRequestAction    = errors.New("missing request action")
+	ErrMissingRequestVerb      = errors.New("missing request verb")
 	ErrMissingCaller           = errors.New("missing caller")
 	ErrMissingSubject          = errors.New("missing subject")
 
@@ -32,41 +32,77 @@ var (
 	checkResponseAllowed = CheckResponse{Allowed: true}
 )
 
+// CheckRequest describes the requested access.
+// This is designed bo to play nicely with the kubernetes authorization system:
+// https://github.com/kubernetes/kubernetes/blob/v1.30.3/staging/src/k8s.io/apiserver/pkg/authorization/authorizer/interfaces.go#L28
 type CheckRequest struct {
-	// The namespace in which the request is made (e.g. "stacks-12")
-	Namespace string
-	// The requested action (e.g. "dashboards:read")
-	Action string
+	// The requested access verb.
+	// this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy,
+	// or the lowercased HTTP verb associated with non-API requests (this includes get, put, post, patch, and delete)
+	Verb string
+
+	// API group (dashboards.grafana.app)
+	Group string
+
 	// ~Kind eg dashboards
 	Resource string
-	// Attribute used to identify the resource in the legacy RBAC system (e.g. uid).
-	Attribute string
+
+	// tenant isolation
+	Namespace string
+
 	// The specific resource
 	// In grafana, this was historically called "UID", but in k8s, it is the name
 	Name string
-	// The Name of the parent folder of the resource
-	Parent string
+
+	// Optional subresource
+	Subresource string
+
+	// For non-resource requests, this will be the requested URL path
+	Path string
+
+	// Folder is the parent folder of the requested resource
+	Folder string
 }
 
 type CheckResponse struct {
-	// Whether the caller is allowed to perform the requested action
+	// Allowed is true if the request is allowed, false otherwise.
 	Allowed bool
 }
 
-// Client is the interface for the Grafana app-platform authorization client.
-// This client can be used by Multi-tenant applications.
-type Client interface {
-	// Check verifies if the Caller has access to specific resources within a namespace.
-	//
-	// Caller represents the authentication information of the entity
-	// initiating the request, which can be a service or a user.
-	//
-	// CheckRequest contains the details of the request, including the namespace, action, resource, parent.
-	//
-	// The method returns a CheckResponse containing whether the caller is authorized.
-	// An error is returned if the authorization check cannot be completed,
-	// for example, due to an unreachable authorization service.
-	Check(ctx context.Context, caller claims.AuthInfo, req *CheckRequest) (CheckResponse, error)
+type AccessChecker interface {
+	// Check checks whether the user can perform the given action for all requests
+	Check(ctx context.Context, id claims.AuthInfo, req CheckRequest) (CheckResponse, error)
+}
+
+type ListRequest struct {
+	// API group (dashboards.grafana.app)
+	Group string
+
+	// ~Kind eg dashboards
+	Resource string
+
+	// tenant isolation
+	Namespace string
+
+	// Optional subresource
+	Subresource string
+}
+
+// TODO: Should the namespace be specified in the request instead.
+// I don't think we'll be able to Compile over multiple namespaces.
+// Checks access while iterating within a resource
+type ItemChecker func(namespace string, name, folder string) bool
+
+type AccessLister interface {
+	// Compile generates a function to check whether the id has access to items matching a request
+	// This is particularly useful when you want to verify access to a list of resources.
+	// Returns nil if there is no access to any matching items
+	Compile(ctx context.Context, id claims.AuthInfo, req ListRequest) (ItemChecker, error)
+}
+
+type AccessClient interface {
+	AccessChecker
+	AccessLister
 }
 
 type ClientConfig struct {
@@ -78,11 +114,13 @@ type ClientConfig struct {
 	accessTokenAuthEnabled bool
 }
 
-var _ Client = (*LegacyClientImpl)(nil)
+// ClientImpl will implement the claims.AccessClient interface
+// Once we are able to deal with folder permissions expansion.
+var _ AccessChecker = (*ClientImpl)(nil)
 
-type LegacyClientOption func(*LegacyClientImpl)
+type AuthzClientOption func(*ClientImpl)
 
-type LegacyClientImpl struct {
+type ClientImpl struct {
 	authCfg     *ClientConfig
 	clientV1    authzv1.AuthzServiceClient
 	cache       cache.Cache
@@ -104,38 +142,38 @@ func (tp *tracerProvider) Tracer(name string, options ...trace.TracerOption) tra
 // Options
 // -----
 
-func WithCacheLCOption(cache cache.Cache) LegacyClientOption {
-	return func(c *LegacyClientImpl) {
+func WithCacheClientOption(cache cache.Cache) AuthzClientOption {
+	return func(c *ClientImpl) {
 		c.cache = cache
 	}
 }
 
-// WithGrpcDialOptionsLCOption sets the gRPC dial options for client connection setup.
+// WithGrpcDialOptionsClientOption sets the gRPC dial options for client connection setup.
 // Useful for adding client interceptors. These options are ignored if WithGrpcConnection is used.
-func WithGrpcDialOptionsLCOption(opts ...grpc.DialOption) LegacyClientOption {
-	return func(c *LegacyClientImpl) {
+func WithGrpcDialOptionsClientOption(opts ...grpc.DialOption) AuthzClientOption {
+	return func(c *ClientImpl) {
 		c.grpcOptions = opts
 	}
 }
 
-// WithGrpcConnectionLCOption sets the gRPC client connection directly.
+// WithGrpcConnectionClientOption sets the gRPC client connection directly.
 // Useful for running the client in the same process as the authorization service.
-func WithGrpcConnectionLCOption(conn grpc.ClientConnInterface) LegacyClientOption {
-	return func(c *LegacyClientImpl) {
+func WithGrpcConnectionClientOption(conn grpc.ClientConnInterface) AuthzClientOption {
+	return func(c *ClientImpl) {
 		c.grpcConn = conn
 	}
 }
 
-func WithTracerLCOption(tracer trace.Tracer) LegacyClientOption {
-	return func(c *LegacyClientImpl) {
+func WithTracerClientOption(tracer trace.Tracer) AuthzClientOption {
+	return func(c *ClientImpl) {
 		c.tracer = tracer
 	}
 }
 
-// WithDisableAccessTokenLCOption is an option to disable access token authorization.
+// WithDisableAccessTokenClientOption is an option to disable access token authorization.
 // Warning: Using this option means there won't be any service authorization.
-func WithDisableAccessTokenLCOption() LegacyClientOption {
-	return func(c *LegacyClientImpl) {
+func WithDisableAccessTokenClientOption() AuthzClientOption {
+	return func(c *ClientImpl) {
 		c.authCfg.accessTokenAuthEnabled = false
 	}
 }
@@ -144,13 +182,13 @@ func WithDisableAccessTokenLCOption() LegacyClientOption {
 // Initialization
 // -----
 
-func NewLegacyClient(cfg *ClientConfig, opts ...LegacyClientOption) (*LegacyClientImpl, error) {
+func NewClient(cfg *ClientConfig, opts ...AuthzClientOption) (*ClientImpl, error) {
 	if cfg == nil {
 		return nil, ErrMissingConfig
 	}
 	cfg.accessTokenAuthEnabled = true
 
-	client := &LegacyClientImpl{authCfg: cfg}
+	client := &ClientImpl{authCfg: cfg}
 
 	// Apply options
 	for _, opt := range opts {
@@ -194,166 +232,48 @@ func NewLegacyClient(cfg *ClientConfig, opts ...LegacyClientOption) (*LegacyClie
 // Implementation
 // -----
 
-func (r *CheckRequest) Validate() error {
-	if r.Namespace == "" {
+func validateAccessRequest(req CheckRequest) error {
+	if req.Namespace == "" {
 		return ErrMissingRequestNamespace
 	}
 
-	if _, err := claims.ParseNamespace(r.Namespace); err != nil {
+	if _, err := claims.ParseNamespace(req.Namespace); err != nil {
 		return ErrInvalidRequestNamespace
 	}
 
-	if r.Action == "" {
-		return ErrMissingRequestAction
+	if req.Resource == "" {
+		return ErrMissingRequestResource
 	}
-
-	if r.Name != "" {
-		if r.Attribute == "" {
-			return ErrMissingRequestAttribute
-		}
-		if r.Resource == "" {
-			return ErrMissingRequestResource
-		}
+	if req.Group == "" {
+		return ErrMissingRequestGroup
+	}
+	if req.Verb == "" {
+		return ErrMissingRequestVerb
 	}
 
 	return nil
 }
 
-func (c *LegacyClientImpl) Check(ctx context.Context, caller claims.AuthInfo, req *CheckRequest) (CheckResponse, error) {
-	ctx, span := c.tracer.Start(ctx, "LegacyClientImpl.Check")
+func (c *ClientImpl) check(ctx context.Context, id claims.AuthInfo, req *CheckRequest) (bool, error) {
+	ctx, span := c.tracer.Start(ctx, "ClientImpl.hasAccess")
 	defer span.End()
 
-	if err := req.Validate(); err != nil {
-		span.RecordError(err)
-		return checkResponseDenied, err
-	}
-
-	if err := c.validateCaller(caller); err != nil {
-		span.RecordError(err)
-		return checkResponseDenied, err
-	}
-
-	if !c.validateCallerNamespace(caller, req.Namespace) {
-		return checkResponseDenied, nil
-	}
-
-	accessClaims := caller.GetAccess()
-	identityClaims := caller.GetIdentity()
-
-	if c.authCfg.accessTokenAuthEnabled && accessClaims != nil && !accessClaims.IsNil() {
-		span.SetAttributes(attribute.String("service", accessClaims.Subject()))
-	}
-	span.SetAttributes(attribute.String("namespace", req.Namespace))
-	span.SetAttributes(attribute.String("action", req.Action))
-	if req.Name != "" {
-		span.SetAttributes(attribute.String("object", fmt.Sprintf("%s:%s:%s", req.Resource, req.Attribute, req.Name)))
-	}
-	if req.Parent != "" {
-		span.SetAttributes(attribute.String("parent", req.Parent))
-	}
-	span.SetAttributes(attribute.Bool("with_user", identityClaims != nil && !identityClaims.IsNil()))
-
-	// No user => check on the service permissions
-	if identityClaims == nil || identityClaims.IsNil() {
-		// access token check is disabled => we can skip the authz service
-		if !c.authCfg.accessTokenAuthEnabled {
-			return checkResponseAllowed, nil
-		}
-
-		if accessClaims == nil || accessClaims.IsNil() {
-			return checkResponseDenied, ErrMissingCaller
-		}
-
-		perms := accessClaims.Permissions()
-		for _, p := range perms {
-			if p == req.Action {
-				return checkResponseAllowed, nil
-			}
-		}
-		return checkResponseDenied, nil
-	}
-
-	span.SetAttributes(attribute.String("subject", identityClaims.Subject()))
-
-	// Only check the service permissions if the access token check is enabled
-	if c.authCfg.accessTokenAuthEnabled {
-		if accessClaims == nil || accessClaims.IsNil() {
-			return checkResponseDenied, ErrMissingCaller
-		}
-
-		// Make sure the service is allowed to perform the requested action
-		serviceIsAllowedAction := false
-		for _, p := range accessClaims.DelegatedPermissions() {
-			if p == req.Action {
-				serviceIsAllowedAction = true
-				break
-			}
-		}
-		if !serviceIsAllowedAction {
-			return checkResponseDenied, nil
-		}
-	}
-
-	res, err := c.check(ctx, caller, req)
-	if err != nil {
-		span.RecordError(err)
-		return checkResponseDenied, err
-	}
-
-	// Check if the user has access to any of the requested resources
-	return CheckResponse{Allowed: res}, nil
-}
-
-func (c *LegacyClientImpl) validateCaller(caller claims.AuthInfo) error {
-	accessClaims := caller.GetAccess()
-	if c.authCfg.accessTokenAuthEnabled && (accessClaims == nil || accessClaims.IsNil()) {
-		return ErrMissingCaller
-	}
-	idClaims := caller.GetIdentity()
-	if idClaims != nil && !idClaims.IsNil() && idClaims.Subject() == "" {
-		return ErrMissingSubject
-	}
-	return nil
-}
-
-func (c *LegacyClientImpl) validateCallerNamespace(caller claims.AuthInfo, expectedNamespace string) bool {
-	// Check both AccessToken and IDToken (if present) for namespace match
-	accessClaims := caller.GetAccess()
-	accessTokenMatch := !c.authCfg.accessTokenAuthEnabled ||
-		(accessClaims != nil && !accessClaims.IsNil() && claims.NamespaceMatches(accessClaims, expectedNamespace))
-
-	idClaims := caller.GetIdentity()
-	idTokenMatch := idClaims == nil || idClaims.IsNil() || claims.NamespaceMatches(idClaims, expectedNamespace)
-
-	return accessTokenMatch && idTokenMatch
-}
-
-func (c *LegacyClientImpl) check(ctx context.Context, caller claims.AuthInfo, req *CheckRequest) (bool, error) {
-	ctx, span := c.tracer.Start(ctx, "LegacyClientImpl.check")
-	defer span.End()
-
-	scope := ""
-	parentScope := ""
-	if req.Name != "" {
-		scope = fmt.Sprintf("%s:%s:%s", req.Resource, req.Attribute, req.Name)
-	}
-	if req.Parent != "" {
-		parentScope = fmt.Sprintf("%s:%s:%s", "folders", "uid", req.Parent)
-	}
-
-	// Check the cache
-	key := checkCacheKey(req.Namespace, caller.GetIdentity().Subject(), req.Action, scope, parentScope)
-	ctrl, err := c.getCachedCheck(ctx, key)
-	if err == nil || !errors.Is(err, cache.ErrNotFound) {
-		return ctrl, err
+	key := checkCacheKey(id.GetIdentity().Subject(), req)
+	res, err := c.getCachedCheck(ctx, key)
+	if err == nil {
+		return res, nil
 	}
 
 	checkReq := &authzv1.CheckRequest{
-		Namespace: req.Namespace,
-		Subject:   caller.GetIdentity().Subject(),
-		Action:    req.Action,
-		Scope:     scope,
-		Parent:    parentScope,
+		Subject:     id.GetIdentity().Subject(),
+		Verb:        req.Verb,
+		Group:       req.Group,
+		Resource:    req.Resource,
+		Namespace:   req.Namespace,
+		Name:        req.Name,
+		Subresource: req.Subresource,
+		Path:        req.Path,
+		Folder:      req.Folder,
 	}
 
 	// Instantiate a new context for the request
@@ -369,6 +289,116 @@ func (c *LegacyClientImpl) check(ctx context.Context, caller claims.AuthInfo, re
 	err = c.cacheCheck(ctx, key, resp.Allowed)
 
 	return resp.Allowed, err
+}
+
+func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckRequest) (CheckResponse, error) {
+	ctx, span := c.tracer.Start(ctx, "ClientImpl.Check")
+	defer span.End()
+
+	if err := validateAccessRequest(req); err != nil {
+		span.RecordError(err)
+		return checkResponseDenied, err
+	}
+
+	if err := c.validateCaller(id); err != nil {
+		span.RecordError(err)
+		return checkResponseDenied, err
+	}
+
+	if !c.validateCallerNamespace(id, req.Namespace) {
+		return checkResponseDenied, nil
+	}
+
+	accessClaims := id.GetAccess()
+	identityClaims := id.GetIdentity()
+
+	span.SetAttributes(attribute.String("namespace", req.Namespace))
+	span.SetAttributes(attribute.String("verb", req.Verb))
+	span.SetAttributes(attribute.String("group", req.Group))
+	span.SetAttributes(attribute.String("resource", req.Resource))
+	if req.Name != "" {
+		span.SetAttributes(attribute.String("name", req.Name))
+	}
+	if req.Path != "" {
+		span.SetAttributes(attribute.String("path", req.Path))
+	}
+	span.SetAttributes(attribute.Bool("with_user", identityClaims != nil && !identityClaims.IsNil()))
+
+	// No user => check on the service permissions
+	if identityClaims == nil || identityClaims.IsNil() {
+		// access token check is disabled => we can skip the authz service
+		if !c.authCfg.accessTokenAuthEnabled {
+			return checkResponseAllowed, nil
+		}
+
+		if accessClaims == nil || accessClaims.IsNil() {
+			return checkResponseDenied, ErrMissingCaller
+		}
+
+		action := fmt.Sprintf("%s/%s:%s", req.Group, req.Resource, req.Verb)
+		perms := accessClaims.Permissions()
+		for _, p := range perms {
+			if p == action {
+				return checkResponseAllowed, nil
+			}
+		}
+		return checkResponseDenied, nil
+	}
+
+	span.SetAttributes(attribute.String("subject", identityClaims.Subject()))
+
+	// Only check the service permissions if the access token check is enabled
+	if c.authCfg.accessTokenAuthEnabled {
+		if accessClaims == nil || accessClaims.IsNil() {
+			return checkResponseDenied, ErrMissingCaller
+		}
+
+		// Make sure the service is allowed to perform the requested action
+		action := fmt.Sprintf("%s/%s:%s", req.Group, req.Resource, req.Verb)
+		serviceIsAllowedAction := false
+		for _, p := range accessClaims.DelegatedPermissions() {
+			if p == action {
+				serviceIsAllowedAction = true
+				break
+			}
+		}
+		if !serviceIsAllowedAction {
+			return checkResponseDenied, nil
+		}
+	}
+
+	res, err := c.check(ctx, id, &req)
+	if err != nil {
+		span.RecordError(err)
+		return checkResponseDenied, err
+	}
+
+	// Check if the user has access to any of the requested resources
+	return CheckResponse{Allowed: res}, nil
+}
+
+func (c *ClientImpl) validateCaller(caller claims.AuthInfo) error {
+	accessClaims := caller.GetAccess()
+	if c.authCfg.accessTokenAuthEnabled && (accessClaims == nil || accessClaims.IsNil()) {
+		return ErrMissingCaller
+	}
+	idClaims := caller.GetIdentity()
+	if idClaims != nil && !idClaims.IsNil() && idClaims.Subject() == "" {
+		return ErrMissingSubject
+	}
+	return nil
+}
+
+func (c *ClientImpl) validateCallerNamespace(caller claims.AuthInfo, expectedNamespace string) bool {
+	// Check both AccessToken and IDToken (if present) for namespace match
+	accessClaims := caller.GetAccess()
+	accessTokenMatch := !c.authCfg.accessTokenAuthEnabled ||
+		(accessClaims != nil && !accessClaims.IsNil() && claims.NamespaceMatches(accessClaims, expectedNamespace))
+
+	idClaims := caller.GetIdentity()
+	idTokenMatch := idClaims == nil || idClaims.IsNil() || claims.NamespaceMatches(idClaims, expectedNamespace)
+
+	return accessTokenMatch && idTokenMatch
 }
 
 // newOutgoingContext creates a new context that will be canceled when the input context is canceled.
@@ -397,12 +427,12 @@ func newOutgoingContext(ctx context.Context) context.Context {
 // CACHE
 // -----
 
-func checkCacheKey(namespace, subject, action, object, parent string) string {
-	return fmt.Sprintf("read-%s-%s-%s-%s-%s", namespace, subject, action, object, parent)
+func checkCacheKey(subj string, req *CheckRequest) string {
+	return fmt.Sprintf("check-%s-%s-%s-%s-%s-%s-%s-%s-%s", req.Namespace, subj, req.Group, req.Resource, req.Verb, req.Name, req.Subresource, req.Path, req.Folder)
 }
 
-func (c *LegacyClientImpl) cacheCheck(ctx context.Context, key string, allowed bool) error {
-	ctx, span := c.tracer.Start(ctx, "LegacyClientImpl.cacheCheck")
+func (c *ClientImpl) cacheCheck(ctx context.Context, key string, allowed bool) error {
+	ctx, span := c.tracer.Start(ctx, "ClientImpl.cacheCheck")
 	defer span.End()
 
 	buf := bytes.Buffer{}
@@ -415,8 +445,8 @@ func (c *LegacyClientImpl) cacheCheck(ctx context.Context, key string, allowed b
 	return c.cache.Set(ctx, key, buf.Bytes(), cache.DefaultExpiration)
 }
 
-func (c *LegacyClientImpl) getCachedCheck(ctx context.Context, key string) (bool, error) {
-	ctx, span := c.tracer.Start(ctx, "LegacyClientImpl.getCachedCheck")
+func (c *ClientImpl) getCachedCheck(ctx context.Context, key string) (bool, error) {
+	ctx, span := c.tracer.Start(ctx, "ClientImpl.getCachedCheck")
 	defer span.End()
 
 	data, err := c.cache.Get(ctx, key)

@@ -18,8 +18,8 @@
   "paths": {
     "/v1/namespace/{namespace}/check": {
       "post": {
-        "summary": "Check access for subject on resource given parent",
-        "description": "The check API will check if a subject is allowed to perform an action on a specific scope.",
+        "summary": "Check access for subject on resource given its parent folder",
+        "description": "The check API will check if a subject is allowed to perform an action on a specific resource.",
         "operationId": "Check",
         "responses": {
           "200": {
@@ -52,13 +52,25 @@
                 "subject": {
                   "type": "string"
                 },
-                "action": {
+                "verb": {
                   "type": "string"
                 },
-                "scope": {
+                "group": {
                   "type": "string"
                 },
-                "parent": {
+                "resource": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "subresource": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "folder": {
                   "type": "string"
                 }
               }
