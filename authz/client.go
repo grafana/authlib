@@ -91,15 +91,18 @@ type ListRequest struct {
 // TODO: Should the namespace be specified in the request instead.
 // I don't think we'll be able to Compile over multiple namespaces.
 // Checks access while iterating within a resource
-type ItemChecker func(namespace string, name string) bool
+type ItemChecker func(namespace string, name, folder string) bool
 
-type AccessClient interface {
-	AccessChecker
-
+type AccessLister interface {
 	// Compile generates a function to check whether the id has access to items matching a request
 	// This is particularly useful when you want to verify access to a list of resources.
 	// Returns nil if there is no access to any matching items
 	Compile(ctx context.Context, id claims.AuthInfo, req ListRequest) (ItemChecker, error)
+}
+
+type AccessClient interface {
+	AccessChecker
+	AccessLister
 }
 
 type ClientConfig struct {
