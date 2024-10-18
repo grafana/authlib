@@ -81,65 +81,9 @@
           "Check"
         ]
       }
-    },
-    "/v1/namespace/{namespace}/read": {
-      "post": {
-        "summary": "Read permissions for subject",
-        "description": "The read API will read permissions for subject",
-        "operationId": "Read",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/v1ReadResponse"
-            }
-          },
-          "default": {
-            "description": "An unexpected error response.",
-            "schema": {
-              "$ref": "#/definitions/rpcStatus"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "namespace",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "type": "object",
-              "properties": {
-                "subject": {
-                  "type": "string"
-                },
-                "action": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        ],
-        "tags": [
-          "Read"
-        ]
-      }
     }
   },
   "definitions": {
-    "ReadResponseData": {
-      "type": "object",
-      "properties": {
-        "scope": {
-          "type": "string"
-        }
-      }
-    },
     "protobufAny": {
       "type": "object",
       "properties": {
@@ -171,20 +115,6 @@
       "type": "object",
       "properties": {
         "allowed": {
-          "type": "boolean"
-        }
-      }
-    },
-    "v1ReadResponse": {
-      "type": "object",
-      "properties": {
-        "data": {
-          "type": "array",
-          "items": {
-            "$ref": "#/definitions/ReadResponseData"
-          }
-        },
-        "Found": {
           "type": "boolean"
         }
       }

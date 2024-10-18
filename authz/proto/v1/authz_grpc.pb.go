@@ -19,7 +19,6 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	AuthzService_Read_FullMethodName  = "/authz.v1.AuthzService/Read"
 	AuthzService_Check_FullMethodName = "/authz.v1.AuthzService/Check"
 )
 
@@ -27,7 +26,6 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AuthzServiceClient interface {
-	Read(ctx context.Context, in *ReadRequest, opts ...grpc.CallOption) (*ReadResponse, error)
 	Check(ctx context.Context, in *CheckRequest, opts ...grpc.CallOption) (*CheckResponse, error)
 }
 
@@ -37,15 +35,6 @@ type authzServiceClient struct {
 
 func NewAuthzServiceClient(cc grpc.ClientConnInterface) AuthzServiceClient {
 	return &authzServiceClient{cc}
-}
-
-func (c *authzServiceClient) Read(ctx context.Context, in *ReadRequest, opts ...grpc.CallOption) (*ReadResponse, error) {
-	out := new(ReadResponse)
-	err := c.cc.Invoke(ctx, AuthzService_Read_FullMethodName, in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
 }
 
 func (c *authzServiceClient) Check(ctx context.Context, in *CheckRequest, opts ...grpc.CallOption) (*CheckResponse, error) {
@@ -61,7 +50,6 @@ func (c *authzServiceClient) Check(ctx context.Context, in *CheckRequest, opts .
 // All implementations must embed UnimplementedAuthzServiceServer
 // for forward compatibility
 type AuthzServiceServer interface {
-	Read(context.Context, *ReadRequest) (*ReadResponse, error)
 	Check(context.Context, *CheckRequest) (*CheckResponse, error)
 	mustEmbedUnimplementedAuthzServiceServer()
 }
@@ -70,9 +58,6 @@ type AuthzServiceServer interface {
 type UnimplementedAuthzServiceServer struct {
 }
 
-func (UnimplementedAuthzServiceServer) Read(context.Context, *ReadRequest) (*ReadResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Read not implemented")
-}
 func (UnimplementedAuthzServiceServer) Check(context.Context, *CheckRequest) (*CheckResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Check not implemented")
 }
@@ -87,24 +72,6 @@ type UnsafeAuthzServiceServer interface {
 
 func RegisterAuthzServiceServer(s grpc.ServiceRegistrar, srv AuthzServiceServer) {
 	s.RegisterService(&AuthzService_ServiceDesc, srv)
-}
-
-func _AuthzService_Read_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ReadRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(AuthzServiceServer).Read(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: AuthzService_Read_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AuthzServiceServer).Read(ctx, req.(*ReadRequest))
-	}
-	return interceptor(ctx, in, info, handler)
 }
 
 func _AuthzService_Check_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -132,10 +99,6 @@ var AuthzService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "authz.v1.AuthzService",
 	HandlerType: (*AuthzServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "Read",
-			Handler:    _AuthzService_Read_Handler,
-		},
 		{
 			MethodName: "Check",
 			Handler:    _AuthzService_Check_Handler,
