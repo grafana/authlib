@@ -324,13 +324,9 @@ func setupLegacyClient() (*ClientImpl, *FakeAuthzServiceClient) {
 }
 
 type FakeAuthzServiceClient struct {
-	readRes  *authzv1.ReadResponse
 	checkRes *authzv1.CheckResponse
 }
 
-func (f *FakeAuthzServiceClient) Read(ctx context.Context, in *authzv1.ReadRequest, opts ...grpc.CallOption) (*authzv1.ReadResponse, error) {
-	return f.readRes, nil
-}
 func (f *FakeAuthzServiceClient) Check(ctx context.Context, in *authzv1.CheckRequest, opts ...grpc.CallOption) (*authzv1.CheckResponse, error) {
 	return f.checkRes, nil
 }
