@@ -199,8 +199,8 @@ func NewClient(cfg *ClientConfig, opts ...AuthzClientOption) (*ClientImpl, error
 	// Instantiate the cache
 	if client.cache == nil {
 		client.cache = cache.NewLocalCache(cache.Config{
-			Expiry:          cacheExp,
-			CleanupInterval: time.Minute,
+			Expiry:          5 * time.Minute,
+			CleanupInterval: 10 * time.Minute,
 		})
 	}
 
