@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel/attribute"
@@ -198,8 +199,8 @@ func NewClient(cfg *ClientConfig, opts ...AuthzClientOption) (*ClientImpl, error
 	// Instantiate the cache
 	if client.cache == nil {
 		client.cache = cache.NewLocalCache(cache.Config{
-			Expiry:          cache.DefaultExpiration,
-			CleanupInterval: 1 * cache.DefaultExpiration,
+			Expiry:          cacheExp,
+			CleanupInterval: 1 * time.Minute,
 		})
 	}
 
