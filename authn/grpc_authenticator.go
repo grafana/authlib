@@ -153,19 +153,19 @@ func NewUnsafeGrpcAuthenticator(cfg *GrpcAuthenticatorConfig, opts ...GrpcAuthen
 
 // Authenticate authenticates the incoming request based on the access token and ID token, and returns the context with the caller information.
 func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context, error) {
-	ctx, span := ga.tracer.Start(ctx, "GrpcAuthenticator.Authenticate")
+	spanCtx, span := ga.tracer.Start(ctx, "GrpcAuthenticator.Authenticate")
 	defer span.End()
 
 	authInfo := AuthInfo{}
 
-	md, ok := metadata.FromIncomingContext(ctx)
+	md, ok := metadata.FromIncomingContext(spanCtx)
 	if !ok {
 		span.RecordError(ErrorMissingMetadata)
 		return nil, ErrorMissingMetadata
 	}
 
 	if ga.cfg.accessTokenAuthEnabled {
-		atClaims, err := ga.authenticateService(ctx, md)
+		atClaims, err := ga.authenticateService(spanCtx, md)
 		if err != nil {
 			span.RecordError(err)
 			return nil, err
@@ -178,7 +178,7 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 	}
 
 	if ga.cfg.idTokenAuthEnabled {
-		idClaims, err := ga.authenticateUser(ctx, md)
+		idClaims, err := ga.authenticateUser(spanCtx, md)
 		if err != nil {
 			span.RecordError(err)
 			return nil, err

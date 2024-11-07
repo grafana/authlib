@@ -148,13 +148,13 @@ func (gci *GrpcClientInterceptor) StreamClientInterceptor(ctx context.Context, d
 }
 
 func (gci *GrpcClientInterceptor) wrapContext(ctx context.Context) (context.Context, error) {
-	ctx, span := gci.tracer.Start(ctx, "GrpcClientInterceptor.wrapContext")
+	spanCtx, span := gci.tracer.Start(ctx, "GrpcClientInterceptor.wrapContext")
 	defer span.End()
 
 	md := metadata.Pairs()
 
 	if gci.cfg.accessTokenAuthEnabled {
-		token, err := gci.tokenClient.Exchange(ctx, *gci.cfg.TokenRequest)
+		token, err := gci.tokenClient.Exchange(spanCtx, *gci.cfg.TokenRequest)
 		if err != nil {
 			span.RecordError(err)
 			return ctx, err
@@ -166,7 +166,7 @@ func (gci *GrpcClientInterceptor) wrapContext(ctx context.Context) (context.Cont
 
 	keys := make([]string, 0, len(gci.metadataExtractors))
 	for _, extract := range gci.metadataExtractors {
-		k, v, err := extract(ctx)
+		k, v, err := extract(spanCtx)
 		if err != nil {
 			span.RecordError(err)
 			return ctx, err
