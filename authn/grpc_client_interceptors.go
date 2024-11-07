@@ -157,7 +157,7 @@ func (gci *GrpcClientInterceptor) wrapContext(ctx context.Context) (context.Cont
 		token, err := gci.tokenClient.Exchange(spanCtx, *gci.cfg.TokenRequest)
 		if err != nil {
 			span.RecordError(err)
-			return spanCtx, err
+			return ctx, err
 		}
 
 		span.SetAttributes(attribute.Bool("with_accesstoken", true))
@@ -169,7 +169,7 @@ func (gci *GrpcClientInterceptor) wrapContext(ctx context.Context) (context.Cont
 		k, v, err := extract(spanCtx)
 		if err != nil {
 			span.RecordError(err)
-			return spanCtx, err
+			return ctx, err
 		}
 		keys = append(keys, k)
 		md.Set(k, v...)
