@@ -61,6 +61,8 @@ func ParseType(str string) (IdentityType, error) {
 		return TypeRenderService, nil
 	case string(TypeAccessPolicy):
 		return TypeAccessPolicy, nil
+	case string(TypeProvisioning):
+		return TypeProvisioning, nil
 	default:
 		return "", ErrInvalidTypedID
 	}
