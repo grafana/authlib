@@ -126,7 +126,7 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 		name    string
 		md      metadata.MD
 		initEnv initEnv
-		want    AuthInfo
+		want    *AuthInfo
 		wantErr error
 	}{
 		{
@@ -162,16 +162,16 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 					Rest:   IDTokenClaims{Namespace: "stacks-12"},
 				}
 			},
-			want: AuthInfo{
-				AccessClaims: NewAccessClaims(Claims[AccessTokenClaims]{
+			want: NewIDTokenAuthInfo(
+				Claims[AccessTokenClaims]{
 					Claims: &jwt.Claims{Subject: claims.NewTypeID(claims.TypeAccessPolicy, "3")},
 					Rest:   AccessTokenClaims{Namespace: "*"},
-				}),
-				IdentityClaims: NewIdentityClaims(Claims[IDTokenClaims]{
+				},
+				&Claims[IDTokenClaims]{
 					Claims: &jwt.Claims{Subject: claims.NewTypeID(claims.TypeUser, "3")},
 					Rest:   IDTokenClaims{Namespace: "stacks-12"},
-				}),
-			},
+				},
+			),
 		},
 		{
 			name: "valid service authentication no id token",
@@ -184,12 +184,10 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 					Rest:   AccessTokenClaims{Namespace: "*"},
 				}
 			},
-			want: AuthInfo{
-				AccessClaims: NewAccessClaims(Claims[AccessTokenClaims]{
-					Claims: &jwt.Claims{Subject: claims.NewTypeID(claims.TypeAccessPolicy, "3")},
-					Rest:   AccessTokenClaims{Namespace: "*"},
-				}),
-			},
+			want: NewAccessTokenAuthInfo(Claims[AccessTokenClaims]{
+				Claims: &jwt.Claims{Subject: claims.NewTypeID(claims.TypeAccessPolicy, "3")},
+				Rest:   AccessTokenClaims{Namespace: "*"},
+			}),
 		},
 		{
 			name: "valid service authentication disable id token verification",
@@ -202,12 +200,10 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 					Rest:   AccessTokenClaims{Namespace: "*"},
 				}
 			},
-			want: AuthInfo{
-				AccessClaims: NewAccessClaims(Claims[AccessTokenClaims]{
-					Claims: &jwt.Claims{Subject: claims.NewTypeID(claims.TypeAccessPolicy, "3")},
-					Rest:   AccessTokenClaims{Namespace: "*"},
-				}),
-			},
+			want: NewAccessTokenAuthInfo(Claims[AccessTokenClaims]{
+				Claims: &jwt.Claims{Subject: claims.NewTypeID(claims.TypeAccessPolicy, "3")},
+				Rest:   AccessTokenClaims{Namespace: "*"},
+			}),
 		},
 		{
 			name: "valid no authentication when both access and id token are disabled",
@@ -217,7 +213,7 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 				env.authenticator.cfg.idTokenAuthEnabled = false
 				env.authenticator.cfg.idTokenAuthRequired = false
 			},
-			want: AuthInfo{},
+			want: &AuthInfo{},
 		},
 		{
 			name: "access and id token namespaces mismatch",
@@ -259,19 +255,7 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 
 			require.NoError(t, err)
 			require.NotNil(t, got)
-			if tt.want.GetAccess() == nil || tt.want.GetAccess().IsNil() {
-				require.Nil(t, got.GetAccess())
-				require.True(t, got.GetAccess().IsNil())
-			} else {
-				require.Equal(t, tt.want.GetAccess(), got.GetAccess())
-			}
-
-			if tt.want.GetIdentity() == nil || tt.want.GetIdentity().IsNil() {
-				require.Nil(t, got.GetIdentity())
-				require.True(t, got.GetIdentity().IsNil())
-			} else {
-				require.Equal(t, tt.want.GetIdentity(), got.GetIdentity())
-			}
+			require.EqualValues(t, tt.want, got)
 		})
 	}
 }

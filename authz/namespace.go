@@ -29,7 +29,6 @@ var (
 
 type NamespaceAccessChecker interface {
 	CheckAccess(ctx context.Context, caller claims.AuthInfo, namespace string) error
-	CheckAccessByID(ctx context.Context, caller claims.AuthInfo, id int64) error
 }
 
 var _ NamespaceAccessChecker = &NamespaceAccessCheckerImpl{}
@@ -38,34 +37,6 @@ type NamespaceAccessCheckerOption func(*NamespaceAccessCheckerImpl)
 
 type NamespaceAccessCheckerImpl struct {
 	tracer trace.Tracer
-
-	// namespaceFmt is the namespace formatter used to generate the expected namespace.
-	// Ex: "stacks-%d" -> "stacks-12"
-	namespaceFmt claims.NamespaceFormatter
-
-	// idTokenEnabled is a flag to enable ID token namespace validation.
-	idTokenEnabled bool
-	// idTokenRequired is a flag to require the ID token for namespace validation.
-	// if the ID is not provided and required is true, an error is returned.
-	idTokenRequired bool
-	// accessTokenEnabled is a flag to enable access token namespace validation.
-	accessTokenEnabled bool
-}
-
-// WithIDTokenNamespaceAuthorizerOption enables ID token namespace validation.
-// If required is true, the ID token is required for validation.
-func WithIDTokenNamespaceAccessCheckerOption(required bool) NamespaceAccessCheckerOption {
-	return func(na *NamespaceAccessCheckerImpl) {
-		na.idTokenEnabled = true
-		na.idTokenRequired = required
-	}
-}
-
-// WithDisableAccessTokenNamespaceAuthorizerOption disables access token namespace validation.
-func WithDisableAccessTokenNamespaceAccessCheckerOption() NamespaceAccessCheckerOption {
-	return func(na *NamespaceAccessCheckerImpl) {
-		na.accessTokenEnabled = false
-	}
 }
 
 func WithTracerAccessCheckerOption(tracer trace.Tracer) NamespaceAccessCheckerOption {
@@ -75,14 +46,8 @@ func WithTracerAccessCheckerOption(tracer trace.Tracer) NamespaceAccessCheckerOp
 }
 
 // NewNamespaceAuthorizer creates a new namespace authorizer.
-// If both ID token and access token are disabled, the authorizer will always return nil.
-func NewNamespaceAccessChecker(namespaceFmt claims.NamespaceFormatter, opts ...NamespaceAccessCheckerOption) *NamespaceAccessCheckerImpl {
-	na := &NamespaceAccessCheckerImpl{
-		namespaceFmt:       namespaceFmt,
-		idTokenEnabled:     false,
-		idTokenRequired:    false,
-		accessTokenEnabled: true,
-	}
+func NewNamespaceAccessChecker(opts ...NamespaceAccessCheckerOption) *NamespaceAccessCheckerImpl {
+	na := &NamespaceAccessCheckerImpl{}
 
 	for _, opt := range opts {
 		opt(na)
@@ -100,43 +65,13 @@ func (na *NamespaceAccessCheckerImpl) CheckAccess(ctx context.Context, caller cl
 	defer span.End()
 	span.SetAttributes(attribute.String("expectedNamespace", expectedNamespace))
 
-	if na.idTokenEnabled {
-		idClaims := caller.GetIdentity()
-		if idClaims == nil || idClaims.IsNil() {
-			if na.idTokenRequired {
-				span.RecordError(ErrorMissingIDToken)
-				return ErrorMissingIDToken
-			}
-			// for else-if branch below,
-			// when id token claims are evaluated with an access token claims (with wildcard namespace) present
-			// but expectedNamespace is *, we skip the namespace equality check since it will always fail
-		} else if expectedNamespace != "*" && !claims.NamespaceMatches(idClaims, expectedNamespace) {
-			span.RecordError(ErrorIDTokenNamespaceMismatch)
-			return ErrorIDTokenNamespaceMismatch
-		}
-	}
-	if na.accessTokenEnabled {
-		accessClaims := caller.GetAccess()
-		if accessClaims == nil || accessClaims.IsNil() {
-			span.RecordError(ErrorMissingAccessToken)
-			return ErrorMissingAccessToken
-		}
-		// for if branch below,
-		// when access token claims with a wildcard namespace are passed in, we skip the namespace equality check
-		// it **will fail** when checking on resources in specific namespaces, which we don't want
-		if !claims.NamespaceMatches(accessClaims, expectedNamespace) {
-			span.RecordError(ErrorAccessTokenNamespaceMismatch)
-			return ErrorAccessTokenNamespaceMismatch
-		}
-	}
-	return nil
-}
+	if expectedNamespace != "*" && !claims.NamespaceMatches(caller.GetNamespace(), expectedNamespace) {
+		span.RecordError(ErrorIDTokenNamespaceMismatch)
+		return ErrorIDTokenNamespaceMismatch
 
-// CheckAccessById uses the specified identifier to use with the namespace formatter
-// to generate the expected namespace which will be checked for access.
-func (na *NamespaceAccessCheckerImpl) CheckAccessByID(ctx context.Context, caller claims.AuthInfo, id int64) error {
-	expectedNamespace := na.namespaceFmt(id)
-	return na.CheckAccess(ctx, caller, expectedNamespace)
+	}
+
+	return nil
 }
 
 type NamespaceExtractor func(context.Context) (string, error)

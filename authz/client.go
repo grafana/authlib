@@ -259,14 +259,14 @@ func (c *ClientImpl) check(ctx context.Context, id claims.AuthInfo, req *CheckRe
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.hasAccess")
 	defer span.End()
 
-	key := checkCacheKey(id.GetIdentity().Subject(), req)
+	key := checkCacheKey(id.GetSubject(), req)
 	res, err := c.getCachedCheck(ctx, key)
 	if err == nil {
 		return res, nil
 	}
 
 	checkReq := &authzv1.CheckRequest{
-		Subject:     id.GetIdentity().Subject(),
+		Subject:     id.GetSubject(),
 		Verb:        req.Verb,
 		Group:       req.Group,
 		Resource:    req.Resource,
@@ -310,9 +310,6 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 		return checkResponseDenied, nil
 	}
 
-	accessClaims := id.GetAccess()
-	identityClaims := id.GetIdentity()
-
 	span.SetAttributes(attribute.String("namespace", req.Namespace))
 	span.SetAttributes(attribute.String("verb", req.Verb))
 	span.SetAttributes(attribute.String("group", req.Group))
@@ -323,22 +320,17 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 	if req.Path != "" {
 		span.SetAttributes(attribute.String("path", req.Path))
 	}
-	span.SetAttributes(attribute.Bool("with_user", identityClaims != nil && !identityClaims.IsNil()))
+	span.SetAttributes(attribute.Bool("with_user", !claims.IsIdentityType(claims.IdentityType(id.GetIdentityType()), claims.TypeAccessPolicy)))
 
 	// No user => check on the service permissions
-	if identityClaims == nil || identityClaims.IsNil() {
+	if claims.IsIdentityType(id.GetIdentityType(), claims.TypeAccessPolicy) {
 		// access token check is disabled => we can skip the authz service
 		if !c.authCfg.accessTokenAuthEnabled {
 			return checkResponseAllowed, nil
 		}
 
-		if accessClaims == nil || accessClaims.IsNil() {
-			return checkResponseDenied, ErrMissingCaller
-		}
-
 		action := fmt.Sprintf("%s/%s:%s", req.Group, req.Resource, req.Verb)
-		perms := accessClaims.Permissions()
-		for _, p := range perms {
+		for _, p := range id.GetPermissions() {
 			if p == action {
 				return checkResponseAllowed, nil
 			}
@@ -346,18 +338,14 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 		return checkResponseDenied, nil
 	}
 
-	span.SetAttributes(attribute.String("subject", identityClaims.Subject()))
+	span.SetAttributes(attribute.String("subject", id.GetSubject()))
 
 	// Only check the service permissions if the access token check is enabled
 	if c.authCfg.accessTokenAuthEnabled {
-		if accessClaims == nil || accessClaims.IsNil() {
-			return checkResponseDenied, ErrMissingCaller
-		}
-
 		// Make sure the service is allowed to perform the requested action
 		action := fmt.Sprintf("%s/%s:%s", req.Group, req.Resource, req.Verb)
 		serviceIsAllowedAction := false
-		for _, p := range accessClaims.DelegatedPermissions() {
+		for _, p := range id.GetDelegatedPermissions() {
 			if p == action {
 				serviceIsAllowedAction = true
 				break
@@ -379,27 +367,14 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 }
 
 func (c *ClientImpl) validateCaller(caller claims.AuthInfo) error {
-	accessClaims := caller.GetAccess()
-	if c.authCfg.accessTokenAuthEnabled && (accessClaims == nil || accessClaims.IsNil()) {
+	if caller.GetSubject() != "" {
 		return ErrMissingCaller
-	}
-	idClaims := caller.GetIdentity()
-	if idClaims != nil && !idClaims.IsNil() && idClaims.Subject() == "" {
-		return ErrMissingSubject
 	}
 	return nil
 }
 
 func (c *ClientImpl) validateCallerNamespace(caller claims.AuthInfo, expectedNamespace string) bool {
-	// Check both AccessToken and IDToken (if present) for namespace match
-	accessClaims := caller.GetAccess()
-	accessTokenMatch := !c.authCfg.accessTokenAuthEnabled ||
-		(accessClaims != nil && !accessClaims.IsNil() && claims.NamespaceMatches(accessClaims, expectedNamespace))
-
-	idClaims := caller.GetIdentity()
-	idTokenMatch := idClaims == nil || idClaims.IsNil() || claims.NamespaceMatches(idClaims, expectedNamespace)
-
-	return accessTokenMatch && idTokenMatch
+	return claims.NamespaceMatches(caller.GetNamespace(), expectedNamespace)
 }
 
 // newOutgoingContext creates a new context that will be canceled when the input context is canceled.

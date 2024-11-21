@@ -16,6 +16,14 @@ const (
 	TokenTypeAccess TokenType = "at+jwt"
 )
 
+type Claims[T any] struct {
+	*jwt.Claims
+	Rest T
+
+	// The original raw token
+	token string
+}
+
 type Verifier[T any] interface {
 	// Verify will parse and verify provided token, if `AllowedAudiences` was configured those will be validated as well.
 	Verify(ctx context.Context, token string) (*Claims[T], error)
