@@ -66,6 +66,11 @@ func (a *AuthInfo) GetGroups() []string {
 }
 
 func (a *AuthInfo) GetExtra() map[string][]string {
+	if a.id != nil {
+		// Currently required for external k8s aggregation
+		// but this should be removed in the not-to-distant future
+		return map[string][]string{"id-token": {a.id.token}}
+	}
 	return map[string][]string{}
 }
 
