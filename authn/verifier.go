@@ -17,7 +17,7 @@ const (
 )
 
 type Claims[T any] struct {
-	*jwt.Claims
+	jwt.Claims
 	Rest T
 
 	// The original raw token

@@ -74,7 +74,7 @@ func (a *AuthInfo) GetAudience() []string {
 }
 
 func (a *AuthInfo) GetSubject() string {
-	if a.id.Claims != nil {
+	if a.id != nil {
 		return a.id.Subject
 	}
 	return a.at.Subject

@@ -19,12 +19,8 @@ const (
 )
 
 var (
-	ErrorMissingMetadata              = status.Errorf(codes.Unauthenticated, "unauthenticated: missing metadata")
-	ErrorInvalidStackID               = status.Errorf(codes.Unauthenticated, "unauthenticated: invalid stack ID")
-	ErrorMissingIDToken               = status.Errorf(codes.Unauthenticated, "unauthenticated: missing id token")
-	ErrorMissingAccessToken           = status.Errorf(codes.Unauthenticated, "unauthenticated: missing access token")
-	ErrorIDTokenNamespaceMismatch     = status.Errorf(codes.PermissionDenied, "unauthorized: id token namespace does not match expected namespace")
-	ErrorAccessTokenNamespaceMismatch = status.Errorf(codes.PermissionDenied, "unauthorized: access token namespace does not match expected namespace")
+	ErrorMissingMetadata = status.Errorf(codes.Unauthenticated, "unauthenticated: missing metadata")
+	ErrNamespaceMismatch = status.Errorf(codes.PermissionDenied, "unauthorized: namespace does not match expected namespace")
 )
 
 type NamespaceAccessChecker interface {
@@ -66,8 +62,8 @@ func (na *NamespaceAccessCheckerImpl) CheckAccess(ctx context.Context, caller cl
 	span.SetAttributes(attribute.String("expectedNamespace", expectedNamespace))
 
 	if expectedNamespace != "*" && !claims.NamespaceMatches(caller.GetNamespace(), expectedNamespace) {
-		span.RecordError(ErrorIDTokenNamespaceMismatch)
-		return ErrorIDTokenNamespaceMismatch
+		span.RecordError(ErrNamespaceMismatch)
+		return ErrNamespaceMismatch
 
 	}
 

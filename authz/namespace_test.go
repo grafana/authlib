@@ -19,9 +19,10 @@ func TestNamespaceAccessChecker(t *testing.T) {
 		namespace string
 	}{
 		{
-			name:    "missing access token",
-			caller:  &authn.AuthInfo{},
-			wantErr: ErrorMissingAccessToken,
+			name:      "missing access token",
+			caller:    &authn.AuthInfo{},
+			namespace: claims.CloudNamespaceFormatter(12),
+			wantErr:   ErrNamespaceMismatch,
 		},
 		{
 			name:      "access token match",
@@ -47,41 +48,41 @@ func TestNamespaceAccessChecker(t *testing.T) {
 			name:      "access token mismatch",
 			caller:    authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stacks-13"}}),
 			namespace: claims.CloudNamespaceFormatter(12),
-			wantErr:   ErrorAccessTokenNamespaceMismatch,
+			wantErr:   ErrNamespaceMismatch,
 		},
 		{
 			name:      "access token mismatch for org checker",
 			caller:    authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "org-13"}}),
 			namespace: claims.OrgNamespaceFormatter(12),
-			wantErr:   ErrorAccessTokenNamespaceMismatch,
+			wantErr:   ErrNamespaceMismatch,
 		},
 		{
 			name:      "missing id token",
 			namespace: claims.CloudNamespaceFormatter(12),
 			caller:    &authn.AuthInfo{},
-			wantErr:   ErrorMissingIDToken,
-		},
-		{
-			name:      "id token match",
-			namespace: claims.CloudNamespaceFormatter(12),
-			caller:    authn.NewIDTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{}, &authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stacks-12"}}),
+			wantErr:   ErrNamespaceMismatch,
 		},
 		{
 			name:      "id token match for stack",
 			namespace: claims.CloudNamespaceFormatter(12),
+			caller:    authn.NewIDTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{}, &authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stacks-12"}}),
+		},
+		{
+			name:      "id token mismatch for stack",
+			namespace: claims.CloudNamespaceFormatter(12),
 			caller:    authn.NewIDTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{}, &authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stacks-13"}}),
+			wantErr:   ErrNamespaceMismatch,
 		},
 		{
 			name:      "id token match for org",
 			namespace: claims.OrgNamespaceFormatter(12),
 			caller:    authn.NewIDTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{}, &authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "org-12"}}),
-			wantErr:   ErrorIDTokenNamespaceMismatch,
 		},
 		{
 			name:      "id token mismatch for org",
 			namespace: claims.OrgNamespaceFormatter(12),
 			caller:    authn.NewIDTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{}, &authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "org-13"}}),
-			wantErr:   ErrorIDTokenNamespaceMismatch,
+			wantErr:   ErrNamespaceMismatch,
 		},
 	}
 	for _, tt := range tests {

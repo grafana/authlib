@@ -174,6 +174,7 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 		}
 		span.SetAttributes(attribute.Bool("with_accesstoken", true))
 		span.SetAttributes(attribute.String("service", at.Subject))
+		authInfo.at = *at
 	}
 
 	var id *Claims[IDTokenClaims]
@@ -187,6 +188,7 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 		if id != nil {
 			span.SetAttributes(attribute.Bool("with_idtoken", true))
 			span.SetAttributes(attribute.String("user", id.Subject))
+			authInfo.id = id
 		}
 	}
 

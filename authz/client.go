@@ -367,13 +367,17 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 }
 
 func (c *ClientImpl) validateCaller(caller claims.AuthInfo) error {
-	if caller.GetSubject() != "" {
+	if caller.GetSubject() == "" {
 		return ErrMissingCaller
 	}
 	return nil
 }
 
 func (c *ClientImpl) validateCallerNamespace(caller claims.AuthInfo, expectedNamespace string) bool {
+	if !c.authCfg.accessTokenAuthEnabled && claims.IsIdentityType(caller.GetIdentityType(), claims.TypeAccessPolicy) {
+		return true
+	}
+
 	return claims.NamespaceMatches(caller.GetNamespace(), expectedNamespace)
 }
 

@@ -12,9 +12,10 @@ import (
 	"github.com/grafana/authlib/authn"
 	authzv1 "github.com/grafana/authlib/authz/proto/v1"
 	"github.com/grafana/authlib/cache"
+	"github.com/grafana/authlib/claims"
 )
 
-func TestLegacyClientImpl_Check(t *testing.T) {
+func TestClient_Check(t *testing.T) {
 	tests := []struct {
 		name     string
 		caller   *authn.AuthInfo
@@ -64,7 +65,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		{
 			name: "Service does not have the action",
 			caller: authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{
-				Claims: &jwt.Claims{Subject: "service"},
+				Claims: jwt.Claims{Subject: "service"},
 				Rest:   authn.AccessTokenClaims{Namespace: "stacks-12"},
 			}),
 			req: CheckRequest{
@@ -78,7 +79,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		{
 			name: "Service has the action",
 			caller: authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{
-				Claims: &jwt.Claims{Subject: "service"},
+				Claims: jwt.Claims{Subject: "service"},
 				Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", Permissions: []string{"dashboards.grafana.app/dashboards:list"}},
 			}),
 			req: CheckRequest{
@@ -92,7 +93,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 		{
 			name: "Service has the action but in the wrong namespace",
 			caller: authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{
-				Claims: &jwt.Claims{Subject: "service"},
+				Claims: jwt.Claims{Subject: "service"},
 				Rest:   authn.AccessTokenClaims{Namespace: "stacks-13", Permissions: []string{"dashboards.grafana.app/dashboards:list"}},
 			}),
 			req: CheckRequest{
@@ -107,11 +108,11 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 			name: "On behalf of, service does not have the action",
 			caller: authn.NewIDTokenAuthInfo(
 				authn.Claims[authn.AccessTokenClaims]{
-					Claims: &jwt.Claims{Subject: "service"},
+					Claims: jwt.Claims{Subject: "service"},
 					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12"},
 				},
 				&authn.Claims[authn.IDTokenClaims]{
-					Claims: &jwt.Claims{Subject: "user:1"},
+					Claims: jwt.Claims{Subject: "user:1"},
 					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 				},
 			),
@@ -127,11 +128,11 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 			name: "On behalf of, service does have the action, but user not",
 			caller: authn.NewIDTokenAuthInfo(
 				authn.Claims[authn.AccessTokenClaims]{
-					Claims: &jwt.Claims{Subject: "service"},
+					Claims: jwt.Claims{Subject: "service"},
 					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:list"}},
 				},
 				&authn.Claims[authn.IDTokenClaims]{
-					Claims: &jwt.Claims{Subject: "user:1"},
+					Claims: jwt.Claims{Subject: "user:1"},
 					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 				},
 			),
@@ -147,11 +148,11 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 			name: "On behalf of, service and user have the action",
 			caller: authn.NewIDTokenAuthInfo(
 				authn.Claims[authn.AccessTokenClaims]{
-					Claims: &jwt.Claims{Subject: "service"},
+					Claims: jwt.Claims{Subject: "service"},
 					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:list"}},
 				},
 				&authn.Claims[authn.IDTokenClaims]{
-					Claims: &jwt.Claims{Subject: "user:1"},
+					Claims: jwt.Claims{Subject: "user:1"},
 					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 				},
 			),
@@ -167,7 +168,7 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, authz := setupLegacyClient()
+			client, authz := setupAccessClient()
 			authz.checkRes = &authzv1.CheckResponse{Allowed: tt.checkRes}
 
 			got, err := client.Check(context.Background(), tt.caller, tt.req)
@@ -181,17 +182,17 @@ func TestLegacyClientImpl_Check(t *testing.T) {
 	}
 }
 
-func TestLegacyClientImpl_Check_OnPremFmt(t *testing.T) {
-	client, authz := setupLegacyClient()
+func TestClient_Check_OnPremFmt(t *testing.T) {
+	client, authz := setupAccessClient()
 
 	authz.checkRes = &authzv1.CheckResponse{Allowed: true}
 	caller := authn.NewIDTokenAuthInfo(
 		authn.Claims[authn.AccessTokenClaims]{
-			Claims: &jwt.Claims{Subject: "service"},
+			Claims: jwt.Claims{Subject: "service"},
 			Rest:   authn.AccessTokenClaims{Namespace: "default", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:list"}},
 		},
 		&authn.Claims[authn.IDTokenClaims]{
-			Claims: &jwt.Claims{Subject: "user:1"},
+			Claims: jwt.Claims{Subject: "user:1"},
 			Rest:   authn.IDTokenClaims{Namespace: "default"},
 		},
 	)
@@ -209,17 +210,17 @@ func TestLegacyClientImpl_Check_OnPremFmt(t *testing.T) {
 	require.True(t, got.Allowed)
 }
 
-func TestLegacyClientImpl_Check_Cache(t *testing.T) {
-	client, authz := setupLegacyClient()
+func TestClient_Check_Cache(t *testing.T) {
+	client, authz := setupAccessClient()
 	authz.checkRes = &authzv1.CheckResponse{Allowed: true}
 
 	caller := authn.NewIDTokenAuthInfo(
 		authn.Claims[authn.AccessTokenClaims]{
-			Claims: &jwt.Claims{Subject: "service"},
+			Claims: jwt.Claims{Subject: "service"},
 			Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:list"}},
 		},
 		&authn.Claims[authn.IDTokenClaims]{
-			Claims: &jwt.Claims{Subject: "user:1"},
+			Claims: jwt.Claims{Subject: "user:1"},
 			Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 		},
 	)
@@ -251,7 +252,7 @@ func TestLegacyClientImpl_Check_Cache(t *testing.T) {
 	require.True(t, got.Allowed)
 }
 
-func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
+func TestClient_Check_DisableAccessToken(t *testing.T) {
 	tests := []struct {
 		name     string
 		caller   *authn.AuthInfo
@@ -262,7 +263,7 @@ func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
 	}{
 		{
 			name:   "No user assume the service is allowed",
-			caller: &authn.AuthInfo{},
+			caller: authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{Claims: jwt.Claims{Subject: string(claims.NewTypeID(claims.TypeAccessPolicy, "1"))}}),
 			req: CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
@@ -276,9 +277,10 @@ func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
 			caller: authn.NewIDTokenAuthInfo(
 				authn.Claims[authn.AccessTokenClaims]{},
 				&authn.Claims[authn.IDTokenClaims]{
-					Claims: &jwt.Claims{Subject: "user:1"},
+					Claims: jwt.Claims{Subject: "user:1"},
 					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
-				}),
+				},
+			),
 			req: CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
@@ -291,7 +293,7 @@ func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			client, authz := setupLegacyClient()
+			client, authz := setupAccessClient()
 			WithDisableAccessTokenClientOption()(client)
 
 			authz.checkRes = &authzv1.CheckResponse{Allowed: tt.checkRes}
@@ -307,7 +309,7 @@ func TestLegacyClientImpl_Check_DisableAccessToken(t *testing.T) {
 	}
 }
 
-func setupLegacyClient() (*ClientImpl, *FakeAuthzServiceClient) {
+func setupAccessClient() (*ClientImpl, *FakeAuthzServiceClient) {
 	fakeClient := &FakeAuthzServiceClient{}
 	return &ClientImpl{
 		authCfg:  &ClientConfig{accessTokenAuthEnabled: true},
