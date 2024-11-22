@@ -45,12 +45,18 @@ func (c *AuthInfo) GetGroups() []string {
 
 // Name implements claims.AuthInfo.
 func (c *AuthInfo) GetName() string {
-	return c.IdentityClaims.claims.Rest.getK8sName()
+	if c.IdentityClaims != nil && !c.IdentityClaims.IsNil() {
+		return c.IdentityClaims.claims.Rest.getK8sName()
+	}
+	return ""
 }
 
 // UID implements claims.AuthInfo.
 func (c *AuthInfo) GetUID() string {
-	return c.IdentityClaims.claims.Rest.asTypedUID()
+	if c.IdentityClaims != nil && !c.IdentityClaims.IsNil() {
+		return c.IdentityClaims.claims.Rest.asTypedUID()
+	}
+	return ""
 }
 
 type Identity struct {
