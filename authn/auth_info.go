@@ -116,7 +116,7 @@ func (a *AuthInfo) GetEmailVerified() bool {
 
 func (a *AuthInfo) GetUsername() string {
 	if a.id != nil {
-		return a.id.Rest.getK8sName()
+		return a.id.Rest.Username
 	}
 	return a.at.Subject
 }
