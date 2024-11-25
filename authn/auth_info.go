@@ -92,11 +92,14 @@ func (a *AuthInfo) GetAuthenticatedBy() string {
 	return ""
 }
 
-func (a *AuthInfo) GetPermissions() []string {
+func (a *AuthInfo) GetTokenPermissions() []string {
+	if a.id != nil {
+		return []string{}
+	}
 	return a.at.Rest.Permissions
 }
 
-func (a *AuthInfo) GetDelegatedPermissions() []string {
+func (a *AuthInfo) GetTokenDelegatedPermissions() []string {
 	return a.at.Rest.DelegatedPermissions
 }
 

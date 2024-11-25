@@ -330,7 +330,7 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 		}
 
 		action := fmt.Sprintf("%s/%s:%s", req.Group, req.Resource, req.Verb)
-		for _, p := range id.GetPermissions() {
+		for _, p := range id.GetTokenPermissions() {
 			if p == action {
 				return checkResponseAllowed, nil
 			}
@@ -345,7 +345,7 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 		// Make sure the service is allowed to perform the requested action
 		action := fmt.Sprintf("%s/%s:%s", req.Group, req.Resource, req.Verb)
 		serviceIsAllowedAction := false
-		for _, p := range id.GetDelegatedPermissions() {
+		for _, p := range id.GetTokenDelegatedPermissions() {
 			if p == action {
 				serviceIsAllowedAction = true
 				break

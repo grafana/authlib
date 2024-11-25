@@ -23,7 +23,7 @@ type AuthInfo interface {
 	GetIdentityType() IdentityType
 
 	// GetNamespace returns a namespace in the form of '<type>-<id>', '*' means all namespaces.
-	// In Grafana the can be either org or stacks.
+	// In Grafana it can be either org or stacks.
 	GetNamespace() string
 
 	// GetGroups returns the names of the groups the identity is a member of
@@ -50,11 +50,11 @@ type AuthInfo interface {
 	// GetAudience returns the audience.
 	GetAudience() []string
 
-	// GetPermissions returns Grafana permissions that authenticated access token can perform.
-	GetPermissions() []string
+	// GetTokenPermissions returns Grafana permissions that authenticated access token can perform.
+	GetTokenPermissions() []string
 
-	// GetDelegatedPermissions returns Grafana permissions that can be performed on-behalf of another identity
-	GetDelegatedPermissions() []string
+	// GetTokenDelegatedPermissions returns Grafana permissions that can be performed on-behalf of another identity
+	GetTokenDelegatedPermissions() []string
 
 	// GetEmail returns the email.
 	// This is only set for users.
