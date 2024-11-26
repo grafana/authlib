@@ -61,7 +61,7 @@ func (na *NamespaceAccessCheckerImpl) CheckAccess(ctx context.Context, caller cl
 	defer span.End()
 	span.SetAttributes(attribute.String("expectedNamespace", expectedNamespace))
 
-	if expectedNamespace != "*" && !claims.NamespaceMatches(caller.GetNamespace(), expectedNamespace) {
+	if !claims.NamespaceMatches(caller.GetNamespace(), expectedNamespace) {
 		span.RecordError(ErrNamespaceMismatch)
 		return ErrNamespaceMismatch
 
