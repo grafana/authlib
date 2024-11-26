@@ -11,7 +11,7 @@ type AuthInfo interface {
 	// This will be in the form: <IdentityType>:<Identifier>
 	GetUID() string
 
-	// GetIdentifier returns only the Identitfier part.
+	// GetIdentifier returns only the Identifier part.
 	// For some identity types this can be empty e.g. Anonymous.
 	GetIdentifier() string
 
