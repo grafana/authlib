@@ -5,10 +5,6 @@ package claims
 // fulfil the kubernetes user requirements:
 // https://github.com/kubernetes/apiserver/blob/master/pkg/authentication/user/user.go#L20
 type AuthInfo interface {
-	// GetName returns the name that can be shown to identify the identity
-	// This may be a configured display name, an email, or (worst case) a ID
-	GetName() string
-
 	// GetUID returns a unique value for a particular identity that will change
 	// if the user is removed from the system and another user is added with
 	// the same name.
@@ -19,11 +15,11 @@ type AuthInfo interface {
 	// For some identity types this can be empty e.g. Anonymous.
 	GetIdentifier() string
 
-	// GetIdentityType return the identity type.
+	// GetIdentityType returns the identity type.
 	GetIdentityType() IdentityType
 
 	// GetNamespace returns a namespace in the form of '<type>-<id>', '*' means all namespaces.
-	// In Grafana it can be either org or stacks.
+	// In Grafana it the type can be either org or stacks.
 	GetNamespace() string
 
 	// GetGroups returns the names of the groups the identity is a member of
@@ -55,6 +51,10 @@ type AuthInfo interface {
 
 	// GetTokenDelegatedPermissions returns Grafana permissions that can be performed on-behalf of another identity
 	GetTokenDelegatedPermissions() []string
+
+	// GetName returns the name that can be shown to identify the identity
+	// This may be a configured display name, an email, or (worst case) a ID
+	GetName() string
 
 	// GetEmail returns the email.
 	// This is only set for users.
