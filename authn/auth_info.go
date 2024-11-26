@@ -123,3 +123,10 @@ func (a *AuthInfo) GetUsername() string {
 	}
 	return ""
 }
+
+func (a *AuthInfo) GetIDToken() string {
+	if a.id != nil {
+		return a.id.token
+	}
+	return ""
+}

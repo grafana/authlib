@@ -320,10 +320,12 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 	if req.Path != "" {
 		span.SetAttributes(attribute.String("path", req.Path))
 	}
-	span.SetAttributes(attribute.Bool("with_user", !claims.IsIdentityType(claims.IdentityType(id.GetIdentityType()), claims.TypeAccessPolicy)))
+
+	isService := claims.IsIdentityType(id.GetIdentityType(), claims.TypeAccessPolicy)
+	span.SetAttributes(attribute.Bool("with_user", !isService))
 
 	// No user => check on the service permissions
-	if claims.IsIdentityType(id.GetIdentityType(), claims.TypeAccessPolicy) {
+	if isService {
 		// access token check is disabled => we can skip the authz service
 		if !c.authCfg.accessTokenAuthEnabled {
 			return checkResponseAllowed, nil

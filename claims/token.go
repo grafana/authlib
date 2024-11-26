@@ -71,4 +71,8 @@ type AuthInfo interface {
 	// GetAuthenticatedBy is the original method used to authenticate the identity.
 	// Examples: password, oauth_azuread, etc
 	GetAuthenticatedBy() string
+
+	// GetIDToken returns the singed id token used during authentication.
+	// Will be empty if authencation was performed only using access token.
+	GetIDToken() string
 }
