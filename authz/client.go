@@ -369,6 +369,10 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 }
 
 func (c *ClientImpl) validateCaller(caller claims.AuthInfo) error {
+	if !c.authCfg.accessTokenAuthEnabled && claims.IsIdentityType(caller.GetIdentityType(), claims.TypeAccessPolicy) {
+		return nil
+	}
+
 	if caller.GetSubject() == "" {
 		return ErrMissingCaller
 	}

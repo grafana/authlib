@@ -12,7 +12,6 @@ import (
 	"github.com/grafana/authlib/authn"
 	authzv1 "github.com/grafana/authlib/authz/proto/v1"
 	"github.com/grafana/authlib/cache"
-	"github.com/grafana/authlib/claims"
 )
 
 func TestClient_Check(t *testing.T) {
@@ -263,7 +262,7 @@ func TestClient_Check_DisableAccessToken(t *testing.T) {
 	}{
 		{
 			name:   "No user assume the service is allowed",
-			caller: authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{Claims: jwt.Claims{Subject: string(claims.NewTypeID(claims.TypeAccessPolicy, "1"))}}),
+			caller: &authn.AuthInfo{},
 			req: CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
