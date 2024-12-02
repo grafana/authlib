@@ -164,42 +164,39 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 		return nil, ErrorMissingMetadata
 	}
 
+	var at *Claims[AccessTokenClaims]
 	if ga.cfg.accessTokenAuthEnabled {
-		atClaims, err := ga.authenticateService(spanCtx, md)
+		var err error
+		at, err = ga.authenticateService(spanCtx, md)
 		if err != nil {
 			span.RecordError(err)
 			return nil, err
 		}
-		if atClaims != nil {
-			span.SetAttributes(attribute.Bool("with_accesstoken", true))
-			span.SetAttributes(attribute.String("service", atClaims.Subject))
-			authInfo.AccessClaims = &Access{claims: *atClaims}
-		}
+		span.SetAttributes(attribute.Bool("with_accesstoken", true))
+		span.SetAttributes(attribute.String("service", at.Subject))
+		authInfo.at = *at
 	}
 
+	var id *Claims[IDTokenClaims]
 	if ga.cfg.idTokenAuthEnabled {
-		idClaims, err := ga.authenticateUser(spanCtx, md)
+		var err error
+		id, err = ga.authenticateUser(spanCtx, md)
 		if err != nil {
 			span.RecordError(err)
 			return nil, err
 		}
-		if idClaims != nil {
+		if id != nil {
 			span.SetAttributes(attribute.Bool("with_idtoken", true))
-			span.SetAttributes(attribute.String("user", idClaims.Subject))
-			authInfo.IdentityClaims = NewIdentityClaims(*idClaims)
+			span.SetAttributes(attribute.String("user", id.Subject))
+			authInfo.id = id
 		}
 	}
 
 	// Validate accessToken namespace matches IDToken namespace
-	if ga.cfg.accessTokenAuthEnabled && ga.cfg.idTokenAuthEnabled {
-		accessToken := authInfo.GetAccess()
-		identityToken := authInfo.GetIdentity()
-
-		if !accessToken.IsNil() && !identityToken.IsNil() {
-			if !claims.NamespaceMatches(accessToken, identityToken.Namespace()) {
-				span.RecordError(ErrorNamespacesMismatch)
-				return nil, ErrorNamespacesMismatch
-			}
+	if ga.cfg.accessTokenAuthEnabled && ga.cfg.idTokenAuthEnabled && id != nil {
+		if !claims.NamespaceMatches(at.Rest.Namespace, id.Rest.Namespace) {
+			span.RecordError(ErrorNamespacesMismatch)
+			return nil, ErrorNamespacesMismatch
 		}
 	}
 

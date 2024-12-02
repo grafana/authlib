@@ -28,9 +28,9 @@ func disambiguateNamespace(namespace string) string {
 	return strings.Replace(namespace, "stack-", "stacks-", 1)
 }
 
-func NamespaceMatches(c Namespaced, namespace string) bool {
-	actual := disambiguateNamespace(c.Namespace())
-	expected := disambiguateNamespace(namespace)
+func NamespaceMatches(a, b string) bool {
+	actual := disambiguateNamespace(a)
+	expected := disambiguateNamespace(b)
 	// actual should never be a "*" where ID token claims are concerned
 	if actual == "*" {
 		return true

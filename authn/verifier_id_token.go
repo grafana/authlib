@@ -26,7 +26,7 @@ type IDTokenClaims struct {
 }
 
 // Helper for the id
-func (c IDTokenClaims) asTypedUID() string {
+func (c IDTokenClaims) getTypedUID() string {
 	return fmt.Sprintf("%s:%s", c.Type, c.Identifier)
 }
 
