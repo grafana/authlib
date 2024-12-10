@@ -332,8 +332,11 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 		}
 
 		action := fmt.Sprintf("%s/%s:%s", req.Group, req.Resource, req.Verb)
+		// Granular action includes the name of the resource
+		granularAction := fmt.Sprintf("%s/%s/%s:%s", req.Group, req.Resource, req.Name, req.Verb)
+
 		for _, p := range id.GetTokenPermissions() {
-			if p == action {
+			if p == action || p == granularAction {
 				return checkResponseAllowed, nil
 			}
 		}
@@ -346,9 +349,12 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 	if c.authCfg.accessTokenAuthEnabled {
 		// Make sure the service is allowed to perform the requested action
 		action := fmt.Sprintf("%s/%s:%s", req.Group, req.Resource, req.Verb)
+		// Granular action includes the name of the resource
+		granularAction := fmt.Sprintf("%s/%s/%s:%s", req.Group, req.Resource, req.Name, req.Verb)
+
 		serviceIsAllowedAction := false
 		for _, p := range id.GetTokenDelegatedPermissions() {
-			if p == action {
+			if p == action || p == granularAction {
 				serviceIsAllowedAction = true
 				break
 			}
