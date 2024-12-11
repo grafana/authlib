@@ -494,10 +494,22 @@ func TestWildcardMatch(t *testing.T) {
 		expected bool
 	}{
 		{
-			name:     "Wildcard pattern matches anything",
-			pattern:  "*",
-			input:    "anything",
+			name:     "Exact match",
+			pattern:  "exact",
+			input:    "exact",
 			expected: true,
+		},
+		{
+			name:     "Exact mismatch",
+			pattern:  "exact",
+			input:    "different",
+			expected: false,
+		},
+		{
+			name:     "Only suffix matches",
+			pattern:  "omplete",
+			input:    "complete",
+			expected: false,
 		},
 		{
 			name:     "Empty pattern matches empty input",
@@ -512,9 +524,9 @@ func TestWildcardMatch(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "Exact match",
-			pattern:  "exact",
-			input:    "exact",
+			name:     "Wildcard pattern matches anything",
+			pattern:  "*",
+			input:    "anything",
 			expected: true,
 		},
 		{
@@ -542,12 +554,6 @@ func TestWildcardMatch(t *testing.T) {
 			expected: true,
 		},
 		{
-			name:     "Pattern does not match input",
-			pattern:  "exact",
-			input:    "different",
-			expected: false,
-		},
-		{
 			name:     "Pattern with consecutive wildcards",
 			pattern:  "pre**post",
 			input:    "pre-middle-post",
@@ -563,12 +569,6 @@ func TestWildcardMatch(t *testing.T) {
 			name:     "Pattern with wildcard does not match input",
 			pattern:  "pre*post",
 			input:    "pre-middle",
-			expected: false,
-		},
-		{
-			name:     "Match almost everything",
-			pattern:  "*complet",
-			input:    "complete",
 			expected: false,
 		},
 	}

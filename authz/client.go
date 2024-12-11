@@ -303,22 +303,27 @@ func wildcardMatch(pattern, input string) bool {
 
 	patternParts := strings.Split(pattern, "*")
 
+	// leading chunk must match
+	if len(patternParts[0]) > 0 && !strings.HasPrefix(input, patternParts[0]) {
+		return false
+	}
+
 	inputIndex := 0
 	// Iterate over the pattern parts
-	for _, part := range patternParts {
+	for i := range patternParts {
 		// leading/trailing '*' or consecutive '*'
-		if part == "" {
+		if patternParts[i] == "" {
 			continue
 		}
 
-		nextIndex := strings.Index(input[inputIndex:], part)
+		nextIndex := strings.Index(input[inputIndex:], patternParts[i])
 		if nextIndex == -1 {
 			return false
 		}
-		inputIndex += nextIndex + len(part)
+		inputIndex += nextIndex + len(patternParts[i])
 	}
 
-	// trailing '*'
+	// trailing '*' matches input leftovers
 	if pattern[len(pattern)-1] == '*' {
 		return true
 	}
