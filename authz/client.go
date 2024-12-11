@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -292,6 +293,78 @@ func (c *ClientImpl) check(ctx context.Context, id claims.AuthInfo, req *CheckRe
 	return resp.Allowed, err
 }
 
+// wildcardMatch efficiently checks if an input string matches a given pattern.
+// e.g. wildcardMatch("*foo*bar*", "foobar") => true
+func wildcardMatch(pattern, input string) bool {
+	// empty pattern only matches empty input
+	if len(pattern) == 0 {
+		return len(input) == 0
+	}
+
+	patternParts := strings.Split(pattern, "*")
+
+	// leading pattern part must match
+	if pattern[0] != '*' && !strings.HasPrefix(input, patternParts[0]) {
+		return false
+	}
+
+	inputIndex := 0
+	// iterate over the pattern parts
+	for i := range patternParts {
+		// leading/trailing '*' or consecutive '*'
+		if patternParts[i] == "" {
+			continue
+		}
+
+		nextIndex := strings.Index(input[inputIndex:], patternParts[i])
+		if nextIndex == -1 {
+			return false
+		}
+		inputIndex += nextIndex + len(patternParts[i])
+	}
+
+	// trailing '*' matches input leftovers
+	if pattern[len(pattern)-1] == '*' {
+		return true
+	}
+
+	return inputIndex == len(input)
+}
+
+func hasPermissionInToken(tokenPermissions []string, group, resource, verb, name string) bool {
+	for _, p := range tokenPermissions {
+		parts := strings.Split(p, ":")
+		if len(parts) != 2 {
+			continue
+		}
+		pVerb := parts[1]
+		if pVerb != "*" && pVerb != verb {
+			continue
+		}
+
+		parts = strings.Split(parts[0], "/")
+		if len(parts) < 2 || len(parts) > 3 {
+			continue
+		}
+
+		pGroup := parts[0]
+		pResource := parts[1]
+		if !wildcardMatch(pGroup, group) || !wildcardMatch(pResource, resource) {
+			continue
+		}
+		if len(parts) == 2 {
+			return true
+		}
+
+		pName := parts[2]
+		if !wildcardMatch(pName, name) {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
 func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckRequest) (CheckResponse, error) {
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.Check")
 	defer span.End()
@@ -331,34 +404,15 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 			return checkResponseAllowed, nil
 		}
 
-		action := fmt.Sprintf("%s/%s:%s", req.Group, req.Resource, req.Verb)
-		// Granular action includes the name of the resource
-		granularAction := fmt.Sprintf("%s/%s/%s:%s", req.Group, req.Resource, req.Name, req.Verb)
-
-		for _, p := range id.GetTokenPermissions() {
-			if p == action || p == granularAction {
-				return checkResponseAllowed, nil
-			}
-		}
-		return checkResponseDenied, nil
+		serviceIsAllowedAction := hasPermissionInToken(id.GetTokenPermissions(), req.Group, req.Resource, req.Verb, req.Name)
+		return CheckResponse{Allowed: serviceIsAllowedAction}, nil
 	}
 
 	span.SetAttributes(attribute.String("subject", id.GetSubject()))
 
 	// Only check the service permissions if the access token check is enabled
 	if c.authCfg.accessTokenAuthEnabled {
-		// Make sure the service is allowed to perform the requested action
-		action := fmt.Sprintf("%s/%s:%s", req.Group, req.Resource, req.Verb)
-		// Granular action includes the name of the resource
-		granularAction := fmt.Sprintf("%s/%s/%s:%s", req.Group, req.Resource, req.Name, req.Verb)
-
-		serviceIsAllowedAction := false
-		for _, p := range id.GetTokenDelegatedPermissions() {
-			if p == action || p == granularAction {
-				serviceIsAllowedAction = true
-				break
-			}
-		}
+		serviceIsAllowedAction := hasPermissionInToken(id.GetTokenDelegatedPermissions(), req.Group, req.Resource, req.Verb, req.Name)
 		if !serviceIsAllowedAction {
 			return checkResponseDenied, nil
 		}

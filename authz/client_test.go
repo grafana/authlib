@@ -382,6 +382,229 @@ func TestClient_Check_DisableAccessToken(t *testing.T) {
 	}
 }
 
+func TestHasPermissionInToken(t *testing.T) {
+	tests := []struct {
+		name             string
+		tokenPermissions []string
+		group            string
+		resource         string
+		verb             string
+		resourceName     string
+		want             bool
+	}{
+		{
+			name:             "Permission matches group/resource",
+			tokenPermissions: []string{"dashboard.grafana.app/dashboards:list"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "list",
+			want:             true,
+		},
+		{
+			name:             "Permission matches group/resource/name",
+			tokenPermissions: []string{"dashboard.grafana.app/dashboards/dashUID:get"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "get",
+			resourceName:     "dashUID",
+			want:             true,
+		},
+		{
+			name:             "Permission does not match verb",
+			tokenPermissions: []string{"dashboard.grafana.app/dashboards:list"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "get",
+			want:             false,
+		},
+		{
+			name:             "Permission matches wildcard verb",
+			tokenPermissions: []string{"dashboard.grafana.app/dashboards:*"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "get",
+			want:             true,
+		},
+		{
+			name:             "Permission does not match group/resource/name",
+			tokenPermissions: []string{"dashboard.grafana.app/dashboards/otherDashUID:get"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "get",
+			resourceName:     "dashUID",
+			want:             false,
+		},
+		{
+			name:             "Invalid permission missing verb",
+			tokenPermissions: []string{"dashboard.grafana.app/dashboards"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "list",
+			want:             false,
+		},
+		{
+			name:             "Invalid permission missing resource",
+			tokenPermissions: []string{"dashboard.grafana.app:list"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "list",
+			want:             false,
+		},
+		{
+			name:             "Permission on the wrong group",
+			tokenPermissions: []string{"other-group.grafana.app/dashboards:list"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "list",
+			want:             false,
+		},
+		{
+			name:             "Permission on the wrong resource",
+			tokenPermissions: []string{"dashboard.grafana.app/other-resource:list"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "list",
+			want:             false,
+		},
+		{
+			name:             "Permission matches wildcard resource",
+			tokenPermissions: []string{"dashboard.grafana.app/*:list"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "list",
+			want:             true,
+		},
+		{
+			name:             "Permission matches wildcard group/resource",
+			tokenPermissions: []string{"*.grafana.app/dashboards:list"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "list",
+			want:             true,
+		},
+		{
+			name:             "Permission matches wildcard group/resource/name",
+			tokenPermissions: []string{"*/dashboards/dashUID:get"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "get",
+			resourceName:     "dashUID",
+			want:             true,
+		},
+		{
+			name:             "Permission matches wildcard everything",
+			tokenPermissions: []string{"*.grafana.app/*:*"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "get",
+			resourceName:     "dashUID",
+			want:             true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := hasPermissionInToken(tt.tokenPermissions, tt.group, tt.resource, tt.verb, tt.resourceName)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestWildcardMatch(t *testing.T) {
+	tests := []struct {
+		name     string
+		pattern  string
+		input    string
+		expected bool
+	}{
+		{
+			name:     "Exact match",
+			pattern:  "exact",
+			input:    "exact",
+			expected: true,
+		},
+		{
+			name:     "Exact mismatch",
+			pattern:  "exact",
+			input:    "different",
+			expected: false,
+		},
+		{
+			name:     "Only suffix matches",
+			pattern:  "omplete",
+			input:    "complete",
+			expected: false,
+		},
+		{
+			name:     "Empty pattern matches empty input",
+			pattern:  "",
+			input:    "",
+			expected: true,
+		},
+		{
+			name:     "Empty pattern does not match non-empty input",
+			pattern:  "",
+			input:    "non-empty",
+			expected: false,
+		},
+		{
+			name:     "Wildcard pattern matches anything",
+			pattern:  "*",
+			input:    "anything",
+			expected: true,
+		},
+		{
+			name:     "Pattern with leading wildcard",
+			pattern:  "*suffix",
+			input:    "prefix-suffix",
+			expected: true,
+		},
+		{
+			name:     "Pattern with trailing wildcard",
+			pattern:  "prefix*",
+			input:    "prefix-suffix",
+			expected: true,
+		},
+		{
+			name:     "Pattern with wildcard in the middle",
+			pattern:  "pre*post",
+			input:    "pre-middle-post",
+			expected: true,
+		},
+		{
+			name:     "Pattern with multiple wildcards",
+			pattern:  "pre*mid*post",
+			input:    "pre-middle-mid-post",
+			expected: true,
+		},
+		{
+			name:     "Pattern with consecutive wildcards",
+			pattern:  "pre**post",
+			input:    "pre-middle-post",
+			expected: true,
+		},
+		{
+			name:     "Pattern with leading and trailing wildcards",
+			pattern:  "*middle*",
+			input:    "prefix-middle-suffix",
+			expected: true,
+		},
+		{
+			name:     "Pattern with wildcard does not match input",
+			pattern:  "pre*post",
+			input:    "pre-middle",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := wildcardMatch(tt.pattern, tt.input)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 func setupAccessClient() (*ClientImpl, *FakeAuthzServiceClient) {
 	fakeClient := &FakeAuthzServiceClient{}
 	return &ClientImpl{
