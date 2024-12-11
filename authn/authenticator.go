@@ -137,3 +137,27 @@ func (a *AccessTokenAutenticator) Autenticate(ctx context.Context, provider Toke
 
 	return NewAccessTokenAuthInfo(*claims), nil
 }
+
+var _ Authenticator = (*IDTokenAuthenticator)(nil)
+
+func NewIDTokenAutenticator(id *IDTokenVerifier) *IDTokenAuthenticator {
+	return &IDTokenAuthenticator{id}
+}
+
+type IDTokenAuthenticator struct {
+	id *IDTokenVerifier
+}
+
+func (a *IDTokenAuthenticator) Autenticate(ctx context.Context, provider TokenProvider) (claims.AuthInfo, error) {
+	token, ok := provider.IDToken(ctx)
+	if !ok {
+		return nil, errors.New("unauthenticated")
+	}
+
+	claims, err := a.id.Verify(ctx, token)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify access token: %w", err)
+	}
+
+	return NewIDTokenAuthInfo(Claims[AccessTokenClaims]{}, claims), nil
+}
