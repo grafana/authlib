@@ -90,6 +90,20 @@ func TestClient_Check(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "Fail if service has the action on the group",
+			caller: authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{
+				Claims: jwt.Claims{Subject: "service"},
+				Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", Permissions: []string{"dashboards.grafana.app:list"}},
+			}),
+			req: CheckRequest{
+				Namespace: "stacks-12",
+				Group:     "dashboards.grafana.app",
+				Resource:  "dashboards",
+				Verb:      "list",
+			},
+			want: false,
+		},
+		{
 			name: "Service has a granular action",
 			caller: authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{
 				Claims: jwt.Claims{Subject: "service"},
