@@ -90,6 +90,36 @@ func TestClient_Check(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "Service has a granular action",
+			caller: authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{
+				Claims: jwt.Claims{Subject: "service"},
+				Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", Permissions: []string{"dashboards.grafana.app/dashboards/dashUID:get"}},
+			}),
+			req: CheckRequest{
+				Namespace: "stacks-12",
+				Group:     "dashboards.grafana.app",
+				Resource:  "dashboards",
+				Verb:      "get",
+				Name:      "dashUID",
+			},
+			want: true,
+		},
+		{
+			name: "Service has a granular action on another resource",
+			caller: authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{
+				Claims: jwt.Claims{Subject: "service"},
+				Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", Permissions: []string{"dashboards.grafana.app/dashboards/otherDashUID:get"}},
+			}),
+			req: CheckRequest{
+				Namespace: "stacks-12",
+				Group:     "dashboards.grafana.app",
+				Resource:  "dashboards",
+				Verb:      "get",
+				Name:      "dashUID",
+			},
+			want: false,
+		},
+		{
 			name: "Service has the action but in the wrong namespace",
 			caller: authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{
 				Claims: jwt.Claims{Subject: "service"},
@@ -163,6 +193,50 @@ func TestClient_Check(t *testing.T) {
 			},
 			checkRes: true,
 			want:     true,
+		},
+		{
+			name: "On behalf of, service has granular action and user has the action",
+			caller: authn.NewIDTokenAuthInfo(
+				authn.Claims[authn.AccessTokenClaims]{
+					Claims: jwt.Claims{Subject: "service"},
+					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards/dashUID:list"}},
+				},
+				&authn.Claims[authn.IDTokenClaims]{
+					Claims: jwt.Claims{Subject: "user:1"},
+					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+				},
+			),
+			req: CheckRequest{
+				Namespace: "stacks-12",
+				Group:     "dashboards.grafana.app",
+				Resource:  "dashboards",
+				Verb:      "list",
+				Name:      "dashUID",
+			},
+			checkRes: true,
+			want:     true,
+		},
+		{
+			name: "On behalf of, service has granular action on another resource",
+			caller: authn.NewIDTokenAuthInfo(
+				authn.Claims[authn.AccessTokenClaims]{
+					Claims: jwt.Claims{Subject: "service"},
+					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards/otherDashUID:list"}},
+				},
+				&authn.Claims[authn.IDTokenClaims]{
+					Claims: jwt.Claims{Subject: "user:1"},
+					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+				},
+			),
+			req: CheckRequest{
+				Namespace: "stacks-12",
+				Group:     "dashboards.grafana.app",
+				Resource:  "dashboards",
+				Verb:      "list",
+				Name:      "dashUID",
+			},
+			checkRes: true,
+			want:     false,
 		},
 	}
 	for _, tt := range tests {
