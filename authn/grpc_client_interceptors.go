@@ -56,6 +56,9 @@ func WithTokenClientOption(tokenClient TokenExchanger) GrpcClientInterceptorOpti
 	}
 }
 
+// WithIDTokenExtractorOption is an option to set the ID token extractor for the gRPC client interceptor.
+// Warning: The id_token will be considered optional if the extractor returns an empty string.
+// Returning an error will stop the interceptor.
 func WithIDTokenExtractorOption(extractor func(context.Context) (string, error)) GrpcClientInterceptorOption {
 	return func(gci *GrpcClientInterceptor) {
 		gci.idTokenExtractor = extractor
