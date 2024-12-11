@@ -343,7 +343,7 @@ func hasPermissionInToken(tokenPermissions []string, group, resource, verb, name
 		}
 
 		parts = strings.Split(parts[0], "/")
-		if len(parts) < 2 {
+		if len(parts) < 2 || len(parts) > 3 {
 			continue
 		}
 
