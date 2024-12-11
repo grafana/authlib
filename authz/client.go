@@ -6,6 +6,8 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -292,6 +294,34 @@ func (c *ClientImpl) check(ctx context.Context, id claims.AuthInfo, req *CheckRe
 	return resp.Allowed, err
 }
 
+func hasPermissionInToken(tokenPermissions []string, group, resource, verb, name string) bool {
+	for _, p := range tokenPermissions {
+		parts := strings.Split(p, ":")
+		if len(parts) != 2 {
+			continue
+		}
+		pVerb := parts[1]
+		if pVerb != "*" && pVerb != verb {
+			continue
+		}
+
+		groupResource := fmt.Sprintf("%s/%s", group, resource)
+		fqdn := fmt.Sprintf("%s/%s", groupResource, name)
+
+		for _, pattern := range []string{groupResource, fqdn} {
+			ok, err := filepath.Match(parts[0], pattern)
+			if err != nil {
+				// TODO: log error
+				continue
+			}
+			if ok {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckRequest) (CheckResponse, error) {
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.Check")
 	defer span.End()
@@ -331,34 +361,15 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 			return checkResponseAllowed, nil
 		}
 
-		action := fmt.Sprintf("%s/%s:%s", req.Group, req.Resource, req.Verb)
-		// Granular action includes the name of the resource
-		granularAction := fmt.Sprintf("%s/%s/%s:%s", req.Group, req.Resource, req.Name, req.Verb)
-
-		for _, p := range id.GetTokenPermissions() {
-			if p == action || p == granularAction {
-				return checkResponseAllowed, nil
-			}
-		}
-		return checkResponseDenied, nil
+		serviceIsAllowedAction := hasPermissionInToken(id.GetTokenPermissions(), req.Group, req.Resource, req.Verb, req.Name)
+		return CheckResponse{Allowed: serviceIsAllowedAction}, nil
 	}
 
 	span.SetAttributes(attribute.String("subject", id.GetSubject()))
 
 	// Only check the service permissions if the access token check is enabled
 	if c.authCfg.accessTokenAuthEnabled {
-		// Make sure the service is allowed to perform the requested action
-		action := fmt.Sprintf("%s/%s:%s", req.Group, req.Resource, req.Verb)
-		// Granular action includes the name of the resource
-		granularAction := fmt.Sprintf("%s/%s/%s:%s", req.Group, req.Resource, req.Name, req.Verb)
-
-		serviceIsAllowedAction := false
-		for _, p := range id.GetTokenDelegatedPermissions() {
-			if p == action || p == granularAction {
-				serviceIsAllowedAction = true
-				break
-			}
-		}
+		serviceIsAllowedAction := hasPermissionInToken(id.GetTokenDelegatedPermissions(), req.Group, req.Resource, req.Verb, req.Name)
 		if !serviceIsAllowedAction {
 			return checkResponseDenied, nil
 		}

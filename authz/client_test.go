@@ -382,6 +382,110 @@ func TestClient_Check_DisableAccessToken(t *testing.T) {
 	}
 }
 
+func TestHasPermissionInToken(t *testing.T) {
+	tests := []struct {
+		name             string
+		tokenPermissions []string
+		group            string
+		resource         string
+		verb             string
+		resourceName     string
+		want             bool
+	}{
+		{
+			name:             "Permission matches group/resource",
+			tokenPermissions: []string{"dashboard.grafana.app/dashboards:list"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "list",
+			want:             true,
+		},
+		{
+			name:             "Permission matches group/resource/name",
+			tokenPermissions: []string{"dashboard.grafana.app/dashboards/dashUID:get"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "get",
+			resourceName:     "dashUID",
+			want:             true,
+		},
+		{
+			name:             "Permission does not match verb",
+			tokenPermissions: []string{"dashboard.grafana.app/dashboards:list"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "get",
+			want:             false,
+		},
+		{
+			name:             "Permission matches wildcard verb",
+			tokenPermissions: []string{"dashboard.grafana.app/dashboards:*"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "get",
+			want:             true,
+		},
+		{
+			name:             "Permission does not match group/resource/name",
+			tokenPermissions: []string{"dashboard.grafana.app/dashboards/otherDashUID:get"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "get",
+			resourceName:     "dashUID",
+			want:             false,
+		},
+		{
+			name:             "Invalid permission format",
+			tokenPermissions: []string{"invalid-permission-format"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "list",
+			want:             false,
+		},
+		{
+			name:             "Permission matches wildcard resource",
+			tokenPermissions: []string{"dashboard.grafana.app/*:list"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "list",
+			want:             true,
+		},
+		{
+			name:             "Permission matches wildcard group/resource",
+			tokenPermissions: []string{"*.grafana.app/dashboards:list"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "list",
+			want:             true,
+		},
+		{
+			name:             "Permission matches wildcard group/resource/name",
+			tokenPermissions: []string{"*/dashboards/dashUID:get"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "get",
+			resourceName:     "dashUID",
+			want:             true,
+		},
+		{
+			name:             "Permission matches wildcard everything",
+			tokenPermissions: []string{"*.grafana.app/*:*"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "get",
+			resourceName:     "dashUID",
+			want:             true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := hasPermissionInToken(tt.tokenPermissions, tt.group, tt.resource, tt.verb, tt.resourceName)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func setupAccessClient() (*ClientImpl, *FakeAuthzServiceClient) {
 	fakeClient := &FakeAuthzServiceClient{}
 	return &ClientImpl{
