@@ -303,7 +303,7 @@ func wildcardMatch(pattern, input string) bool {
 
 	patternParts := strings.Split(pattern, "*")
 
-	// leading chunk must match
+	// leading pattern part must match
 	if len(patternParts[0]) > 0 && !strings.HasPrefix(input, patternParts[0]) {
 		return false
 	}
