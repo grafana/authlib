@@ -41,6 +41,7 @@ type GrpcClientConfig struct {
 type GrpcClientInterceptor struct {
 	cfg                *GrpcClientConfig
 	tokenClient        TokenExchanger
+	idTokenExtractor   func(context.Context) (string, error)
 	metadataExtractors []ContextMetadataExtractor
 	tracer             trace.Tracer
 }
@@ -55,15 +56,12 @@ func WithTokenClientOption(tokenClient TokenExchanger) GrpcClientInterceptorOpti
 	}
 }
 
+// WithIDTokenExtractorOption is an option to set the ID token extractor for the gRPC client interceptor.
+// Warning: The id_token will be considered optional if the extractor returns an empty string.
+// Returning an error will stop the interceptor.
 func WithIDTokenExtractorOption(extractor func(context.Context) (string, error)) GrpcClientInterceptorOption {
 	return func(gci *GrpcClientInterceptor) {
-		WithMetadataExtractorOption(func(ctx context.Context) (key string, values []string, err error) {
-			idToken, err := extractor(ctx)
-			if err != nil {
-				return "", nil, err
-			}
-			return gci.cfg.IDTokenMetadataKey, []string{idToken}, nil
-		})(gci)
+		gci.idTokenExtractor = extractor
 	}
 }
 
@@ -162,6 +160,18 @@ func (gci *GrpcClientInterceptor) wrapContext(ctx context.Context) (context.Cont
 
 		span.SetAttributes(attribute.Bool("with_accesstoken", true))
 		md.Set(gci.cfg.AccessTokenMetadataKey, token.Token)
+	}
+
+	if gci.idTokenExtractor != nil {
+		idToken, err := gci.idTokenExtractor(spanCtx)
+		if err != nil {
+			span.RecordError(err)
+			return ctx, err
+		}
+		if idToken != "" {
+			span.SetAttributes(attribute.Bool("with_idtoken", true))
+			md.Set(gci.cfg.IDTokenMetadataKey, idToken)
+		}
 	}
 
 	keys := make([]string, 0, len(gci.metadataExtractors))
