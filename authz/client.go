@@ -311,7 +311,6 @@ func hasPermissionInToken(tokenPermissions []string, group, resource, verb, name
 		for _, pattern := range []string{groupResource, fqdn} {
 			ok, err := filepath.Match(parts[0], pattern)
 			if err != nil {
-				// TODO: log error
 				continue
 			}
 			if ok {
