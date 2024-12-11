@@ -48,7 +48,7 @@ type GRPCTokenProvider struct {
 	md metadata.MD
 }
 
-func (p GRPCTokenProvider) AccessToken(ctx context.Context) (string, bool) {
+func (p GRPCTokenProvider) AccessToken(_ context.Context) (string, bool) {
 	const key = "X-Access-Token"
 	values := p.md.Get(key)
 	if len(values) == 0 {
@@ -59,7 +59,7 @@ func (p GRPCTokenProvider) AccessToken(ctx context.Context) (string, bool) {
 	return token, len(token) > 0
 }
 
-func (p GRPCTokenProvider) IDToken(ctx context.Context) (string, bool) {
+func (p GRPCTokenProvider) IDToken(_ context.Context) (string, bool) {
 	const key = "X-Grafana-Id"
 	values := p.md.Get(key)
 	if len(values) == 0 {
