@@ -6,7 +6,6 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -294,6 +293,39 @@ func (c *ClientImpl) check(ctx context.Context, id claims.AuthInfo, req *CheckRe
 	return resp.Allowed, err
 }
 
+// wildcardMatch efficiently checks if an input string matches a given pattern.
+// e.g. wildcardMatch("*foo*bar*", "foobar") => true
+func wildcardMatch(pattern, input string) bool {
+	// empty pattern only matches empty input
+	if len(pattern) == 0 {
+		return len(input) == 0
+	}
+
+	patternParts := strings.Split(pattern, "*")
+
+	inputIndex := 0
+	// Iterate over the pattern parts
+	for _, part := range patternParts {
+		// leading/trailing '*' or consecutive '*'
+		if part == "" {
+			continue
+		}
+
+		nextIndex := strings.Index(input[inputIndex:], part)
+		if nextIndex == -1 {
+			return false
+		}
+		inputIndex += nextIndex + len(part)
+	}
+
+	// trailing '*'
+	if pattern[len(pattern)-1] == '*' {
+		return true
+	}
+
+	return inputIndex == len(input)
+}
+
 func hasPermissionInToken(tokenPermissions []string, group, resource, verb, name string) bool {
 	for _, p := range tokenPermissions {
 		parts := strings.Split(p, ":")
@@ -305,18 +337,25 @@ func hasPermissionInToken(tokenPermissions []string, group, resource, verb, name
 			continue
 		}
 
-		groupResource := fmt.Sprintf("%s/%s", group, resource)
-		fqdn := fmt.Sprintf("%s/%s", groupResource, name)
-
-		for _, pattern := range []string{groupResource, fqdn} {
-			ok, err := filepath.Match(parts[0], pattern)
-			if err != nil {
-				continue
-			}
-			if ok {
-				return true
-			}
+		parts = strings.Split(parts[0], "/")
+		if len(parts) < 2 {
+			continue
 		}
+
+		pGroup := parts[0]
+		pResource := parts[1]
+		if !wildcardMatch(pGroup, group) || !wildcardMatch(pResource, resource) {
+			continue
+		}
+		if len(parts) == 2 {
+			return true
+		}
+
+		pName := parts[2]
+		if !wildcardMatch(pName, name) {
+			continue
+		}
+		return true
 	}
 	return false
 }

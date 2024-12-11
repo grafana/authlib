@@ -486,6 +486,101 @@ func TestHasPermissionInToken(t *testing.T) {
 	}
 }
 
+func TestWildcardMatch(t *testing.T) {
+	tests := []struct {
+		name     string
+		pattern  string
+		input    string
+		expected bool
+	}{
+		{
+			name:     "Wildcard pattern matches anything",
+			pattern:  "*",
+			input:    "anything",
+			expected: true,
+		},
+		{
+			name:     "Empty pattern matches empty input",
+			pattern:  "",
+			input:    "",
+			expected: true,
+		},
+		{
+			name:     "Empty pattern does not match non-empty input",
+			pattern:  "",
+			input:    "non-empty",
+			expected: false,
+		},
+		{
+			name:     "Exact match",
+			pattern:  "exact",
+			input:    "exact",
+			expected: true,
+		},
+		{
+			name:     "Pattern with leading wildcard",
+			pattern:  "*suffix",
+			input:    "prefix-suffix",
+			expected: true,
+		},
+		{
+			name:     "Pattern with trailing wildcard",
+			pattern:  "prefix*",
+			input:    "prefix-suffix",
+			expected: true,
+		},
+		{
+			name:     "Pattern with wildcard in the middle",
+			pattern:  "pre*post",
+			input:    "pre-middle-post",
+			expected: true,
+		},
+		{
+			name:     "Pattern with multiple wildcards",
+			pattern:  "pre*mid*post",
+			input:    "pre-middle-mid-post",
+			expected: true,
+		},
+		{
+			name:     "Pattern does not match input",
+			pattern:  "exact",
+			input:    "different",
+			expected: false,
+		},
+		{
+			name:     "Pattern with consecutive wildcards",
+			pattern:  "pre**post",
+			input:    "pre-middle-post",
+			expected: true,
+		},
+		{
+			name:     "Pattern with leading and trailing wildcards",
+			pattern:  "*middle*",
+			input:    "prefix-middle-suffix",
+			expected: true,
+		},
+		{
+			name:     "Pattern with wildcard does not match input",
+			pattern:  "pre*post",
+			input:    "pre-middle",
+			expected: false,
+		},
+		{
+			name:     "Match almost everything",
+			pattern:  "*complet",
+			input:    "complete",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := wildcardMatch(tt.pattern, tt.input)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 func setupAccessClient() (*ClientImpl, *FakeAuthzServiceClient) {
 	fakeClient := &FakeAuthzServiceClient{}
 	return &ClientImpl{
