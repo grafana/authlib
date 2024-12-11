@@ -309,7 +309,7 @@ func wildcardMatch(pattern, input string) bool {
 	}
 
 	inputIndex := 0
-	// Iterate over the pattern parts
+	// iterate over the pattern parts
 	for i := range patternParts {
 		// leading/trailing '*' or consecutive '*'
 		if patternParts[i] == "" {
