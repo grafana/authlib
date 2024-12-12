@@ -337,9 +337,11 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 
 		for _, p := range id.GetTokenPermissions() {
 			if p == action || p == granularAction {
+				span.SetAttributes(attribute.Bool("service_allowed", true))
 				return checkResponseAllowed, nil
 			}
 		}
+		span.SetAttributes(attribute.Bool("service_allowed", false))
 		return checkResponseDenied, nil
 	}
 
@@ -359,6 +361,7 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 				break
 			}
 		}
+		span.SetAttributes(attribute.Bool("service_allowed", serviceIsAllowedAction))
 		if !serviceIsAllowedAction {
 			return checkResponseDenied, nil
 		}
@@ -371,6 +374,7 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 	}
 
 	// Check if the user has access to any of the requested resources
+	span.SetAttributes(attribute.Bool("user_allowed", res))
 	return CheckResponse{Allowed: res}, nil
 }
 
