@@ -293,42 +293,82 @@ func (c *ClientImpl) check(ctx context.Context, id claims.AuthInfo, req *CheckRe
 	return resp.Allowed, err
 }
 
-// wildcardMatch efficiently checks if an input string matches a given pattern.
-// e.g. wildcardMatch("*foo*bar*", "foobar") => true
-func wildcardMatch(pattern, input string) bool {
+func splitByWildcard(a string) []string {
+	res := make([]string, 0, 32)
+	cur := make([]byte, len(a))
+	curIdx := 0
+
+	alreadyWildcard := false
+	for i := range a {
+		if a[i] == '*' {
+			if alreadyWildcard {
+				continue
+			}
+			alreadyWildcard = true
+			if curIdx > 0 {
+				res = append(res, string(cur[:curIdx]))
+				curIdx = 0
+			}
+			res = append(res, "*")
+			continue
+		}
+		alreadyWildcard = false
+		cur[curIdx] = a[i]
+		curIdx++
+	}
+	if curIdx > 0 {
+		res = append(res, string(cur[:curIdx]))
+	}
+	return res
+}
+
+func wildcardMatchRec(patternParts []string, input string, leadingWildcard bool) bool {
 	// empty pattern only matches empty input
-	if len(pattern) == 0 {
+	if len(patternParts) == 0 {
 		return len(input) == 0
 	}
 
-	patternParts := strings.Split(pattern, "*")
-
-	// leading pattern part must match
-	if pattern[0] != '*' && !strings.HasPrefix(input, patternParts[0]) {
-		return false
-	}
-
-	inputIndex := 0
-	// iterate over the pattern parts
-	for i := range patternParts {
-		// leading/trailing '*' or consecutive '*'
-		if patternParts[i] == "" {
-			continue
+	// Wildcard case
+	if patternParts[0] == "*" {
+		if len(patternParts) == 1 {
+			// There was only a wildcard
+			return true
 		}
 
-		nextIndex := strings.Index(input[inputIndex:], patternParts[i])
-		if nextIndex == -1 {
+		return wildcardMatchRec(patternParts[1:], input, true)
+	}
+
+	if !leadingWildcard {
+		if !strings.HasPrefix(input, patternParts[0]) {
 			return false
 		}
-		inputIndex += nextIndex + len(patternParts[i])
+		return wildcardMatchRec(patternParts[1:], input[len(patternParts[0]):], false)
 	}
 
-	// trailing '*' matches input leftovers
-	if pattern[len(pattern)-1] == '*' {
-		return true
+	foundAt := 0
+	for foundAt < len(input) {
+		next := strings.Index(input[foundAt:], patternParts[0])
+		if next == -1 {
+			return false
+		}
+		foundAt += next + len(patternParts[0])
+		if len(patternParts) == 1 && foundAt != len(input) {
+			continue
+		}
+		ok := wildcardMatchRec(patternParts[1:], input[foundAt:], false)
+		if ok {
+			return true
+		}
 	}
 
-	return inputIndex == len(input)
+	return false
+}
+
+// wildcardMatch efficiently checks if an input string matches a given pattern.
+// e.g. wildcardMatch("*foo*bar*", "foobar") => true
+func wildcardMatch(pattern, input string) bool {
+	parts := splitByWildcard(pattern)
+	return wildcardMatchRec(parts, input, false)
 }
 
 func hasPermissionInToken(tokenPermissions []string, group, resource, verb, name string) bool {

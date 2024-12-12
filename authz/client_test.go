@@ -548,6 +548,18 @@ func TestWildcardMatch(t *testing.T) {
 			expected: false,
 		},
 		{
+			name:     "Wildcard prefix but pattern matches start",
+			pattern:  "*v",
+			input:    "vv",
+			expected: true,
+		},
+		{
+			name:     "Wildcard prefix found twice",
+			pattern:  "*v",
+			input:    "*vtv",
+			expected: true,
+		},
+		{
 			name:     "Wildcard pattern matches anything",
 			pattern:  "*",
 			input:    "anything",
@@ -600,6 +612,72 @@ func TestWildcardMatch(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := wildcardMatch(tt.pattern, tt.input)
+			require.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestSplitWildcard(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected []string
+	}{
+		{
+			name:     "No wildcards",
+			input:    "exact",
+			expected: []string{"exact"},
+		},
+		{
+			name:     "Single wildcard",
+			input:    "pre*post",
+			expected: []string{"pre", "*", "post"},
+		},
+		{
+			name:     "Leading wildcard",
+			input:    "*suffix",
+			expected: []string{"*", "suffix"},
+		},
+		{
+			name:     "Trailing wildcard",
+			input:    "prefix*",
+			expected: []string{"prefix", "*"},
+		},
+		{
+			name:     "Multiple wildcards",
+			input:    "pre*mid*post",
+			expected: []string{"pre", "*", "mid", "*", "post"},
+		},
+		{
+			name:     "Consecutive wildcards",
+			input:    "pre**post",
+			expected: []string{"pre", "*", "post"},
+		},
+		{
+			name:     "Only wildcards",
+			input:    "***",
+			expected: []string{"*"},
+		},
+		{
+			name:     "Empty input",
+			input:    "",
+			expected: []string{},
+		},
+		{
+			name:     "Wildcard at the start and end",
+			input:    "*middle*",
+			expected: []string{"*", "middle", "*"},
+		},
+		{
+			name:     "Wildcard in the middle",
+			input:    "pre*post",
+			expected: []string{"pre", "*", "post"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := splitByWildcard(tt.input)
 			require.Equal(t, tt.expected, result)
 		})
 	}
