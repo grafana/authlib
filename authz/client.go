@@ -323,12 +323,14 @@ func wildcardMatch(pattern, input string) bool {
 		inputIndex += nextIndex + len(patternParts[i])
 	}
 
-	// trailing '*' matches input leftovers
+	// loose check as trailing '*' matches input leftovers
 	if pattern[len(pattern)-1] == '*' {
-		return true
+		nextIndex := strings.Index(input[inputIndex:], patternParts[len(patternParts)-1])
+		return nextIndex != -1
 	}
 
-	return inputIndex == len(input)
+	// trailing pattern must match
+	return strings.HasSuffix(input, patternParts[len(patternParts)-1])
 }
 
 func hasPermissionInToken(tokenPermissions []string, group, resource, verb, name string) bool {

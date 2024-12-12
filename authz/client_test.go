@@ -560,6 +560,36 @@ func TestWildcardMatch(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "Pattern matches multiple times leading wildcard",
+			pattern:  "*v",
+			input:    "vv",
+			expected: true,
+		},
+		{
+			name:     "Pattern matches multiple times trailing wildcard",
+			pattern:  "v*",
+			input:    "vv",
+			expected: true,
+		},
+		{
+			name:     "Pattern with lots of wildcards input matches easily",
+			pattern:  "v*v*v*v*v*v*v*v",
+			input:    "vvvvvvvvvvvvvvv",
+			expected: true,
+		},
+		{
+			name:     "Pattern with lots of wildcards input matches easily",
+			pattern:  "v*v*v*v*v*v*v*v",
+			input:    "v v v v v v v v",
+			expected: true,
+		},
+		{
+			name:     "Pattern with lots of wildcards input does not match",
+			pattern:  "v*v*v*v*v*v*v*v",
+			input:    "v v v v v v v",
+			expected: false,
+		},
+		{
 			name:     "Pattern with trailing wildcard",
 			pattern:  "prefix*",
 			input:    "prefix-suffix",
