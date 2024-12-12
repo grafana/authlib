@@ -407,6 +407,7 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 		}
 
 		serviceIsAllowedAction := hasPermissionInToken(id.GetTokenPermissions(), req.Group, req.Resource, req.Verb, req.Name)
+		span.SetAttributes(attribute.Bool("service_allowed", serviceIsAllowedAction))
 		return CheckResponse{Allowed: serviceIsAllowedAction}, nil
 	}
 
@@ -415,6 +416,7 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 	// Only check the service permissions if the access token check is enabled
 	if c.authCfg.accessTokenAuthEnabled {
 		serviceIsAllowedAction := hasPermissionInToken(id.GetTokenDelegatedPermissions(), req.Group, req.Resource, req.Verb, req.Name)
+		span.SetAttributes(attribute.Bool("service_allowed", serviceIsAllowedAction))
 		if !serviceIsAllowedAction {
 			return checkResponseDenied, nil
 		}
@@ -427,6 +429,7 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 	}
 
 	// Check if the user has access to any of the requested resources
+	span.SetAttributes(attribute.Bool("user_allowed", res))
 	return CheckResponse{Allowed: res}, nil
 }
 
