@@ -301,7 +301,11 @@ func wildcardMatch(pattern, input string) bool {
 		return len(input) == 0
 	}
 
-	patternParts := strings.Split(pattern, "*")
+	if pattern == "*" {
+		return true
+	}
+
+	patternParts := strings.FieldsFunc(pattern, func(r rune) bool { return r == '*' })
 
 	// leading pattern part must match
 	if pattern[0] != '*' && !strings.HasPrefix(input, patternParts[0]) {
@@ -310,12 +314,7 @@ func wildcardMatch(pattern, input string) bool {
 
 	inputIndex := 0
 	// iterate over the pattern parts
-	for i := range patternParts {
-		// leading/trailing '*' or consecutive '*'
-		if patternParts[i] == "" {
-			continue
-		}
-
+	for i := 0; i < len(patternParts)-1; i++ {
 		nextIndex := strings.Index(input[inputIndex:], patternParts[i])
 		if nextIndex == -1 {
 			return false
@@ -330,7 +329,7 @@ func wildcardMatch(pattern, input string) bool {
 	}
 
 	// trailing pattern must match
-	return strings.HasSuffix(input, patternParts[len(patternParts)-1])
+	return strings.HasSuffix(input[inputIndex:], patternParts[len(patternParts)-1])
 }
 
 func hasPermissionInToken(tokenPermissions []string, group, resource, verb, name string) bool {
