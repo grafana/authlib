@@ -71,7 +71,7 @@ func (p GRPCTokenProvider) IDToken(_ context.Context) (string, bool) {
 }
 
 type Authenticator interface {
-	Autenticate(ctx context.Context, provider TokenProvider) (claims.AuthInfo, error)
+	Authenticate(ctx context.Context, provider TokenProvider) (claims.AuthInfo, error)
 }
 
 var _ Authenticator = (*DefaultAuthenticator)(nil)
@@ -85,7 +85,7 @@ type DefaultAuthenticator struct {
 	id *IDTokenVerifier
 }
 
-func (a *DefaultAuthenticator) Autenticate(ctx context.Context, provider TokenProvider) (claims.AuthInfo, error) {
+func (a *DefaultAuthenticator) Authenticate(ctx context.Context, provider TokenProvider) (claims.AuthInfo, error) {
 	atToken, ok := provider.AccessToken(ctx)
 	if !ok {
 		return nil, errors.New("unauthenticated")
@@ -124,7 +124,7 @@ type AccessTokenAutenticator struct {
 	at *AccessTokenVerifier
 }
 
-func (a *AccessTokenAutenticator) Autenticate(ctx context.Context, provider TokenProvider) (claims.AuthInfo, error) {
+func (a *AccessTokenAutenticator) Authenticate(ctx context.Context, provider TokenProvider) (claims.AuthInfo, error) {
 	token, ok := provider.AccessToken(ctx)
 	if !ok {
 		return nil, errors.New("unauthenticated")
@@ -148,7 +148,7 @@ type IDTokenAuthenticator struct {
 	id *IDTokenVerifier
 }
 
-func (a *IDTokenAuthenticator) Autenticate(ctx context.Context, provider TokenProvider) (claims.AuthInfo, error) {
+func (a *IDTokenAuthenticator) Authenticate(ctx context.Context, provider TokenProvider) (claims.AuthInfo, error) {
 	token, ok := provider.IDToken(ctx)
 	if !ok {
 		return nil, errors.New("unauthenticated")
