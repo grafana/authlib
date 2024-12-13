@@ -301,20 +301,30 @@ func wildcardMatch(pattern, input string) bool {
 		return len(input) == 0
 	}
 
-	if pattern == "*" {
-		return true
-	}
-
-	patternParts := strings.FieldsFunc(pattern, func(r rune) bool { return r == '*' })
+	i := 0
+	inputIndex := 0
+	patternParts := strings.Split(pattern, "*")
 
 	// leading pattern part must match
-	if pattern[0] != '*' && !strings.HasPrefix(input, patternParts[0]) {
-		return false
+	if pattern[0] != '*' {
+		if !strings.HasPrefix(input, patternParts[0]) {
+			return false
+		}
+
+		if len(patternParts) == 1 {
+			return (pattern[len(pattern)-1] == '*') || len(patternParts[0]) == len(input)
+		}
+
+		i++
+		inputIndex += len(patternParts[0])
 	}
 
-	inputIndex := 0
 	// iterate over the pattern parts
-	for i := 0; i < len(patternParts)-1; i++ {
+	for ; i < len(patternParts)-1; i++ {
+		if patternParts[i] == "" {
+			continue
+		}
+
 		nextIndex := strings.Index(input[inputIndex:], patternParts[i])
 		if nextIndex == -1 {
 			return false
