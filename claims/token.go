@@ -75,4 +75,7 @@ type AuthInfo interface {
 	// GetIDToken returns the singed id token used during authentication.
 	// Will be empty if authencation was performed only using access token.
 	GetIDToken() string
+
+	// GetAccessToken returns the singed access token used during authentication.
+	GetAccessToken() string
 }
