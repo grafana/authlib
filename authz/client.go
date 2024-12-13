@@ -307,19 +307,18 @@ func wildcardMatch(pattern, input string) bool {
 
 	// leading pattern part must match
 	if pattern[0] != '*' {
-		if !strings.HasPrefix(input, patternParts[0]) {
+		if len(patternParts) == 1 {
+			return pattern == input
+		} else if !strings.HasPrefix(input, patternParts[0]) {
 			return false
 		}
 
-		if len(patternParts) == 1 {
-			return (pattern[len(pattern)-1] == '*') || len(patternParts[0]) == len(input)
-		}
-
+		// Move to the next part
 		i++
 		inputIndex += len(patternParts[0])
 	}
 
-	// iterate over the pattern parts
+	// greedy fit pattern parts
 	for ; i < len(patternParts)-1; i++ {
 		if patternParts[i] == "" {
 			continue

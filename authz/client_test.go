@@ -596,6 +596,12 @@ func TestWildcardMatch(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "Pattern with multiple trailing wildcards",
+			pattern:  "prefix***",
+			input:    "prefix-suffix",
+			expected: true,
+		},
+		{
 			name:     "Pattern with wildcard in the middle",
 			pattern:  "pre*post",
 			input:    "pre-middle-post",
