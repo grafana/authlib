@@ -332,10 +332,9 @@ func wildcardMatch(pattern, input string) bool {
 		inputIndex += nextIndex + len(patternParts[i])
 	}
 
-	// loose check as trailing '*' matches input leftovers
+	// wildcard at then end matches anything
 	if pattern[len(pattern)-1] == '*' {
-		nextIndex := strings.Index(input[inputIndex:], patternParts[len(patternParts)-1])
-		return nextIndex != -1
+		return true
 	}
 
 	// trailing pattern must match
