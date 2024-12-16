@@ -12,20 +12,28 @@ import (
 	"github.com/grafana/authlib/claims"
 )
 
+var (
+	ErrMissingRequiredToken = errors.New("missing required token")
+)
+
+// TokenProvider is used to extract tokens.
 type TokenProvider interface {
 	AccessToken(ctx context.Context) (string, bool)
 	IDToken(ctx context.Context) (string, bool)
 }
 
-func NewHTTPTokenProvider(r *http.Request) HttpTokenProvider {
-	return HttpTokenProvider{r}
+func NewHTTPTokenProvider(r *http.Request) HTTPTokenProvider {
+	return HTTPTokenProvider{r}
 }
 
-type HttpTokenProvider struct {
+// HTTPTokenProvider extract tokens from a http.Request.
+// For access token it will try to extract it from `X-Access-Token` header.
+// For id token it will try to extract it from `X-Grafana-id` header.
+type HTTPTokenProvider struct {
 	r *http.Request
 }
 
-func (p HttpTokenProvider) AccessToken(ctx context.Context) (string, bool) {
+func (p HTTPTokenProvider) AccessToken(ctx context.Context) (string, bool) {
 	const header = "X-Access-Token"
 	// Strip the 'Bearer' prefix if it exists.
 	token := strings.TrimPrefix(p.r.Header.Get(header), "Bearer ")
@@ -33,7 +41,7 @@ func (p HttpTokenProvider) AccessToken(ctx context.Context) (string, bool) {
 
 }
 
-func (p HttpTokenProvider) IDToken(ctx context.Context) (string, bool) {
+func (p HTTPTokenProvider) IDToken(ctx context.Context) (string, bool) {
 	const header = "X-Grafana-Id"
 	// Strip the 'Bearer' prefix if it exists.
 	token := strings.TrimPrefix(p.r.Header.Get(header), "Bearer ")
@@ -44,6 +52,9 @@ func NewGRPCTokenProvider(md metadata.MD) GRPCTokenProvider {
 	return GRPCTokenProvider{md}
 }
 
+// GRPCTokenProvider extract tokens from grpc metadata.
+// For access token it will try to extract it using `X-Access-Token` key.
+// For id token it will try to extract it using `X-Grafana-id` key.
 type GRPCTokenProvider struct {
 	md metadata.MD
 }
@@ -70,6 +81,7 @@ func (p GRPCTokenProvider) IDToken(_ context.Context) (string, bool) {
 	return token, len(token) > 0
 }
 
+// Authenticator is used to authenticate request using the provided TokenProvider.
 type Authenticator interface {
 	Authenticate(ctx context.Context, provider TokenProvider) (claims.AuthInfo, error)
 }
@@ -80,6 +92,8 @@ func NewDefaultAutenticator(at *AccessTokenVerifier, id *IDTokenVerifier) *Defau
 	return &DefaultAuthenticator{at, id}
 }
 
+// DefaultAuthenticator will try to authenticate using both access token and id token.
+// Authnetication can be done with only a access token or with both access token and id token.
 type DefaultAuthenticator struct {
 	at *AccessTokenVerifier
 	id *IDTokenVerifier
@@ -88,7 +102,7 @@ type DefaultAuthenticator struct {
 func (a *DefaultAuthenticator) Authenticate(ctx context.Context, provider TokenProvider) (claims.AuthInfo, error) {
 	atToken, ok := provider.AccessToken(ctx)
 	if !ok {
-		return nil, errors.New("unauthenticated")
+		return nil, ErrMissingRequiredToken
 	}
 
 	atClaims, err := a.at.Verify(ctx, atToken)
@@ -120,6 +134,7 @@ func NewAccessTokenAuthenticator(at *AccessTokenVerifier) *AccessTokenAutenticat
 	return &AccessTokenAutenticator{at}
 }
 
+// AccessTokenAutenticator will authenticate using only the access token.
 type AccessTokenAutenticator struct {
 	at *AccessTokenVerifier
 }
@@ -127,7 +142,7 @@ type AccessTokenAutenticator struct {
 func (a *AccessTokenAutenticator) Authenticate(ctx context.Context, provider TokenProvider) (claims.AuthInfo, error) {
 	token, ok := provider.AccessToken(ctx)
 	if !ok {
-		return nil, errors.New("unauthenticated")
+		return nil, ErrMissingRequiredToken
 	}
 
 	claims, err := a.at.Verify(ctx, token)
@@ -144,6 +159,7 @@ func NewIDTokenAutenticator(id *IDTokenVerifier) *IDTokenAuthenticator {
 	return &IDTokenAuthenticator{id}
 }
 
+// IDTokenAuthenticator will authenticate using only the id token.
 type IDTokenAuthenticator struct {
 	id *IDTokenVerifier
 }
@@ -151,7 +167,7 @@ type IDTokenAuthenticator struct {
 func (a *IDTokenAuthenticator) Authenticate(ctx context.Context, provider TokenProvider) (claims.AuthInfo, error) {
 	token, ok := provider.IDToken(ctx)
 	if !ok {
-		return nil, errors.New("unauthenticated")
+		return nil, ErrMissingRequiredToken
 	}
 
 	claims, err := a.id.Verify(ctx, token)
