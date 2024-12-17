@@ -33,7 +33,7 @@ type HTTPTokenProvider struct {
 	r *http.Request
 }
 
-func (p HTTPTokenProvider) AccessToken(ctx context.Context) (string, bool) {
+func (p HTTPTokenProvider) AccessToken(_ context.Context) (string, bool) {
 	const header = "X-Access-Token"
 	// Strip the 'Bearer' prefix if it exists.
 	token := strings.TrimPrefix(p.r.Header.Get(header), "Bearer ")
@@ -41,7 +41,7 @@ func (p HTTPTokenProvider) AccessToken(ctx context.Context) (string, bool) {
 
 }
 
-func (p HTTPTokenProvider) IDToken(ctx context.Context) (string, bool) {
+func (p HTTPTokenProvider) IDToken(_ context.Context) (string, bool) {
 	const header = "X-Grafana-Id"
 	// Strip the 'Bearer' prefix if it exists.
 	token := strings.TrimPrefix(p.r.Header.Get(header), "Bearer ")
