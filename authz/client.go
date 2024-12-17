@@ -294,11 +294,9 @@ func (c *ClientImpl) check(ctx context.Context, id claims.AuthInfo, req *CheckRe
 }
 
 func hasPermissionInToken(tokenPermissions []string, group, resource, verb, name string) bool {
-	var target string
-	if name == "" {
-		target = group + "/" + resource
-	} else {
-		target = group + "/" + resource + "/" + name
+	target := group + "/" + resource
+	if name != "" {
+		target = target + "/" + name
 	}
 
 	for _, p := range tokenPermissions {
@@ -313,7 +311,7 @@ func hasPermissionInToken(tokenPermissions []string, group, resource, verb, name
 
 		pTarget := parts[0]
 		if len(pTarget) == 0 {
-			// invalid permission format
+			// requires at list the group
 			continue
 		}
 
