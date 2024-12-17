@@ -294,9 +294,11 @@ func (c *ClientImpl) check(ctx context.Context, id claims.AuthInfo, req *CheckRe
 }
 
 func hasPermissionInToken(tokenPermissions []string, group, resource, verb, name string) bool {
-	target := fmt.Sprintf("%s/%s", group, resource)
-	if name != "" {
-		target = fmt.Sprintf("%s/%s", target, name)
+	var target string
+	if name == "" {
+		target = group + "/" + resource
+	} else {
+		target = group + "/" + resource + "/" + name
 	}
 
 	for _, p := range tokenPermissions {
