@@ -312,7 +312,7 @@ func hasPermissionInToken(tokenPermissions []string, group, resource, verb, name
 		}
 
 		pTarget := parts[0]
-		if len(pTarget) == 0 || strings.Count(pTarget, "/") > 2 {
+		if len(pTarget) == 0 {
 			// invalid permission format
 			continue
 		}
