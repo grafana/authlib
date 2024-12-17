@@ -11,7 +11,7 @@ import (
 )
 
 func TestDefaultAuthenticator_Authenticate(t *testing.T) {
-	authenticator := NewDefaultAutenticator(
+	authenticator := NewDefaultAuthenticator(
 		NewUnsafeAccessTokenVerifier(VerifierConfig{}),
 		NewUnsafeIDTokenVerifier(VerifierConfig{}),
 	)
@@ -117,7 +117,7 @@ func TestAccessTokenAuthenticator_Authenticate(t *testing.T) {
 }
 
 func TestIDTokenAuthenticator_Authenticate(t *testing.T) {
-	authenticator := NewIDTokenAutenticator(
+	authenticator := NewIDTokenAuthenticator(
 		NewUnsafeIDTokenVerifier(VerifierConfig{}),
 	)
 

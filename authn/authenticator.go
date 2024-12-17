@@ -88,7 +88,7 @@ type Authenticator interface {
 
 var _ Authenticator = (*DefaultAuthenticator)(nil)
 
-func NewDefaultAutenticator(at *AccessTokenVerifier, id *IDTokenVerifier) *DefaultAuthenticator {
+func NewDefaultAuthenticator(at *AccessTokenVerifier, id *IDTokenVerifier) *DefaultAuthenticator {
 	return &DefaultAuthenticator{at, id}
 }
 
@@ -128,18 +128,18 @@ func (a *DefaultAuthenticator) Authenticate(ctx context.Context, provider TokenP
 	return NewIDTokenAuthInfo(*atClaims, idClaims), nil
 }
 
-var _ Authenticator = (*AccessTokenAutenticator)(nil)
+var _ Authenticator = (*AccessTokenAuthenticator)(nil)
 
-func NewAccessTokenAuthenticator(at *AccessTokenVerifier) *AccessTokenAutenticator {
-	return &AccessTokenAutenticator{at}
+func NewAccessTokenAuthenticator(at *AccessTokenVerifier) *AccessTokenAuthenticator {
+	return &AccessTokenAuthenticator{at}
 }
 
-// AccessTokenAutenticator will authenticate using only the access token.
-type AccessTokenAutenticator struct {
+// AccessTokenAuthenticator will authenticate using only the access token.
+type AccessTokenAuthenticator struct {
 	at *AccessTokenVerifier
 }
 
-func (a *AccessTokenAutenticator) Authenticate(ctx context.Context, provider TokenProvider) (claims.AuthInfo, error) {
+func (a *AccessTokenAuthenticator) Authenticate(ctx context.Context, provider TokenProvider) (claims.AuthInfo, error) {
 	token, ok := provider.AccessToken(ctx)
 	if !ok {
 		return nil, ErrMissingRequiredToken
@@ -155,7 +155,7 @@ func (a *AccessTokenAutenticator) Authenticate(ctx context.Context, provider Tok
 
 var _ Authenticator = (*IDTokenAuthenticator)(nil)
 
-func NewIDTokenAutenticator(id *IDTokenVerifier) *IDTokenAuthenticator {
+func NewIDTokenAuthenticator(id *IDTokenVerifier) *IDTokenAuthenticator {
 	return &IDTokenAuthenticator{id}
 }
 
