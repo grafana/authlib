@@ -313,7 +313,7 @@ func hasPermissionInToken(tokenPermissions []string, group, resource, verb, name
 
 		pTarget := parts[0]
 		if len(pTarget) == 0 {
-			// requires at list the group
+			// requires at least the group
 			continue
 		}
 
