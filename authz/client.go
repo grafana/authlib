@@ -295,7 +295,7 @@ func (c *ClientImpl) check(ctx context.Context, id claims.AuthInfo, req *CheckRe
 
 func hasPermissionInToken(tokenPermissions []string, group, resource, verb, name string) bool {
 	for _, p := range tokenPermissions {
-		parts := strings.Split(p, ":")
+		parts := strings.SplitN(p, ":", 2)
 		if len(parts) != 2 {
 			continue
 		}
@@ -304,20 +304,17 @@ func hasPermissionInToken(tokenPermissions []string, group, resource, verb, name
 			continue
 		}
 
-		parts = strings.Split(parts[0], "/")
+		parts = strings.SplitN(parts[0], "/", 3)
 		switch len(parts) {
 		case 1:
-			// group match only
 			if parts[0] == group {
 				return true
 			}
 		case 2:
-			// group/resource match
 			if parts[0] == group && parts[1] == resource {
 				return true
 			}
 		case 3:
-			// group/resource/name match
 			if parts[0] == group && parts[1] == resource && parts[2] == name {
 				return true
 			}

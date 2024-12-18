@@ -107,6 +107,15 @@ func TestHasPermissionInToken(t *testing.T) {
 			verb:             "list",
 			want:             true,
 		},
+		{
+			name:             "Permission with extra part does not match group/resource/name",
+			tokenPermissions: []string{"dashboard.grafana.app/dashboards/otherDash/UID:get"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "get",
+			resourceName:     "otherDash",
+			want:             false,
+		},
 	}
 
 	for _, tt := range tests {
