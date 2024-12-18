@@ -14,6 +14,127 @@ import (
 	"github.com/grafana/authlib/cache"
 )
 
+func TestHasPermissionInToken(t *testing.T) {
+	tests := []struct {
+		name             string
+		tokenPermissions []string
+		group            string
+		resource         string
+		verb             string
+		resourceName     string
+		want             bool
+	}{
+		{
+			name:             "Permission matches group/resource",
+			tokenPermissions: []string{"dashboard.grafana.app/dashboards:list"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "list",
+			want:             true,
+		},
+		{
+			name:             "Permission matches group/resource/name",
+			tokenPermissions: []string{"dashboard.grafana.app/dashboards/dashUID:get"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "get",
+			resourceName:     "dashUID",
+			want:             true,
+		},
+		{
+			name:             "Permission does not match verb",
+			tokenPermissions: []string{"dashboard.grafana.app/dashboards:list"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "get",
+			want:             false,
+		},
+		{
+			name:             "Permission matches wildcard verb",
+			tokenPermissions: []string{"dashboard.grafana.app/dashboards:*"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "get",
+			want:             true,
+		},
+		{
+			name:             "Permission does not match group/resource/name",
+			tokenPermissions: []string{"dashboard.grafana.app/dashboards/otherDashUID:get"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "get",
+			resourceName:     "dashUID",
+			want:             false,
+		},
+		{
+			name:             "Invalid permission missing verb",
+			tokenPermissions: []string{"dashboard.grafana.app/dashboards"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "list",
+			want:             false,
+		},
+		{
+			name:             "Permission on the wrong group",
+			tokenPermissions: []string{"other-group.grafana.app/dashboards:list"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "list",
+			want:             false,
+		},
+		{
+			name:             "Permission on the wrong resource",
+			tokenPermissions: []string{"dashboard.grafana.app/other-resource:list"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "list",
+			want:             false,
+		},
+		{
+			name:             "Permission without group are skipped",
+			tokenPermissions: []string{":get"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "get",
+			resourceName:     "dashUID",
+			want:             false,
+		},
+		{
+			name:             "Group permission work",
+			tokenPermissions: []string{"dashboard.grafana.app:list"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "list",
+			want:             true,
+		},
+		{
+			name:             "Permission with extra part does not match group/resource/name",
+			tokenPermissions: []string{"dashboard.grafana.app/dashboards/otherDash/UID:get"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "get",
+			resourceName:     "otherDash",
+			want:             false,
+		},
+		{
+			name:             "Parts need an exact match",
+			tokenPermissions: []string{"dashboard.grafana.app/dash:*"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "get",
+			resourceName:     "otherDash",
+			want:             false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := hasPermissionInToken(tt.tokenPermissions, tt.group, tt.resource, tt.verb, tt.resourceName)
+			require.Equal(t, tt.want, got)
+		})
+	}
+}
+
 func TestClient_Check(t *testing.T) {
 	tests := []struct {
 		name     string
