@@ -107,15 +107,6 @@ func TestHasPermissionInToken(t *testing.T) {
 			verb:             "list",
 			want:             true,
 		},
-		{
-			name:             "Wildcard action works",
-			tokenPermissions: []string{"dashboard.grafana.app/dashboard:*"},
-			group:            "dashboard.grafana.app",
-			resource:         "dashboards",
-			verb:             "get",
-			resourceName:     "dashUID",
-			want:             true,
-		},
 	}
 
 	for _, tt := range tests {
