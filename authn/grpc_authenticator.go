@@ -240,13 +240,9 @@ func (ga *GrpcAuthenticator) authenticateUser(ctx context.Context, md metadata.M
 		return nil, fmt.Errorf("%v: %w", err, ErrorInvalidIDToken)
 	}
 
-	typ, _, err := claims.ParseTypeID(idClaims.Subject)
+	_, _, err = claims.ParseTypeID(idClaims.Subject)
 	if err != nil {
 		return nil, fmt.Errorf("id token subject '%s' is not valid: %w", idClaims.Subject, ErrorInvalidSubject)
-	}
-
-	if typ != claims.TypeUser && typ != claims.TypeServiceAccount {
-		return nil, fmt.Errorf("id token subject '%s' type is not allowed: %w", typ, ErrorInvalidSubjectType)
 	}
 
 	return idClaims, nil
