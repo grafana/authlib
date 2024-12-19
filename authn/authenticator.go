@@ -60,7 +60,7 @@ type GRPCTokenProvider struct {
 }
 
 func (p GRPCTokenProvider) AccessToken(_ context.Context) (string, bool) {
-	const key = "X-Access-Token"
+	const key = DefaultAccessTokenMetadataKey
 	values := p.md.Get(key)
 	if len(values) == 0 {
 		return "", false
