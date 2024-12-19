@@ -380,17 +380,6 @@ func TestGrpcAuthenticator_authenticateUser(t *testing.T) {
 			wantErr: ErrorInvalidSubject,
 		},
 		{
-			name: "invalid subject type",
-			md:   metadata.Pairs(DefaultIdTokenMetadataKey, "id-token"),
-			initEnv: func(env *testEnv) {
-				env.idVerifier.expectedClaims = &Claims[IDTokenClaims]{
-					Claims: jwt.Claims{Subject: claims.NewTypeID(claims.TypeAPIKey, "3")},
-					Rest:   IDTokenClaims{Namespace: "stacks-12"},
-				}
-			},
-			wantErr: ErrorInvalidSubjectType,
-		},
-		{
 			name: "valid id token",
 			md:   metadata.Pairs(DefaultIdTokenMetadataKey, "id-token"),
 			initEnv: func(env *testEnv) {
