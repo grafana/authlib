@@ -19,7 +19,7 @@
     "/v1/namespace/{namespace}/check": {
       "post": {
         "summary": "Check access for subject on resource given its parent folder",
-        "description": "The check API will check if a subject is allowed to perform an action on a specific resource.",
+        "description": "This API checks if a subject is allowed to perform a given action on a specific resource.",
         "operationId": "Check",
         "responses": {
           "200": {
@@ -81,6 +81,60 @@
           "Check"
         ]
       }
+    },
+    "/v1/namespace/{namespace}/list": {
+      "post": {
+        "summary": "List a subject accesses on resources",
+        "description": "This API lists the resources a subject can perform a given action on.",
+        "operationId": "List",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "namespace",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "subject": {
+                  "type": "string"
+                },
+                "group": {
+                  "type": "string"
+                },
+                "verb": {
+                  "type": "string"
+                },
+                "resource": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "tags": [
+          "List"
+        ]
+      }
     }
   },
   "definitions": {
@@ -116,6 +170,26 @@
       "properties": {
         "allowed": {
           "type": "boolean"
+        }
+      }
+    },
+    "v1ListResponse": {
+      "type": "object",
+      "properties": {
+        "all": {
+          "type": "boolean"
+        },
+        "folders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     }

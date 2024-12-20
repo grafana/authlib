@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion7
 
 const (
 	AuthzService_Check_FullMethodName = "/authz.v1.AuthzService/Check"
+	AuthzService_List_FullMethodName  = "/authz.v1.AuthzService/List"
 )
 
 // AuthzServiceClient is the client API for AuthzService service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AuthzServiceClient interface {
 	Check(ctx context.Context, in *CheckRequest, opts ...grpc.CallOption) (*CheckResponse, error)
+	List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error)
 }
 
 type authzServiceClient struct {
@@ -46,11 +48,21 @@ func (c *authzServiceClient) Check(ctx context.Context, in *CheckRequest, opts .
 	return out, nil
 }
 
+func (c *authzServiceClient) List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error) {
+	out := new(ListResponse)
+	err := c.cc.Invoke(ctx, AuthzService_List_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthzServiceServer is the server API for AuthzService service.
 // All implementations must embed UnimplementedAuthzServiceServer
 // for forward compatibility
 type AuthzServiceServer interface {
 	Check(context.Context, *CheckRequest) (*CheckResponse, error)
+	List(context.Context, *ListRequest) (*ListResponse, error)
 	mustEmbedUnimplementedAuthzServiceServer()
 }
 
@@ -60,6 +72,9 @@ type UnimplementedAuthzServiceServer struct {
 
 func (UnimplementedAuthzServiceServer) Check(context.Context, *CheckRequest) (*CheckResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Check not implemented")
+}
+func (UnimplementedAuthzServiceServer) List(context.Context, *ListRequest) (*ListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method List not implemented")
 }
 func (UnimplementedAuthzServiceServer) mustEmbedUnimplementedAuthzServiceServer() {}
 
@@ -92,6 +107,24 @@ func _AuthzService_Check_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthzService_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthzServiceServer).List(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthzService_List_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthzServiceServer).List(ctx, req.(*ListRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthzService_ServiceDesc is the grpc.ServiceDesc for AuthzService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -102,6 +135,10 @@ var AuthzService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Check",
 			Handler:    _AuthzService_Check_Handler,
+		},
+		{
+			MethodName: "List",
+			Handler:    _AuthzService_List_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

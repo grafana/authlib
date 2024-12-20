@@ -515,8 +515,13 @@ func setupAccessClient() (*ClientImpl, *FakeAuthzServiceClient) {
 
 type FakeAuthzServiceClient struct {
 	checkRes *authzv1.CheckResponse
+	listRes  *authzv1.ListResponse
 }
 
 func (f *FakeAuthzServiceClient) Check(ctx context.Context, in *authzv1.CheckRequest, opts ...grpc.CallOption) (*authzv1.CheckResponse, error) {
 	return f.checkRes, nil
+}
+
+func (f *FakeAuthzServiceClient) List(ctx context.Context, in *authzv1.ListRequest, opts ...grpc.CallOption) (*authzv1.ListResponse, error) {
+	return f.listRes, nil
 }
