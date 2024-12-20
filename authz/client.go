@@ -434,7 +434,7 @@ func (c *ClientImpl) Compile(ctx context.Context, id claims.AuthInfo, list ListR
 		return nil, err
 	}
 
-	return listChecker(list.Namespace, resp), nil
+	return newItemChecker(list.Namespace, resp), nil
 }
 
 // Validate input
@@ -575,7 +575,7 @@ func allowAllChecker(expectedNamespace string) ItemChecker {
 	}
 }
 
-func listChecker(expectedNamespace string, resp *authzv1.ListResponse) ItemChecker {
+func newItemChecker(expectedNamespace string, resp *authzv1.ListResponse) ItemChecker {
 	if resp.All {
 		return allowAllChecker(expectedNamespace)
 	}
