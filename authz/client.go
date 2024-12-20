@@ -86,6 +86,9 @@ type ListRequest struct {
 	// tenant isolation
 	Namespace string
 
+	// Verb is the requested access verb.
+	Verb string
+
 	// Optional subresource
 	Subresource string
 }
@@ -118,7 +121,7 @@ type ClientConfig struct {
 
 // ClientImpl will implement the claims.AccessClient interface
 // Once we are able to deal with folder permissions expansion.
-var _ AccessChecker = (*ClientImpl)(nil)
+var _ AccessClient = (*ClientImpl)(nil)
 
 type AuthzClientOption func(*ClientImpl)
 
@@ -234,28 +237,6 @@ func NewClient(cfg *ClientConfig, opts ...AuthzClientOption) (*ClientImpl, error
 // Implementation
 // -----
 
-func validateAccessRequest(req CheckRequest) error {
-	if req.Namespace == "" {
-		return ErrMissingRequestNamespace
-	}
-
-	if _, err := claims.ParseNamespace(req.Namespace); err != nil {
-		return ErrInvalidRequestNamespace
-	}
-
-	if req.Resource == "" {
-		return ErrMissingRequestResource
-	}
-	if req.Group == "" {
-		return ErrMissingRequestGroup
-	}
-	if req.Verb == "" {
-		return ErrMissingRequestVerb
-	}
-
-	return nil
-}
-
 func (c *ClientImpl) check(ctx context.Context, id claims.AuthInfo, req *CheckRequest) (bool, error) {
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.hasAccess")
 	defer span.End()
@@ -327,7 +308,7 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.Check")
 	defer span.End()
 
-	if err := validateAccessRequest(req); err != nil {
+	if err := validateCheckRequest(req); err != nil {
 		span.RecordError(err)
 		return checkResponseDenied, err
 	}
@@ -387,6 +368,119 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 	// Check if the user has access to any of the requested resources
 	span.SetAttributes(attribute.Bool("user_allowed", res))
 	return CheckResponse{Allowed: res}, nil
+}
+
+func (c *ClientImpl) Compile(ctx context.Context, id claims.AuthInfo, list ListRequest) (ItemChecker, error) {
+	ctx, span := c.tracer.Start(ctx, "ClientImpl.List")
+	defer span.End()
+
+	if err := validateListRequest(list); err != nil {
+		span.RecordError(err)
+		return nil, err
+	}
+
+	if err := c.validateCaller(id); err != nil {
+		span.RecordError(err)
+		return nil, err
+	}
+
+	if !c.validateCallerNamespace(id, list.Namespace) {
+		return denyAllChecker, nil
+	}
+
+	span.SetAttributes(attribute.String("namespace", list.Namespace))
+	span.SetAttributes(attribute.String("group", list.Group))
+	span.SetAttributes(attribute.String("resource", list.Resource))
+
+	isService := claims.IsIdentityType(id.GetIdentityType(), claims.TypeAccessPolicy)
+	span.SetAttributes(attribute.Bool("with_user", !isService))
+
+	// No user => check on the service permissions
+	if isService {
+		// access token check is disabled => we can skip the authz service
+		if !c.authCfg.accessTokenAuthEnabled {
+			return allowAllChecker(list.Namespace), nil
+		}
+
+		// ToDo - should we handle the granular permission case?
+		if hasPermissionInToken(id.GetTokenPermissions(), list.Group, list.Resource, list.Verb, "") {
+			return allowAllChecker(list.Namespace), nil
+		}
+		return denyAllChecker, nil
+	}
+
+	// Only check the service permissions if the access token check is enabled
+	if c.authCfg.accessTokenAuthEnabled {
+		// ToDo - should we handle the granular permission case?
+		if !hasPermissionInToken(id.GetTokenDelegatedPermissions(), list.Group, list.Resource, list.Verb, "") {
+			return denyAllChecker, nil
+		}
+	}
+
+	// Instantiate a new context for the request
+	outCtx := newOutgoingContext(ctx)
+
+	// Query the authz service
+	checkReq := &authzv1.ListRequest{
+		Subject:   id.GetSubject(),
+		Group:     list.Group,
+		Resource:  list.Resource,
+		Namespace: list.Namespace,
+	}
+
+	resp, err := c.clientV1.List(outCtx, checkReq)
+	if err != nil {
+		span.RecordError(err)
+		return nil, err
+	}
+
+	return listChecker(list.Namespace, resp), nil
+}
+
+// Validate input
+
+func validateCheckRequest(req CheckRequest) error {
+	if req.Namespace == "" {
+		return ErrMissingRequestNamespace
+	}
+
+	if _, err := claims.ParseNamespace(req.Namespace); err != nil {
+		return ErrInvalidRequestNamespace
+	}
+
+	if req.Resource == "" {
+		return ErrMissingRequestResource
+	}
+	if req.Group == "" {
+		return ErrMissingRequestGroup
+	}
+	if req.Verb == "" {
+		return ErrMissingRequestVerb
+	}
+
+	return nil
+}
+
+func validateListRequest(req ListRequest) error {
+	if req.Namespace == "" {
+		return ErrMissingRequestNamespace
+	}
+
+	if _, err := claims.ParseNamespace(req.Namespace); err != nil {
+		return ErrInvalidRequestNamespace
+	}
+
+	if req.Resource == "" {
+		return ErrMissingRequestResource
+	}
+	if req.Group == "" {
+		return ErrMissingRequestGroup
+	}
+	if req.Verb == "" {
+		return ErrMissingRequestVerb
+	}
+
+	return nil
 }
 
 func (c *ClientImpl) validateCaller(caller claims.AuthInfo) error {
@@ -467,4 +561,40 @@ func (c *ClientImpl) getCachedCheck(ctx context.Context, key string) (bool, erro
 		return false, err
 	}
 	return allowed, nil
+}
+
+// -----
+// ItemChecker
+// -----
+
+var denyAllChecker = func(namespace string, name, folder string) bool { return false }
+
+func allowAllChecker(expectedNamespace string) ItemChecker {
+	return func(namespace string, name, folder string) bool {
+		return expectedNamespace == namespace
+	}
+}
+
+func listChecker(expectedNamespace string, resp *authzv1.ListResponse) ItemChecker {
+	if resp.All {
+		return allowAllChecker(expectedNamespace)
+	}
+
+	foldSet := make(map[string]bool, len(resp.Folders))
+	for _, f := range resp.Folders {
+		foldSet[f] = true
+	}
+	itemSet := make(map[string]bool, len(resp.Items))
+	for _, i := range resp.Items {
+		itemSet[i] = true
+	}
+	return func(namespace string, name, folder string) bool {
+		if expectedNamespace != namespace {
+			return false
+		}
+		if itemSet[name] {
+			return true
+		}
+		return foldSet[folder]
+	}
 }
