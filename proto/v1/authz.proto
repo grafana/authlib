@@ -16,7 +16,21 @@ service AuthzService {
       summary: "Check access for subject on resource given its parent folder"
       tags: ["Check"]
       operation_id: "Check"
-      description: "The check API will check if a subject is allowed to perform an action on a specific resource."
+      description: "This API checks if a subject is allowed to perform a given action on a specific resource."
+    };
+  }
+
+  rpc List(ListRequest) returns (ListResponse) {
+    option (google.api.http) = {
+      post: "/v1/namespace/{namespace}/list"
+      body: "*"
+    };
+
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "List a subject accesses on resources"
+      tags: ["List"]
+      operation_id: "List"
+      description: "This API lists the resources a subject can perform a given action on."
     };
   }
 }
@@ -35,4 +49,18 @@ message CheckRequest {
 
 message CheckResponse {
   bool allowed = 1;
+}
+
+message ListRequest {
+  string subject = 1;
+  string group = 2;
+  string verb = 3;
+  string resource = 4;
+  string namespace = 5;
+}
+
+message ListResponse {
+  bool all = 1;
+  repeated string folders = 2;
+  repeated string items = 3;
 }
