@@ -130,3 +130,7 @@ func (a *AuthInfo) GetIDToken() string {
 	}
 	return ""
 }
+
+func (a *AuthInfo) GetAccessToken() string {
+	return a.at.token
+}
