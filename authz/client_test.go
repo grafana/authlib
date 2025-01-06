@@ -126,6 +126,14 @@ func TestHasPermissionInToken(t *testing.T) {
 			resourceName:     "otherDash",
 			want:             false,
 		},
+		{
+			name:             "Resource specific permission should not allow access to all resources",
+			tokenPermissions: []string{"dashboard.grafana.app/dashboards/dashUID:get"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "get",
+			want:             false,
+		},
 	}
 
 	for _, tt := range tests {
