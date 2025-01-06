@@ -101,7 +101,7 @@ func TestHasPermissionInToken(t *testing.T) {
 			want:             false,
 		},
 		{
-			name:             "Group permission work",
+			name:             "Group level permission",
 			tokenPermissions: []string{"dashboard.grafana.app:list"},
 			group:            "dashboard.grafana.app",
 			resource:         "dashboards",
@@ -524,7 +524,7 @@ func TestClient_Compile(t *testing.T) {
 				Namespace: "",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
-				Verb:      "list",
+				Verb:      "get",
 			},
 			wantErr: true,
 		},
@@ -535,7 +535,7 @@ func TestClient_Compile(t *testing.T) {
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
-				Verb:      "list",
+				Verb:      "get",
 			},
 			wantErr: true,
 		},
@@ -549,7 +549,7 @@ func TestClient_Compile(t *testing.T) {
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
-				Verb:      "list",
+				Verb:      "get",
 			},
 			wantRes: map[check]bool{
 				{"stacks-12", "dash1", "fold1"}: false,
@@ -559,13 +559,13 @@ func TestClient_Compile(t *testing.T) {
 			name: "Service has the action",
 			caller: authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{
 				Claims: jwt.Claims{Subject: "service"},
-				Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", Permissions: []string{"dashboards.grafana.app/dashboards:list"}},
+				Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", Permissions: []string{"dashboards.grafana.app/dashboards:get"}},
 			}),
 			listReq: ListRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
-				Verb:      "list",
+				Verb:      "get",
 			},
 			wantRes: map[check]bool{
 				{"stacks-12", "dash1", "fold1"}: true,
@@ -582,7 +582,7 @@ func TestClient_Compile(t *testing.T) {
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
-				Verb:      "list",
+				Verb:      "get",
 			},
 			wantRes: map[check]bool{
 				{"stacks-12", "dash1", "fold1"}: false,
@@ -614,6 +614,26 @@ func TestClient_Compile(t *testing.T) {
 			},
 		},
 		{
+			name: "User has the action but service does not",
+			caller: authn.NewIDTokenAuthInfo(
+				authn.Claims[authn.AccessTokenClaims]{
+					Claims: jwt.Claims{Subject: "service"},
+					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12"},
+				},
+				&authn.Claims[authn.IDTokenClaims]{
+					Claims: jwt.Claims{Subject: "user:1"},
+					Rest:   authn.IDTokenClaims{Namespace: "stacks-12", Type: claims.TypeUser},
+				},
+			),
+			listReq: ListRequest{Namespace: "stacks-12", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get"},
+			listRes: &authzv1.ListResponse{All: true},
+			wantRes: map[check]bool{
+				{"stacks-12", "dash1", "fold1"}: false,
+				{"stacks-12", "dash2", "fold2"}: false,
+				{"stacks-13", "dash2", "fold2"}: false,
+			},
+		},
+		{
 			name: "User does not have the action",
 			caller: authn.NewIDTokenAuthInfo(
 				authn.Claims[authn.AccessTokenClaims]{
@@ -637,7 +657,7 @@ func TestClient_Compile(t *testing.T) {
 			},
 		},
 		{
-			name: "User has the action on a two resources",
+			name: "User has the action on two resources",
 			caller: authn.NewIDTokenAuthInfo(
 				authn.Claims[authn.AccessTokenClaims]{
 					Claims: jwt.Claims{Subject: "service"},
