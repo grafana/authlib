@@ -578,6 +578,10 @@ func newItemChecker(expectedNamespace string, resp *authzv1.ListResponse) ItemCh
 		return allowAllChecker(expectedNamespace)
 	}
 
+	if len(resp.Folders) == 0 && len(resp.Items) == 0 {
+		return denyAllChecker
+	}
+
 	foldSet := make(map[string]bool, len(resp.Folders))
 	for _, f := range resp.Folders {
 		foldSet[f] = true
@@ -590,9 +594,6 @@ func newItemChecker(expectedNamespace string, resp *authzv1.ListResponse) ItemCh
 		if expectedNamespace != namespace {
 			return false
 		}
-		if itemSet[name] {
-			return true
-		}
-		return foldSet[folder]
+		return itemSet[name] || foldSet[folder]
 	}
 }
