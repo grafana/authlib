@@ -126,6 +126,9 @@
                 },
                 "resource": {
                   "type": "string"
+                },
+                "subresource": {
+                  "type": "string"
                 }
               }
             }
