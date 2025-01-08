@@ -12,6 +12,7 @@ import (
 	"github.com/grafana/authlib/authn"
 	authzv1 "github.com/grafana/authlib/authz/proto/v1"
 	"github.com/grafana/authlib/cache"
+	"github.com/grafana/authlib/claims"
 )
 
 func TestHasPermissionInToken(t *testing.T) {
@@ -80,7 +81,7 @@ func TestHasPermissionInToken(t *testing.T) {
 			want:             false,
 		},
 		{
-			name:             "Group permission work",
+			name:             "Group level permission",
 			tokenPermissions: []string{"dashboard.grafana.app:list"},
 			group:            "dashboard.grafana.app",
 			resource:         "dashboards",
@@ -98,6 +99,14 @@ func TestHasPermissionInToken(t *testing.T) {
 		{
 			name:             "Parts need an exact match",
 			tokenPermissions: []string{"dashboard.grafana.app/dash:*"},
+			group:            "dashboard.grafana.app",
+			resource:         "dashboards",
+			verb:             "get",
+			want:             false,
+		},
+		{
+			name:             "Resource specific permission should not allow access to all resources",
+			tokenPermissions: []string{"dashboard.grafana.app/dashboards/dashUID:get"},
 			group:            "dashboard.grafana.app",
 			resource:         "dashboards",
 			verb:             "get",
@@ -387,6 +396,55 @@ func TestClient_Check_Cache(t *testing.T) {
 	require.True(t, got.Allowed)
 }
 
+func TestClient_Compile_Cache(t *testing.T) {
+	client, authz := setupAccessClient()
+	// User has the action on dash1 and fold1
+	authz.listRes = &authzv1.ListResponse{
+		All:     false,
+		Items:   []string{"dash1"},
+		Folders: []string{"fold1"},
+	}
+
+	caller := authn.NewIDTokenAuthInfo(
+		authn.Claims[authn.AccessTokenClaims]{
+			Claims: jwt.Claims{Subject: "service"},
+			Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get"}},
+		},
+		&authn.Claims[authn.IDTokenClaims]{
+			Claims: jwt.Claims{Subject: "user:1"},
+			Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+		},
+	)
+
+	req := ListRequest{
+		Namespace: "stacks-12",
+		Group:     "dashboards.grafana.app",
+		Resource:  "dashboards",
+		Verb:      "get",
+	}
+
+	// First call should populate the cache
+	check, err := client.Compile(context.Background(), caller, req)
+	require.NoError(t, err)
+	require.NotNil(t, check)
+
+	// Check that the cache was populated correctly
+	ctrl, err := client.getCachedItemChecker(context.Background(), itemCheckerCacheKey("user:1", &req))
+	require.NoError(t, err)
+	require.False(t, ctrl.All)
+	require.True(t, ctrl.Items["dash1"])
+	require.True(t, ctrl.Folders["fold1"])
+
+	// Change the response to make sure the cache is used
+	authz.listRes = &authzv1.ListResponse{}
+
+	// Second call should still be true as we hit the cache
+	check, err = client.Compile(context.Background(), caller, req)
+	require.NoError(t, err)
+	require.NotNil(t, check)
+	require.True(t, check("stacks-12", "dash1", "fold1"))
+}
+
 func TestClient_Check_DisableAccessToken(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -440,6 +498,206 @@ func TestClient_Check_DisableAccessToken(t *testing.T) {
 			}
 			require.NoError(t, err)
 			require.Equal(t, tt.want, got.Allowed)
+		})
+	}
+}
+
+func TestClient_Compile(t *testing.T) {
+	type check struct {
+		namespace string
+		item      string
+		folder    string
+	}
+	tests := []struct {
+		name    string
+		caller  *authn.AuthInfo
+		listReq ListRequest
+		listRes *authzv1.ListResponse
+		wantErr bool
+		wantRes map[check]bool
+	}{
+		{
+			name: "Invalid ListRequest",
+			listReq: ListRequest{
+				Namespace: "",
+				Group:     "dashboards.grafana.app",
+				Resource:  "dashboards",
+				Verb:      "get",
+			},
+			wantErr: true,
+		},
+		{
+			name:   "Invalid Caller",
+			caller: &authn.AuthInfo{},
+			listReq: ListRequest{
+				Namespace: "stacks-12",
+				Group:     "dashboards.grafana.app",
+				Resource:  "dashboards",
+				Verb:      "get",
+			},
+			wantErr: true,
+		},
+		{
+			name: "Caller Namespace Mismatch",
+			caller: authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{
+				Claims: jwt.Claims{Subject: "service"},
+				Rest:   authn.AccessTokenClaims{Namespace: "stacks-13"},
+			}),
+			listReq: ListRequest{
+				Namespace: "stacks-12",
+				Group:     "dashboards.grafana.app",
+				Resource:  "dashboards",
+				Verb:      "get",
+			},
+			wantRes: map[check]bool{
+				{"stacks-12", "dash1", "fold1"}: false,
+			},
+		},
+		{
+			name: "Service has the action",
+			caller: authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{
+				Claims: jwt.Claims{Subject: "service"},
+				Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", Permissions: []string{"dashboards.grafana.app/dashboards:get"}},
+			}),
+			listReq: ListRequest{
+				Namespace: "stacks-12",
+				Group:     "dashboards.grafana.app",
+				Resource:  "dashboards",
+				Verb:      "get",
+			},
+			wantRes: map[check]bool{
+				{"stacks-12", "dash1", "fold1"}: true,
+				{"stacks-12", "dash2", "fold2"}: true,
+			},
+		},
+		{
+			name: "Service does not have the action",
+			caller: authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{
+				Claims: jwt.Claims{Subject: "service"},
+				Rest:   authn.AccessTokenClaims{Namespace: "stacks-12"},
+			}),
+			listReq: ListRequest{
+				Namespace: "stacks-12",
+				Group:     "dashboards.grafana.app",
+				Resource:  "dashboards",
+				Verb:      "get",
+			},
+			wantRes: map[check]bool{
+				{"stacks-12", "dash1", "fold1"}: false,
+			},
+		},
+		{
+			name: "User has the action",
+			caller: authn.NewIDTokenAuthInfo(
+				authn.Claims[authn.AccessTokenClaims]{
+					Claims: jwt.Claims{Subject: "service"},
+					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get"}},
+				},
+				&authn.Claims[authn.IDTokenClaims]{
+					Claims: jwt.Claims{Subject: "user:1"},
+					Rest:   authn.IDTokenClaims{Namespace: "stacks-12", Type: claims.TypeUser},
+				},
+			),
+			listReq: ListRequest{
+				Namespace: "stacks-12",
+				Group:     "dashboards.grafana.app",
+				Resource:  "dashboards",
+				Verb:      "get",
+			},
+			listRes: &authzv1.ListResponse{All: true},
+			wantRes: map[check]bool{
+				{"stacks-12", "dash1", "fold1"}: true,
+				{"stacks-12", "dash2", "fold2"}: true,
+				{"stacks-13", "dash2", "fold2"}: false,
+			},
+		},
+		{
+			name: "User has the action but service does not",
+			caller: authn.NewIDTokenAuthInfo(
+				authn.Claims[authn.AccessTokenClaims]{
+					Claims: jwt.Claims{Subject: "service"},
+					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12"},
+				},
+				&authn.Claims[authn.IDTokenClaims]{
+					Claims: jwt.Claims{Subject: "user:1"},
+					Rest:   authn.IDTokenClaims{Namespace: "stacks-12", Type: claims.TypeUser},
+				},
+			),
+			listReq: ListRequest{Namespace: "stacks-12", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get"},
+			listRes: &authzv1.ListResponse{All: true},
+			wantRes: map[check]bool{
+				{"stacks-12", "dash1", "fold1"}: false,
+				{"stacks-12", "dash2", "fold2"}: false,
+				{"stacks-13", "dash2", "fold2"}: false,
+			},
+		},
+		{
+			name: "User does not have the action",
+			caller: authn.NewIDTokenAuthInfo(
+				authn.Claims[authn.AccessTokenClaims]{
+					Claims: jwt.Claims{Subject: "service"},
+					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get"}},
+				},
+				&authn.Claims[authn.IDTokenClaims]{
+					Claims: jwt.Claims{Subject: "user:1"},
+					Rest:   authn.IDTokenClaims{Namespace: "stacks-12", Type: claims.TypeUser},
+				},
+			),
+			listReq: ListRequest{
+				Namespace: "stacks-12",
+				Group:     "dashboards.grafana.app",
+				Resource:  "dashboards",
+				Verb:      "get",
+			},
+			listRes: &authzv1.ListResponse{},
+			wantRes: map[check]bool{
+				{"stacks-12", "dash1", "fold1"}: false,
+			},
+		},
+		{
+			name: "User has the action on two resources",
+			caller: authn.NewIDTokenAuthInfo(
+				authn.Claims[authn.AccessTokenClaims]{
+					Claims: jwt.Claims{Subject: "service"},
+					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get"}},
+				},
+				&authn.Claims[authn.IDTokenClaims]{
+					Claims: jwt.Claims{Subject: "user:1"},
+					Rest:   authn.IDTokenClaims{Namespace: "stacks-12", Type: claims.TypeUser},
+				},
+			),
+			listReq: ListRequest{
+				Namespace: "stacks-12",
+				Group:     "dashboards.grafana.app",
+				Resource:  "dashboards",
+				Verb:      "get",
+			},
+			listRes: &authzv1.ListResponse{Items: []string{"dash1"}, Folders: []string{"fold2"}},
+			wantRes: map[check]bool{
+				{"stacks-12", "dash1", "fold1"}: true,
+				{"stacks-13", "dash1", "fold1"}: false,
+				{"stacks-12", "dash2", "fold2"}: true,
+				{"stacks-12", "dash2", "fold3"}: false,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, authz := setupAccessClient()
+			authz.listRes = tt.listRes
+
+			gotFunc, err := client.Compile(context.Background(), tt.caller, tt.listReq)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, gotFunc)
+			for check, want := range tt.wantRes {
+				got := gotFunc(check.namespace, check.item, check.folder)
+				require.Equal(t, want, got)
+			}
 		})
 	}
 }
