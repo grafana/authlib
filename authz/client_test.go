@@ -396,6 +396,55 @@ func TestClient_Check_Cache(t *testing.T) {
 	require.True(t, got.Allowed)
 }
 
+func TestClient_Compile_Cache(t *testing.T) {
+	client, authz := setupAccessClient()
+	// User has the action on dash1 and fold1
+	authz.listRes = &authzv1.ListResponse{
+		All:     false,
+		Items:   []string{"dash1"},
+		Folders: []string{"fold1"},
+	}
+
+	caller := authn.NewIDTokenAuthInfo(
+		authn.Claims[authn.AccessTokenClaims]{
+			Claims: jwt.Claims{Subject: "service"},
+			Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get"}},
+		},
+		&authn.Claims[authn.IDTokenClaims]{
+			Claims: jwt.Claims{Subject: "user:1"},
+			Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+		},
+	)
+
+	req := ListRequest{
+		Namespace: "stacks-12",
+		Group:     "dashboards.grafana.app",
+		Resource:  "dashboards",
+		Verb:      "get",
+	}
+
+	// First call should populate the cache
+	check, err := client.Compile(context.Background(), caller, req)
+	require.NoError(t, err)
+	require.NotNil(t, check)
+
+	// Check that the cache was populated correctly
+	ctrl, err := client.getCachedItemChecker(context.Background(), itemCheckerCacheKey("user:1", &req))
+	require.NoError(t, err)
+	require.False(t, ctrl.All)
+	require.True(t, ctrl.Items["dash1"])
+	require.True(t, ctrl.Folders["fold1"])
+
+	// Change the response to make sure the cache is used
+	authz.listRes = &authzv1.ListResponse{}
+
+	// Second call should still be true as we hit the cache
+	check, err = client.Compile(context.Background(), caller, req)
+	require.NoError(t, err)
+	require.NotNil(t, check)
+	require.True(t, check("stacks-12", "dash1", "fold1"))
+}
+
 func TestClient_Check_DisableAccessToken(t *testing.T) {
 	tests := []struct {
 		name     string

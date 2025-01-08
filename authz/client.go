@@ -411,6 +411,12 @@ func (c *ClientImpl) Compile(ctx context.Context, id claims.AuthInfo, list ListR
 		}
 	}
 
+	key := itemCheckerCacheKey(id.GetSubject(), &list)
+	checker, err := c.getCachedItemChecker(ctx, key)
+	if err == nil {
+		return checker.fn(list.Namespace), nil
+	}
+
 	// Instantiate a new context for the request
 	outCtx := newOutgoingContext(ctx)
 
@@ -427,8 +433,18 @@ func (c *ClientImpl) Compile(ctx context.Context, id claims.AuthInfo, list ListR
 		span.RecordError(err)
 		return nil, err
 	}
+	if resp == nil {
+		return denyAllChecker, nil
+	}
 
-	return newItemChecker(list.Namespace, resp), nil
+	checker = newItemChecker(resp)
+	err = c.cacheItemChecker(ctx, key, checker)
+	if err != nil {
+		span.RecordError(err)
+		return denyAllChecker, err
+	}
+
+	return checker.fn(list.Namespace), nil
 }
 
 // Validate input
@@ -557,6 +573,41 @@ func (c *ClientImpl) getCachedCheck(ctx context.Context, key string) (bool, erro
 	return allowed, nil
 }
 
+func itemCheckerCacheKey(subj string, req *ListRequest) string {
+	return fmt.Sprintf("list-%s-%s-%s-%s-%s-%s", req.Namespace, subj, req.Group, req.Resource, req.Verb, req.Subresource)
+}
+
+func (c *ClientImpl) cacheItemChecker(ctx context.Context, key string, checker *itemChecker) error {
+	ctx, span := c.tracer.Start(ctx, "ClientImpl.cacheList")
+	defer span.End()
+
+	buf := bytes.Buffer{}
+	err := gob.NewEncoder(&buf).Encode(checker)
+	if err != nil {
+		return err
+	}
+
+	// Cache with default expiry
+	return c.cache.Set(ctx, key, buf.Bytes(), cache.DefaultExpiration)
+}
+
+func (c *ClientImpl) getCachedItemChecker(ctx context.Context, key string) (*itemChecker, error) {
+	ctx, span := c.tracer.Start(ctx, "ClientImpl.getCachedList")
+	defer span.End()
+
+	data, err := c.cache.Get(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &itemChecker{}
+	err = gob.NewDecoder(bytes.NewReader(data)).Decode(resp)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
 // -----
 // ItemChecker
 // -----
@@ -569,27 +620,45 @@ func allowAllChecker(expectedNamespace string) ItemChecker {
 	}
 }
 
-func newItemChecker(expectedNamespace string, resp *authzv1.ListResponse) ItemChecker {
+type itemChecker struct {
+	All     bool
+	Items   map[string]bool
+	Folders map[string]bool
+}
+
+func newItemChecker(resp *authzv1.ListResponse) *itemChecker {
 	if resp.All {
+		return &itemChecker{All: true}
+	}
+
+	res := &itemChecker{
+		Items:   make(map[string]bool, len(resp.Items)),
+		Folders: make(map[string]bool, len(resp.Folders)),
+	}
+	for _, i := range resp.Items {
+		res.Items[i] = true
+	}
+	for _, f := range resp.Folders {
+		res.Folders[f] = true
+	}
+	return res
+}
+
+// fn generates a ItemChecker function that can check user access to items.
+func (c *itemChecker) fn(expectedNamespace string) ItemChecker {
+	if c.All {
 		return allowAllChecker(expectedNamespace)
 	}
 
-	if len(resp.Folders) == 0 && len(resp.Items) == 0 {
+	if len(c.Items) == 0 && len(c.Folders) == 0 {
 		return denyAllChecker
 	}
 
-	foldSet := make(map[string]bool, len(resp.Folders))
-	for _, f := range resp.Folders {
-		foldSet[f] = true
-	}
-	itemSet := make(map[string]bool, len(resp.Items))
-	for _, i := range resp.Items {
-		itemSet[i] = true
-	}
 	return func(namespace string, name, folder string) bool {
-		if expectedNamespace != namespace {
+		if namespace != expectedNamespace {
 			return false
 		}
-		return itemSet[name] || foldSet[folder]
+
+		return c.Items[name] || c.Folders[folder]
 	}
 }
