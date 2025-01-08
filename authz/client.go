@@ -418,6 +418,7 @@ func (c *ClientImpl) Compile(ctx context.Context, id claims.AuthInfo, list ListR
 	span.SetAttributes(attribute.String("namespace", list.Namespace))
 	span.SetAttributes(attribute.String("group", list.Group))
 	span.SetAttributes(attribute.String("resource", list.Resource))
+	span.SetAttributes(attribute.String("verb", list.Verb))
 
 	isService := claims.IsIdentityType(id.GetIdentityType(), claims.TypeAccessPolicy)
 	span.SetAttributes(attribute.Bool("with_user", !isService))
