@@ -21,7 +21,6 @@ func TestHasPermissionInToken(t *testing.T) {
 		group            string
 		resource         string
 		verb             string
-		resourceName     string
 		want             bool
 	}{
 		{
@@ -30,15 +29,6 @@ func TestHasPermissionInToken(t *testing.T) {
 			group:            "dashboard.grafana.app",
 			resource:         "dashboards",
 			verb:             "list",
-			want:             true,
-		},
-		{
-			name:             "Permission matches group/resource/name",
-			tokenPermissions: []string{"dashboard.grafana.app/dashboards/dashUID:get"},
-			group:            "dashboard.grafana.app",
-			resource:         "dashboards",
-			verb:             "get",
-			resourceName:     "dashUID",
 			want:             true,
 		},
 		{
@@ -56,15 +46,6 @@ func TestHasPermissionInToken(t *testing.T) {
 			resource:         "dashboards",
 			verb:             "get",
 			want:             true,
-		},
-		{
-			name:             "Permission does not match group/resource/name",
-			tokenPermissions: []string{"dashboard.grafana.app/dashboards/otherDashUID:get"},
-			group:            "dashboard.grafana.app",
-			resource:         "dashboards",
-			verb:             "get",
-			resourceName:     "dashUID",
-			want:             false,
 		},
 		{
 			name:             "Invalid permission missing verb",
@@ -96,7 +77,6 @@ func TestHasPermissionInToken(t *testing.T) {
 			group:            "dashboard.grafana.app",
 			resource:         "dashboards",
 			verb:             "get",
-			resourceName:     "dashUID",
 			want:             false,
 		},
 		{
@@ -108,12 +88,11 @@ func TestHasPermissionInToken(t *testing.T) {
 			want:             true,
 		},
 		{
-			name:             "Permission with extra part does not match group/resource/name",
-			tokenPermissions: []string{"dashboard.grafana.app/dashboards/otherDash/UID:get"},
+			name:             "Permission with extra parts does not match group/resource",
+			tokenPermissions: []string{"dashboard.grafana.app/dashboards/extra:get"},
 			group:            "dashboard.grafana.app",
 			resource:         "dashboards",
 			verb:             "get",
-			resourceName:     "otherDash",
 			want:             false,
 		},
 		{
@@ -122,14 +101,13 @@ func TestHasPermissionInToken(t *testing.T) {
 			group:            "dashboard.grafana.app",
 			resource:         "dashboards",
 			verb:             "get",
-			resourceName:     "otherDash",
 			want:             false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := hasPermissionInToken(tt.tokenPermissions, tt.group, tt.resource, tt.verb, tt.resourceName)
+			got := hasPermissionInToken(tt.tokenPermissions, tt.group, tt.resource, tt.verb)
 			require.Equal(t, tt.want, got)
 		})
 	}
@@ -211,25 +189,10 @@ func TestClient_Check(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "Service has a granular action",
+			name: "Service has the action but with an extra part",
 			caller: authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{
 				Claims: jwt.Claims{Subject: "service"},
 				Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", Permissions: []string{"dashboards.grafana.app/dashboards/dashUID:get"}},
-			}),
-			req: CheckRequest{
-				Namespace: "stacks-12",
-				Group:     "dashboards.grafana.app",
-				Resource:  "dashboards",
-				Verb:      "get",
-				Name:      "dashUID",
-			},
-			want: true,
-		},
-		{
-			name: "Service has a granular action on another resource",
-			caller: authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{
-				Claims: jwt.Claims{Subject: "service"},
-				Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", Permissions: []string{"dashboards.grafana.app/dashboards/otherDashUID:get"}},
 			}),
 			req: CheckRequest{
 				Namespace: "stacks-12",
@@ -316,33 +279,11 @@ func TestClient_Check(t *testing.T) {
 			want:     true,
 		},
 		{
-			name: "On behalf of, service has granular action and user has the action",
+			name: "On behalf of, service has the action but with an extra part",
 			caller: authn.NewIDTokenAuthInfo(
 				authn.Claims[authn.AccessTokenClaims]{
 					Claims: jwt.Claims{Subject: "service"},
 					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards/dashUID:list"}},
-				},
-				&authn.Claims[authn.IDTokenClaims]{
-					Claims: jwt.Claims{Subject: "user:1"},
-					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
-				},
-			),
-			req: CheckRequest{
-				Namespace: "stacks-12",
-				Group:     "dashboards.grafana.app",
-				Resource:  "dashboards",
-				Verb:      "list",
-				Name:      "dashUID",
-			},
-			checkRes: true,
-			want:     true,
-		},
-		{
-			name: "On behalf of, service has granular action on another resource",
-			caller: authn.NewIDTokenAuthInfo(
-				authn.Claims[authn.AccessTokenClaims]{
-					Claims: jwt.Claims{Subject: "service"},
-					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards/otherDashUID:list"}},
 				},
 				&authn.Claims[authn.IDTokenClaims]{
 					Claims: jwt.Claims{Subject: "user:1"},
