@@ -274,7 +274,7 @@ func (c *ClientImpl) check(ctx context.Context, id claims.AuthInfo, req *CheckRe
 	return resp.Allowed, err
 }
 
-func hasPermissionInToken(tokenPermissions []string, group, resource, verb, name string) bool {
+func hasPermissionInToken(tokenPermissions []string, group, resource, verb string) bool {
 	for _, p := range tokenPermissions {
 		parts := strings.SplitN(p, ":", 2)
 		if len(parts) != 2 {
@@ -293,10 +293,6 @@ func hasPermissionInToken(tokenPermissions []string, group, resource, verb, name
 			}
 		case 2:
 			if parts[0] == group && parts[1] == resource {
-				return true
-			}
-		case 3:
-			if parts[0] == group && parts[1] == resource && parts[2] == name {
 				return true
 			}
 		}
@@ -343,7 +339,7 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 			return checkResponseAllowed, nil
 		}
 
-		serviceIsAllowedAction := hasPermissionInToken(id.GetTokenPermissions(), req.Group, req.Resource, req.Verb, req.Name)
+		serviceIsAllowedAction := hasPermissionInToken(id.GetTokenPermissions(), req.Group, req.Resource, req.Verb)
 		span.SetAttributes(attribute.Bool("service_allowed", serviceIsAllowedAction))
 		return CheckResponse{Allowed: serviceIsAllowedAction}, nil
 	}
@@ -352,7 +348,7 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 
 	// Only check the service permissions if the access token check is enabled
 	if c.authCfg.accessTokenAuthEnabled {
-		serviceIsAllowedAction := hasPermissionInToken(id.GetTokenDelegatedPermissions(), req.Group, req.Resource, req.Verb, req.Name)
+		serviceIsAllowedAction := hasPermissionInToken(id.GetTokenDelegatedPermissions(), req.Group, req.Resource, req.Verb)
 		span.SetAttributes(attribute.Bool("service_allowed", serviceIsAllowedAction))
 		if !serviceIsAllowedAction {
 			return checkResponseDenied, nil
