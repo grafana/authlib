@@ -398,7 +398,7 @@ func (c *ClientImpl) Compile(ctx context.Context, id claims.AuthInfo, list ListR
 			return allowAllChecker(list.Namespace), nil
 		}
 
-		if hasPermissionInToken(id.GetTokenPermissions(), list.Group, list.Resource, list.Verb, "") {
+		if hasPermissionInToken(id.GetTokenPermissions(), list.Group, list.Resource, list.Verb) {
 			return allowAllChecker(list.Namespace), nil
 		}
 		return denyAllChecker, nil
@@ -406,7 +406,7 @@ func (c *ClientImpl) Compile(ctx context.Context, id claims.AuthInfo, list ListR
 
 	// Only check the service permissions if the access token check is enabled
 	if c.authCfg.accessTokenAuthEnabled {
-		if !hasPermissionInToken(id.GetTokenDelegatedPermissions(), list.Group, list.Resource, list.Verb, "") {
+		if !hasPermissionInToken(id.GetTokenDelegatedPermissions(), list.Group, list.Resource, list.Verb) {
 			return denyAllChecker, nil
 		}
 	}
