@@ -366,6 +366,35 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 	return CheckResponse{Allowed: res}, nil
 }
 
+func (c *ClientImpl) compile(ctx context.Context, id claims.AuthInfo, list *ListRequest) (*itemChecker, error) {
+	key := itemCheckerCacheKey(id.GetSubject(), list)
+	checker, err := c.getCachedItemChecker(ctx, key)
+	if err == nil {
+		return checker, nil
+	}
+
+	// Instantiate a new context for the request
+	outCtx := newOutgoingContext(ctx)
+
+	// Query the authz service
+	checkReq := &authzv1.ListRequest{
+		Subject:   id.GetSubject(),
+		Group:     list.Group,
+		Resource:  list.Resource,
+		Namespace: list.Namespace,
+	}
+
+	resp, err := c.clientV1.List(outCtx, checkReq)
+	if err != nil {
+		return nil, err
+	}
+
+	checker = newItemChecker(resp)
+	err = c.cacheItemChecker(ctx, key, checker)
+
+	return checker, err
+}
+
 func (c *ClientImpl) Compile(ctx context.Context, id claims.AuthInfo, list ListRequest) (ItemChecker, error) {
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.List")
 	defer span.End()
@@ -411,34 +440,7 @@ func (c *ClientImpl) Compile(ctx context.Context, id claims.AuthInfo, list ListR
 		}
 	}
 
-	key := itemCheckerCacheKey(id.GetSubject(), &list)
-	checker, err := c.getCachedItemChecker(ctx, key)
-	if err == nil {
-		return checker.fn(list.Namespace), nil
-	}
-
-	// Instantiate a new context for the request
-	outCtx := newOutgoingContext(ctx)
-
-	// Query the authz service
-	checkReq := &authzv1.ListRequest{
-		Subject:   id.GetSubject(),
-		Group:     list.Group,
-		Resource:  list.Resource,
-		Namespace: list.Namespace,
-	}
-
-	resp, err := c.clientV1.List(outCtx, checkReq)
-	if err != nil {
-		span.RecordError(err)
-		return nil, err
-	}
-	if resp == nil {
-		return denyAllChecker, nil
-	}
-
-	checker = newItemChecker(resp)
-	err = c.cacheItemChecker(ctx, key, checker)
+	checker, err := c.compile(ctx, id, &list)
 	if err != nil {
 		span.RecordError(err)
 		return denyAllChecker, err
@@ -627,6 +629,10 @@ type itemChecker struct {
 }
 
 func newItemChecker(resp *authzv1.ListResponse) *itemChecker {
+	if resp == nil {
+		return &itemChecker{}
+	}
+
 	if resp.All {
 		return &itemChecker{All: true}
 	}
