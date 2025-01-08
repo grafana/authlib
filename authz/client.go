@@ -377,14 +377,16 @@ func (c *ClientImpl) compile(ctx context.Context, id claims.AuthInfo, list *List
 	outCtx := newOutgoingContext(ctx)
 
 	// Query the authz service
-	checkReq := &authzv1.ListRequest{
-		Subject:   id.GetSubject(),
-		Group:     list.Group,
-		Resource:  list.Resource,
-		Namespace: list.Namespace,
+	listReq := &authzv1.ListRequest{
+		Subject:     id.GetSubject(),
+		Group:       list.Group,
+		Resource:    list.Resource,
+		Verb:        list.Verb,
+		Namespace:   list.Namespace,
+		Subresource: list.Subresource,
 	}
 
-	resp, err := c.clientV1.List(outCtx, checkReq)
+	resp, err := c.clientV1.List(outCtx, listReq)
 	if err != nil {
 		return nil, err
 	}
