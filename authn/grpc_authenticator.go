@@ -161,7 +161,7 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 	md, ok := metadata.FromIncomingContext(spanCtx)
 	if !ok {
 		span.RecordError(ErrorMissingMetadata)
-		return spanCtx, ErrorMissingMetadata
+		return nil, ErrorMissingMetadata
 	}
 
 	var at *Claims[AccessTokenClaims]
@@ -170,7 +170,7 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 		at, err = ga.authenticateService(spanCtx, md)
 		if err != nil {
 			span.RecordError(err)
-			return spanCtx, err
+			return nil, err
 		}
 		span.SetAttributes(attribute.Bool("with_accesstoken", true))
 		span.SetAttributes(attribute.String("service", at.Subject))
@@ -183,7 +183,7 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 		id, err = ga.authenticateUser(spanCtx, md)
 		if err != nil {
 			span.RecordError(err)
-			return spanCtx, err
+			return nil, err
 		}
 		if id != nil {
 			span.SetAttributes(attribute.Bool("with_idtoken", true))
@@ -196,7 +196,7 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 	if ga.cfg.accessTokenAuthEnabled && ga.cfg.idTokenAuthEnabled && id != nil {
 		if !claims.NamespaceMatches(at.Rest.Namespace, id.Rest.Namespace) {
 			span.RecordError(ErrorNamespacesMismatch)
-			return spanCtx, ErrorNamespacesMismatch
+			return nil, ErrorNamespacesMismatch
 		}
 	}
 
