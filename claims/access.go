@@ -77,3 +77,24 @@ type AccessClient interface {
 	AccessChecker
 	AccessLister
 }
+
+// A simple client that always returns the same value
+func FixedAccessClient(allowed bool) AccessClient {
+	return &fixedClient{allowed}
+}
+
+type fixedClient struct {
+	allowed bool
+}
+
+// Check implements AccessClient.
+func (n *fixedClient) Check(ctx context.Context, id AuthInfo, req CheckRequest) (CheckResponse, error) {
+	return CheckResponse{Allowed: n.allowed}, nil
+}
+
+// Compile implements AccessClient.
+func (n *fixedClient) Compile(ctx context.Context, id AuthInfo, req ListRequest) (ItemChecker, error) {
+	return func(namespace string, name, folder string) bool {
+		return n.allowed
+	}, nil
+}
