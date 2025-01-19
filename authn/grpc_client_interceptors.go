@@ -155,6 +155,8 @@ func (gci *GrpcClientInterceptor) wrapContext(ctx context.Context) (context.Cont
 		md = make(metadata.MD)
 	}
 
+	fmt.Printf("WRAP (before): %+v\n", md)
+
 	if gci.cfg.accessTokenAuthEnabled {
 		token, err := gci.tokenClient.Exchange(spanCtx, *gci.cfg.TokenRequest)
 		if err != nil {
@@ -190,5 +192,6 @@ func (gci *GrpcClientInterceptor) wrapContext(ctx context.Context) (context.Cont
 		span.SetAttributes(attribute.String("keys", strings.Join(keys, ",")))
 	}
 
+	fmt.Printf("WRAP (outgoing): %+v\n", md)
 	return metadata.NewOutgoingContext(ctx, md), nil
 }
