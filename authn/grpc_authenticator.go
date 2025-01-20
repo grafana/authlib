@@ -214,9 +214,9 @@ func (ga *GrpcAuthenticator) authenticateService(ctx context.Context, md metadat
 		return nil, fmt.Errorf("%v: %w", err, ErrorInvalidAccessToken)
 	}
 
-	typ, _, err := types.ParseTypeID(attypes.Subject)
+	typ, _, err := types.ParseTypeID(atClaims.Subject)
 	if err != nil {
-		return nil, fmt.Errorf("access token subject '%s' is not valid: %w", attypes.Subject, ErrorInvalidSubject)
+		return nil, fmt.Errorf("access token subject '%s' is not valid: %w", atClaims.Subject, ErrorInvalidSubject)
 	}
 
 	if typ != types.TypeAccessPolicy {
@@ -240,9 +240,9 @@ func (ga *GrpcAuthenticator) authenticateUser(ctx context.Context, md metadata.M
 		return nil, fmt.Errorf("%v: %w", err, ErrorInvalidIDToken)
 	}
 
-	_, _, err = types.ParseTypeID(idtypes.Subject)
+	_, _, err = types.ParseTypeID(idClaims.Subject)
 	if err != nil {
-		return nil, fmt.Errorf("id token subject '%s' is not valid: %w", idtypes.Subject, ErrorInvalidSubject)
+		return nil, fmt.Errorf("id token subject '%s' is not valid: %w", idClaims.Subject, ErrorInvalidSubject)
 	}
 
 	return idClaims, nil

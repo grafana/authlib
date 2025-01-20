@@ -35,11 +35,11 @@ func (v *UnsafeVerifierBase[T]) Verify(ctx context.Context, token string) (*Clai
 		token: token, // hold on to the original token
 	}
 
-	if err := parsed.UnsafeClaimsWithoutVerification(&types.Claims, &types.Rest); err != nil {
+	if err := parsed.UnsafeClaimsWithoutVerification(&claims.Claims, &claims.Rest); err != nil {
 		return nil, err
 	}
 
-	if err := types.Validate(jwt.Expected{
+	if err := claims.Validate(jwt.Expected{
 		Audience: v.cfg.AllowedAudiences,
 		Time:     time.Now(),
 	}); err != nil {

@@ -118,10 +118,10 @@ func (query *searchQuery) processIDToken(c *searchClientImpl) error {
 		if err != nil {
 			return fmt.Errorf("%v: %w", ErrInvalidIDToken, err)
 		}
-		if types.Subject == "" {
+		if claims.Subject == "" {
 			return fmt.Errorf("%v: %w", ErrInvalidIDToken, errors.New("missing subject (namespacedID) in id token"))
 		}
-		query.NamespacedID = types.Subject
+		query.NamespacedID = claims.Subject
 		if !(strings.HasPrefix(query.NamespacedID, NamespaceServiceAccount) || strings.HasPrefix(query.NamespacedID, NamespaceUser)) {
 			// return an error if we attempt to query an `api-key` - currently not supported by the /search endpoint
 			return ErrInvalidTokenNamespace
