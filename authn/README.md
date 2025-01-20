@@ -39,7 +39,7 @@ func main() {
 }
 ```
 
-The verifier is generic over jwt.types. Most common use cases will be to either verify Grafana issued ID-Token or Access token.
+The verifier is generic over jwt.Claims. Most common use cases will be to either verify Grafana issued ID-Token or Access token.
 For those we have `AccessTokenVerifier` and `IDTokenVerifier`. These two structures are just simple wrappers around `Verifier` with expected types.
 
 ## gRPC interceptors
