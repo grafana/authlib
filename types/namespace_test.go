@@ -1,21 +1,21 @@
-package claims_test
+package types_test
 
 import (
 	"testing"
 
-	"github.com/grafana/authlib/claims"
+	"github.com/grafana/authlib/types"
 )
 
 func TestParseNamespace(t *testing.T) {
 	tests := []struct {
 		name      string
 		namespace string
-		expected  claims.NamespaceInfo
+		expected  types.NamespaceInfo
 		expectErr bool
 	}{
 		{
 			name: "empty namespace",
-			expected: claims.NamespaceInfo{
+			expected: types.NamespaceInfo{
 				OrgID: -1,
 			},
 		},
@@ -23,7 +23,7 @@ func TestParseNamespace(t *testing.T) {
 			name:      "incorrect number of parts",
 			namespace: "org-123-a",
 			expectErr: true,
-			expected: claims.NamespaceInfo{
+			expected: types.NamespaceInfo{
 				OrgID: -1,
 			},
 		},
@@ -31,14 +31,14 @@ func TestParseNamespace(t *testing.T) {
 			name:      "org id not a number",
 			namespace: "org-invalid",
 			expectErr: true,
-			expected: claims.NamespaceInfo{
+			expected: types.NamespaceInfo{
 				OrgID: -1,
 			},
 		},
 		{
 			name:      "valid org id",
 			namespace: "org-123",
-			expected: claims.NamespaceInfo{
+			expected: types.NamespaceInfo{
 				OrgID: 123,
 			},
 		},
@@ -46,7 +46,7 @@ func TestParseNamespace(t *testing.T) {
 			name:      "org should not be 1 in the namespace",
 			namespace: "org-1",
 			expectErr: true,
-			expected: claims.NamespaceInfo{
+			expected: types.NamespaceInfo{
 				OrgID: -1,
 			},
 		},
@@ -54,7 +54,7 @@ func TestParseNamespace(t *testing.T) {
 			name:      "can not be negative",
 			namespace: "org--5",
 			expectErr: true,
-			expected: claims.NamespaceInfo{
+			expected: types.NamespaceInfo{
 				OrgID: -1,
 			},
 		},
@@ -62,14 +62,14 @@ func TestParseNamespace(t *testing.T) {
 			name:      "can not be zero",
 			namespace: "org-0",
 			expectErr: true,
-			expected: claims.NamespaceInfo{
+			expected: types.NamespaceInfo{
 				OrgID: -1,
 			},
 		},
 		{
 			name:      "default is org 1",
 			namespace: "default",
-			expected: claims.NamespaceInfo{
+			expected: types.NamespaceInfo{
 				OrgID: 1,
 			},
 		},
@@ -77,7 +77,7 @@ func TestParseNamespace(t *testing.T) {
 			name:      "invalid stack id (must be an int)",
 			expectErr: true,
 			namespace: "stacks-abcdef",
-			expected: claims.NamespaceInfo{
+			expected: types.NamespaceInfo{
 				OrgID: -1,
 			},
 		},
@@ -85,7 +85,7 @@ func TestParseNamespace(t *testing.T) {
 			name:      "invalid stack id in deprecated claim (must be an int)",
 			expectErr: true,
 			namespace: "stack-abcdef",
-			expected: claims.NamespaceInfo{
+			expected: types.NamespaceInfo{
 				OrgID: -1,
 			},
 		},
@@ -93,7 +93,7 @@ func TestParseNamespace(t *testing.T) {
 			name:      "invalid stack id (must be provided)",
 			namespace: "stacks-",
 			expectErr: true,
-			expected: claims.NamespaceInfo{
+			expected: types.NamespaceInfo{
 				OrgID: -1,
 			},
 		},
@@ -101,14 +101,14 @@ func TestParseNamespace(t *testing.T) {
 			name:      "invalid stack id (cannot be 0)",
 			namespace: "stacks-0",
 			expectErr: true,
-			expected: claims.NamespaceInfo{
+			expected: types.NamespaceInfo{
 				OrgID: -1,
 			},
 		},
 		{
 			name:      "valid stack",
 			namespace: "stacks-1",
-			expected: claims.NamespaceInfo{
+			expected: types.NamespaceInfo{
 				OrgID:   1,
 				StackID: 1,
 			},
@@ -116,7 +116,7 @@ func TestParseNamespace(t *testing.T) {
 		{
 			name:      "valid stack is read from deprecated claim",
 			namespace: "stack-1",
-			expected: claims.NamespaceInfo{
+			expected: types.NamespaceInfo{
 				OrgID:   1,
 				StackID: 1,
 			},
@@ -124,7 +124,7 @@ func TestParseNamespace(t *testing.T) {
 		{
 			name:      "other namespace",
 			namespace: "anything",
-			expected: claims.NamespaceInfo{
+			expected: types.NamespaceInfo{
 				OrgID: -1,
 				Value: "anything",
 			},
@@ -133,7 +133,7 @@ func TestParseNamespace(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			info, err := claims.ParseNamespace(tt.namespace)
+			info, err := types.ParseNamespace(tt.namespace)
 			if tt.expectErr != (err != nil) {
 				t.Errorf("ParseNamespace() returned %+v, expected an error", info)
 			}
