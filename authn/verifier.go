@@ -52,6 +52,20 @@ func (c Claims[T]) MarshalJSON() ([]byte, error) {
 	return json.Marshal(combined)
 }
 
+func (c *Claims[T]) UnmarshalJSON(data []byte) error {
+	// Unmarshal into jwt.Claims
+	if err := json.Unmarshal(data, &c.Claims); err != nil {
+		return err
+	}
+
+	// Unmarshal into Rest
+	if err := json.Unmarshal(data, &c.Rest); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 type Verifier[T any] interface {
 	// Verify will parse and verify provided token, if `AllowedAudiences` was configured those will be validated as well.
 	Verify(ctx context.Context, token string) (*Claims[T], error)
