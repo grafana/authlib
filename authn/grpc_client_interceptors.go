@@ -149,7 +149,11 @@ func (gci *GrpcClientInterceptor) wrapContext(ctx context.Context) (context.Cont
 	spanCtx, span := gci.tracer.Start(ctx, "GrpcClientInterceptor.wrapContext")
 	defer span.End()
 
-	md := metadata.Pairs()
+	// Keep any existing values
+	md, ok := metadata.FromOutgoingContext(ctx)
+	if !ok {
+		md = make(metadata.MD)
+	}
 
 	if gci.cfg.accessTokenAuthEnabled {
 		token, err := gci.tokenClient.Exchange(spanCtx, *gci.cfg.TokenRequest)

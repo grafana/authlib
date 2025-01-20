@@ -43,15 +43,22 @@ func TestGrpcClientInterceptor_wrapContext(t *testing.T) {
 		return idToken, nil
 	})(gci)
 
+	// Setup existing outgoing headers
+	ctx := metadata.AppendToOutgoingContext(context.Background(),
+		"x-header-one", "one",
+		"x-header-ab", "aaa",
+		"x-header-ab", "bbb",
+	)
+
 	// Add id_token to context
-	ctx := context.WithValue(context.Background(), idKey{}, "some-id-token")
+	ctx = context.WithValue(ctx, idKey{}, "some-id-token")
 
 	ctx, err := gci.wrapContext(ctx)
 	require.NoError(t, err)
 
 	md, ok := metadata.FromOutgoingContext(ctx)
 	require.True(t, ok)
-	require.Len(t, md, 2)
+	require.Len(t, md, 4)
 	mdAtKey := md.Get(DefaultAccessTokenMetadataKey)
 	require.Len(t, mdAtKey, 1)
 	token := mdAtKey[0]
@@ -61,6 +68,10 @@ func TestGrpcClientInterceptor_wrapContext(t *testing.T) {
 	require.Len(t, mdIdKey, 1)
 	idToken := mdIdKey[0]
 	require.Equal(t, idToken, "some-id-token")
+
+	// The existing headers
+	require.Equal(t, []string{"one"}, md.Get("x-header-one"))
+	require.Equal(t, []string{"aaa", "bbb"}, md.Get("x-header-ab"))
 }
 
 func TestGrpcClientInterceptor_wrapContextNoAccessToken(t *testing.T) {
