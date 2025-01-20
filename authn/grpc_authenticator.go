@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/grafana/authlib/claims"
+	"github.com/grafana/authlib/types"
 )
 
 var (
@@ -194,13 +194,13 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 
 	// Validate accessToken namespace matches IDToken namespace
 	if ga.cfg.accessTokenAuthEnabled && ga.cfg.idTokenAuthEnabled && id != nil {
-		if !claims.NamespaceMatches(at.Rest.Namespace, id.Rest.Namespace) {
+		if !types.NamespaceMatches(at.Rest.Namespace, id.Rest.Namespace) {
 			span.RecordError(ErrorNamespacesMismatch)
 			return nil, ErrorNamespacesMismatch
 		}
 	}
 
-	return claims.WithClaims(ctx, &authInfo), nil
+	return types.WithClaims(ctx, &authInfo), nil
 }
 
 func (ga *GrpcAuthenticator) authenticateService(ctx context.Context, md metadata.MD) (*Claims[AccessTokenClaims], error) {
@@ -214,12 +214,12 @@ func (ga *GrpcAuthenticator) authenticateService(ctx context.Context, md metadat
 		return nil, fmt.Errorf("%v: %w", err, ErrorInvalidAccessToken)
 	}
 
-	typ, _, err := claims.ParseTypeID(atClaims.Subject)
+	typ, _, err := types.ParseTypeID(attypes.Subject)
 	if err != nil {
-		return nil, fmt.Errorf("access token subject '%s' is not valid: %w", atClaims.Subject, ErrorInvalidSubject)
+		return nil, fmt.Errorf("access token subject '%s' is not valid: %w", attypes.Subject, ErrorInvalidSubject)
 	}
 
-	if typ != claims.TypeAccessPolicy {
+	if typ != types.TypeAccessPolicy {
 		return nil, fmt.Errorf("access token subject '%s' type is not allowed: %w", typ, ErrorInvalidSubjectType)
 	}
 
@@ -240,9 +240,9 @@ func (ga *GrpcAuthenticator) authenticateUser(ctx context.Context, md metadata.M
 		return nil, fmt.Errorf("%v: %w", err, ErrorInvalidIDToken)
 	}
 
-	_, _, err = claims.ParseTypeID(idClaims.Subject)
+	_, _, err = types.ParseTypeID(idtypes.Subject)
 	if err != nil {
-		return nil, fmt.Errorf("id token subject '%s' is not valid: %w", idClaims.Subject, ErrorInvalidSubject)
+		return nil, fmt.Errorf("id token subject '%s' is not valid: %w", idtypes.Subject, ErrorInvalidSubject)
 	}
 
 	return idClaims, nil

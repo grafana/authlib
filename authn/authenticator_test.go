@@ -6,8 +6,9 @@ import (
 
 	"github.com/go-jose/go-jose/v3"
 	"github.com/go-jose/go-jose/v3/jwt"
-	"github.com/grafana/authlib/claims"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/authlib/types"
 )
 
 func TestDefaultAuthenticator_Authenticate(t *testing.T) {
@@ -30,7 +31,7 @@ func TestDefaultAuthenticator_Authenticate(t *testing.T) {
 			at: signAtToken(t, "access-policy:1", AccessTokenClaims{Namespace: "*"}),
 			id: signIDToken(t, "user:1", IDTokenClaims{
 				Identifier: "1",
-				Type:       claims.TypeUser,
+				Type:       types.TypeUser,
 				Namespace:  "stacks-1",
 			}),
 		}
@@ -46,7 +47,7 @@ func TestDefaultAuthenticator_Authenticate(t *testing.T) {
 			at: signAtToken(t, "access-policy:1", AccessTokenClaims{Namespace: "stacks-2"}),
 			id: signIDToken(t, "user:1", IDTokenClaims{
 				Identifier: "1",
-				Type:       claims.TypeUser,
+				Type:       types.TypeUser,
 				Namespace:  "stacks-1",
 			}),
 		}
@@ -60,7 +61,7 @@ func TestDefaultAuthenticator_Authenticate(t *testing.T) {
 		provider := fakeTokenProvider{
 			id: signIDToken(t, "user:1", IDTokenClaims{
 				Identifier: "1",
-				Type:       claims.TypeUser,
+				Type:       types.TypeUser,
 				Namespace:  "stacks-1",
 			}),
 		}
@@ -90,7 +91,7 @@ func TestAccessTokenAuthenticator_Authenticate(t *testing.T) {
 			at: signAtToken(t, "access-policy:1", AccessTokenClaims{Namespace: "*"}),
 			id: signIDToken(t, "user:1", IDTokenClaims{
 				Identifier: "1",
-				Type:       claims.TypeUser,
+				Type:       types.TypeUser,
 				Namespace:  "stacks-1",
 			}),
 		}
@@ -105,7 +106,7 @@ func TestAccessTokenAuthenticator_Authenticate(t *testing.T) {
 		provider := fakeTokenProvider{
 			id: signIDToken(t, "user:1", IDTokenClaims{
 				Identifier: "1",
-				Type:       claims.TypeUser,
+				Type:       types.TypeUser,
 				Namespace:  "stacks-1",
 			}),
 		}
@@ -125,7 +126,7 @@ func TestIDTokenAuthenticator_Authenticate(t *testing.T) {
 		provider := fakeTokenProvider{
 			id: signIDToken(t, "user:1", IDTokenClaims{
 				Identifier: "1",
-				Type:       claims.TypeUser,
+				Type:       types.TypeUser,
 				Namespace:  "stacks-1",
 			}),
 		}
@@ -141,7 +142,7 @@ func TestIDTokenAuthenticator_Authenticate(t *testing.T) {
 			at: signAtToken(t, "access-policy:1", AccessTokenClaims{Namespace: "*"}),
 			id: signIDToken(t, "user:1", IDTokenClaims{
 				Identifier: "1",
-				Type:       claims.TypeUser,
+				Type:       types.TypeUser,
 				Namespace:  "stacks-1",
 			}),
 		}

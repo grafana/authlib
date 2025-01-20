@@ -9,7 +9,7 @@ import (
 
 	"google.golang.org/grpc/metadata"
 
-	"github.com/grafana/authlib/claims"
+	"github.com/grafana/authlib/types"
 )
 
 var (
@@ -84,7 +84,7 @@ func (p GRPCTokenProvider) IDToken(_ context.Context) (string, bool) {
 
 // Authenticator is used to authenticate request using the provided TokenProvider.
 type Authenticator interface {
-	Authenticate(ctx context.Context, provider TokenProvider) (claims.AuthInfo, error)
+	Authenticate(ctx context.Context, provider TokenProvider) (types.AuthInfo, error)
 }
 
 var _ Authenticator = (*DefaultAuthenticator)(nil)
@@ -100,7 +100,7 @@ type DefaultAuthenticator struct {
 	id *IDTokenVerifier
 }
 
-func (a *DefaultAuthenticator) Authenticate(ctx context.Context, provider TokenProvider) (claims.AuthInfo, error) {
+func (a *DefaultAuthenticator) Authenticate(ctx context.Context, provider TokenProvider) (types.AuthInfo, error) {
 	atToken, ok := provider.AccessToken(ctx)
 	if !ok {
 		return nil, ErrMissingRequiredToken
@@ -122,7 +122,7 @@ func (a *DefaultAuthenticator) Authenticate(ctx context.Context, provider TokenP
 	}
 
 	// verify that access token can operate in the same namespace as id token
-	if !claims.NamespaceMatches(atClaims.Rest.Namespace, idClaims.Rest.Namespace) {
+	if !types.NamespaceMatches(attypes.Rest.Namespace, idtypes.Rest.Namespace) {
 		return nil, errors.New("namespace missmatch")
 	}
 
@@ -140,7 +140,7 @@ type AccessTokenAuthenticator struct {
 	at *AccessTokenVerifier
 }
 
-func (a *AccessTokenAuthenticator) Authenticate(ctx context.Context, provider TokenProvider) (claims.AuthInfo, error) {
+func (a *AccessTokenAuthenticator) Authenticate(ctx context.Context, provider TokenProvider) (types.AuthInfo, error) {
 	token, ok := provider.AccessToken(ctx)
 	if !ok {
 		return nil, ErrMissingRequiredToken
@@ -165,7 +165,7 @@ type IDTokenAuthenticator struct {
 	id *IDTokenVerifier
 }
 
-func (a *IDTokenAuthenticator) Authenticate(ctx context.Context, provider TokenProvider) (claims.AuthInfo, error) {
+func (a *IDTokenAuthenticator) Authenticate(ctx context.Context, provider TokenProvider) (types.AuthInfo, error) {
 	token, ok := provider.IDToken(ctx)
 	if !ok {
 		return nil, ErrMissingRequiredToken

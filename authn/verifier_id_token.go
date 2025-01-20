@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/grafana/authlib/claims"
+	"github.com/grafana/authlib/types"
 )
 
 type IDTokenClaims struct {
 	// Identifier is the unique ID of the of entity
 	Identifier string `json:"identifier"`
 	// The type of the entity.
-	Type claims.IdentityType `json:"type"`
+	Type types.IdentityType `json:"type"`
 	// Namespace takes the form of '<type>-<id>', '*' means all namespaces.
 	// Type can be either org or stack.
 	Namespace string `json:"namespace"`

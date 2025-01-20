@@ -10,7 +10,7 @@ This library provides a robust and flexible way to verify JSON Web Tokens (JWTs)
 
 ## Token verifier
 
-This package will handle retrival and caching of jwks. It was desing to be generic over "Custom claims" so that we are not only restricted to the current structure of id tokens. This means that the parsed claims will contain standard jwts claims such as `aud`, `exp` etc plus specified custom claims.
+This package will handle retrival and caching of jwks. It was desing to be generic over "Custom claims" so that we are not only restricted to the current structure of id tokens. This means that the parsed claims will contain standard jwts claims such as `aud`, `exp` etc plus specified custom types.
 
 ```go
 package main
@@ -39,8 +39,8 @@ func main() {
 }
 ```
 
-The verifier is generic over jwt.Claims. Most common use cases will be to either verify Grafana issued ID-Token or Access token.
-For those we have `AccessTokenVerifier` and `IDTokenVerifier`. These two structures are just simple wrappers around `Verifier` with expected claims.
+The verifier is generic over jwt.types. Most common use cases will be to either verify Grafana issued ID-Token or Access token.
+For those we have `AccessTokenVerifier` and `IDTokenVerifier`. These two structures are just simple wrappers around `Verifier` with expected types.
 
 ## gRPC interceptors
 
@@ -68,13 +68,13 @@ In this first example:
 import (
 	authnlib "github.com/grafana/authlib/authn"
 	authzlib "github.com/grafana/authlib/authz"
-	"github.com/grafana/authlib/claims"
+	"github.com/grafana/authlib/types"
 	"google.golang.org/grpc"
 )
 
 // idTokenExtractor is a helper function to get the user ID Token from context
 func idTokenExtractor(ctx context.Context) (string, error) {
-	authInfo, ok := claims.From(ctx)
+	authInfo, ok := types.From(ctx)
 	if !ok {
 		return "", fmt.Errorf("no claims found")
 	}
@@ -188,7 +188,7 @@ import (
 
 	authnlib "github.com/grafana/authlib/authn"
 	authzlib "github.com/grafana/authlib/authz"
-	"github.com/grafana/authlib/claims"
+	"github.com/grafana/authlib/types"
 	"google.golang.org/grpc"
 )
 
@@ -197,7 +197,7 @@ type OriginContextKey struct{}
 
 // idTokenExtractor is a helper function to get the user ID Token from context
 func idTokenExtractor(ctx context.Context) (string, error) {
-	authInfo, ok := claims.From(ctx)
+	authInfo, ok := types.From(ctx)
 	if !ok {
 		return "", fmt.Errorf("no claims found")
 	}

@@ -63,11 +63,11 @@ func (v *VerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T],
 	claims := Claims[T]{
 		token: token, // hold on to the original token
 	}
-	if err := parsed.Claims(jwk, &claims.Claims, &claims.Rest); err != nil {
+	if err := parsed.Claims(jwk, &types.Claims, &types.Rest); err != nil {
 		return nil, err
 	}
 
-	if err := claims.Validate(jwt.Expected{
+	if err := types.Validate(jwt.Expected{
 		Audience: v.cfg.AllowedAudiences,
 		Time:     time.Now(),
 	}); err != nil {

@@ -197,5 +197,5 @@ func (c *TokenExchangeClient) setCache(ctx context.Context, token string, key st
 		return fmt.Errorf("failed to extract claims from the token: %v", err)
 	}
 
-	return c.cache.Set(ctx, key, []byte(token), time.Until(claims.Expiry.Time())-cacheLeeway)
+	return c.cache.Set(ctx, key, []byte(token), time.Until(types.Expiry.Time())-cacheLeeway)
 }

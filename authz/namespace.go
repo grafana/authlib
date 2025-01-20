@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"github.com/grafana/authlib/claims"
+	"github.com/grafana/authlib/types"
 )
 
 const (
@@ -24,7 +24,7 @@ var (
 )
 
 type NamespaceAccessChecker interface {
-	CheckAccess(ctx context.Context, caller claims.AuthInfo, namespace string) error
+	CheckAccess(ctx context.Context, caller types.AuthInfo, namespace string) error
 }
 
 var _ NamespaceAccessChecker = &NamespaceAccessCheckerImpl{}
@@ -56,12 +56,12 @@ func NewNamespaceAccessChecker(opts ...NamespaceAccessCheckerOption) *NamespaceA
 	return na
 }
 
-func (na *NamespaceAccessCheckerImpl) CheckAccess(ctx context.Context, caller claims.AuthInfo, expectedNamespace string) error {
+func (na *NamespaceAccessCheckerImpl) CheckAccess(ctx context.Context, caller types.AuthInfo, expectedNamespace string) error {
 	_, span := na.tracer.Start(ctx, "NamespaceAccessChecker.CheckAccess")
 	defer span.End()
 	span.SetAttributes(attribute.String("expectedNamespace", expectedNamespace))
 
-	if !claims.NamespaceMatches(caller.GetNamespace(), expectedNamespace) {
+	if !types.NamespaceMatches(caller.GetNamespace(), expectedNamespace) {
 		span.RecordError(ErrNamespaceMismatch)
 		return ErrNamespaceMismatch
 
@@ -92,7 +92,7 @@ func MetadataNamespaceExtractor(key string) NamespaceExtractor {
 // This function can be used with UnaryAuthorizeInterceptor and StreamAuthorizeInterceptor.
 func NamespaceAuthorizationFunc(na NamespaceAccessChecker, nsExtract NamespaceExtractor) AuthorizeFunc {
 	return func(ctx context.Context) error {
-		caller, ok := claims.From(ctx)
+		caller, ok := types.From(ctx)
 		if !ok {
 			return ErrMissingCaller
 		}

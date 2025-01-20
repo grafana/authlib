@@ -17,7 +17,7 @@ import (
 
 	authzv1 "github.com/grafana/authlib/authz/proto/v1"
 	"github.com/grafana/authlib/cache"
-	"github.com/grafana/authlib/claims"
+	"github.com/grafana/authlib/types"
 )
 
 var (
@@ -30,8 +30,8 @@ var (
 	ErrMissingCaller           = errors.New("missing caller")
 	ErrMissingSubject          = errors.New("missing subject")
 
-	checkResponseDenied  = claims.CheckResponse{Allowed: false}
-	checkResponseAllowed = claims.CheckResponse{Allowed: true}
+	checkResponseDenied  = types.CheckResponse{Allowed: false}
+	checkResponseAllowed = types.CheckResponse{Allowed: true}
 )
 
 type ClientConfig struct {
@@ -43,9 +43,9 @@ type ClientConfig struct {
 	accessTokenAuthEnabled bool
 }
 
-// ClientImpl will implement the claims.AccessClient interface
+// ClientImpl will implement the types.AccessClient interface
 // Once we are able to deal with folder permissions expansion.
-var _ claims.AccessClient = (*ClientImpl)(nil)
+var _ types.AccessClient = (*ClientImpl)(nil)
 
 type AuthzClientOption func(*ClientImpl)
 
@@ -161,7 +161,7 @@ func NewClient(cfg *ClientConfig, opts ...AuthzClientOption) (*ClientImpl, error
 // Implementation
 // -----
 
-func (c *ClientImpl) check(ctx context.Context, id claims.AuthInfo, req *claims.CheckRequest) (bool, error) {
+func (c *ClientImpl) check(ctx context.Context, id types.AuthInfo, req *types.CheckRequest) (bool, error) {
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.hasAccess")
 	defer span.End()
 
@@ -224,7 +224,7 @@ func hasPermissionInToken(tokenPermissions []string, group, resource, verb strin
 	return false
 }
 
-func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req claims.CheckRequest) (claims.CheckResponse, error) {
+func (c *ClientImpl) Check(ctx context.Context, id types.AuthInfo, req types.CheckRequest) (types.CheckResponse, error) {
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.Check")
 	defer span.End()
 
@@ -253,7 +253,7 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req claims.C
 		span.SetAttributes(attribute.String("path", req.Path))
 	}
 
-	isService := claims.IsIdentityType(id.GetIdentityType(), claims.TypeAccessPolicy)
+	isService := types.IsIdentityType(id.GetIdentityType(), types.TypeAccessPolicy)
 	span.SetAttributes(attribute.Bool("with_user", !isService))
 
 	// No user => check on the service permissions
@@ -265,7 +265,7 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req claims.C
 
 		serviceIsAllowedAction := hasPermissionInToken(id.GetTokenPermissions(), req.Group, req.Resource, req.Verb)
 		span.SetAttributes(attribute.Bool("service_allowed", serviceIsAllowedAction))
-		return claims.CheckResponse{Allowed: serviceIsAllowedAction}, nil
+		return types.CheckResponse{Allowed: serviceIsAllowedAction}, nil
 	}
 
 	span.SetAttributes(attribute.String("subject", id.GetSubject()))
@@ -287,10 +287,10 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req claims.C
 
 	// Check if the user has access to any of the requested resources
 	span.SetAttributes(attribute.Bool("user_allowed", res))
-	return claims.CheckResponse{Allowed: res}, nil
+	return types.CheckResponse{Allowed: res}, nil
 }
 
-func (c *ClientImpl) compile(ctx context.Context, id claims.AuthInfo, list *claims.ListRequest) (*itemChecker, error) {
+func (c *ClientImpl) compile(ctx context.Context, id types.AuthInfo, list *types.ListRequest) (*itemChecker, error) {
 	key := itemCheckerCacheKey(id.GetSubject(), list)
 	checker, err := c.getCachedItemChecker(ctx, key)
 	if err == nil {
@@ -321,7 +321,7 @@ func (c *ClientImpl) compile(ctx context.Context, id claims.AuthInfo, list *clai
 	return checker, err
 }
 
-func (c *ClientImpl) Compile(ctx context.Context, id claims.AuthInfo, list claims.ListRequest) (claims.ItemChecker, error) {
+func (c *ClientImpl) Compile(ctx context.Context, id types.AuthInfo, list types.ListRequest) (types.ItemChecker, error) {
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.List")
 	defer span.End()
 
@@ -344,7 +344,7 @@ func (c *ClientImpl) Compile(ctx context.Context, id claims.AuthInfo, list claim
 	span.SetAttributes(attribute.String("resource", list.Resource))
 	span.SetAttributes(attribute.String("verb", list.Verb))
 
-	isService := claims.IsIdentityType(id.GetIdentityType(), claims.TypeAccessPolicy)
+	isService := types.IsIdentityType(id.GetIdentityType(), types.TypeAccessPolicy)
 	span.SetAttributes(attribute.Bool("with_user", !isService))
 
 	// No user => check on the service permissions
@@ -378,12 +378,12 @@ func (c *ClientImpl) Compile(ctx context.Context, id claims.AuthInfo, list claim
 
 // Validate input
 
-func validateCheckRequest(req claims.CheckRequest) error {
+func validateCheckRequest(req types.CheckRequest) error {
 	if req.Namespace == "" {
 		return ErrMissingRequestNamespace
 	}
 
-	if _, err := claims.ParseNamespace(req.Namespace); err != nil {
+	if _, err := types.ParseNamespace(req.Namespace); err != nil {
 		return ErrInvalidRequestNamespace
 	}
 
@@ -400,12 +400,12 @@ func validateCheckRequest(req claims.CheckRequest) error {
 	return nil
 }
 
-func validateListRequest(req claims.ListRequest) error {
+func validateListRequest(req types.ListRequest) error {
 	if req.Namespace == "" {
 		return ErrMissingRequestNamespace
 	}
 
-	if _, err := claims.ParseNamespace(req.Namespace); err != nil {
+	if _, err := types.ParseNamespace(req.Namespace); err != nil {
 		return ErrInvalidRequestNamespace
 	}
 
@@ -422,8 +422,8 @@ func validateListRequest(req claims.ListRequest) error {
 	return nil
 }
 
-func (c *ClientImpl) validateCaller(caller claims.AuthInfo) error {
-	if !c.authCfg.accessTokenAuthEnabled && claims.IsIdentityType(caller.GetIdentityType(), claims.TypeAccessPolicy) {
+func (c *ClientImpl) validateCaller(caller types.AuthInfo) error {
+	if !c.authCfg.accessTokenAuthEnabled && types.IsIdentityType(caller.GetIdentityType(), types.TypeAccessPolicy) {
 		return nil
 	}
 
@@ -433,12 +433,12 @@ func (c *ClientImpl) validateCaller(caller claims.AuthInfo) error {
 	return nil
 }
 
-func (c *ClientImpl) validateCallerNamespace(caller claims.AuthInfo, expectedNamespace string) bool {
-	if !c.authCfg.accessTokenAuthEnabled && claims.IsIdentityType(caller.GetIdentityType(), claims.TypeAccessPolicy) {
+func (c *ClientImpl) validateCallerNamespace(caller types.AuthInfo, expectedNamespace string) bool {
+	if !c.authCfg.accessTokenAuthEnabled && types.IsIdentityType(caller.GetIdentityType(), types.TypeAccessPolicy) {
 		return true
 	}
 
-	return claims.NamespaceMatches(caller.GetNamespace(), expectedNamespace)
+	return types.NamespaceMatches(caller.GetNamespace(), expectedNamespace)
 }
 
 // newOutgoingContext creates a new context that will be canceled when the input context is canceled.
@@ -467,7 +467,7 @@ func newOutgoingContext(ctx context.Context) context.Context {
 // CACHE
 // -----
 
-func checkCacheKey(subj string, req *claims.CheckRequest) string {
+func checkCacheKey(subj string, req *types.CheckRequest) string {
 	return fmt.Sprintf("check-%s-%s-%s-%s-%s-%s-%s-%s-%s", req.Namespace, subj, req.Group, req.Resource, req.Verb, req.Name, req.Subresource, req.Path, req.Folder)
 }
 
@@ -502,7 +502,7 @@ func (c *ClientImpl) getCachedCheck(ctx context.Context, key string) (bool, erro
 	return allowed, nil
 }
 
-func itemCheckerCacheKey(subj string, req *claims.ListRequest) string {
+func itemCheckerCacheKey(subj string, req *types.ListRequest) string {
 	return fmt.Sprintf("list-%s-%s-%s-%s-%s-%s", req.Namespace, subj, req.Group, req.Resource, req.Verb, req.Subresource)
 }
 
@@ -543,7 +543,7 @@ func (c *ClientImpl) getCachedItemChecker(ctx context.Context, key string) (*ite
 
 var denyAllChecker = func(namespace string, name, folder string) bool { return false }
 
-func allowAllChecker(expectedNamespace string) claims.ItemChecker {
+func allowAllChecker(expectedNamespace string) types.ItemChecker {
 	return func(namespace string, name, folder string) bool {
 		return expectedNamespace == namespace
 	}
@@ -578,7 +578,7 @@ func newItemChecker(resp *authzv1.ListResponse) *itemChecker {
 }
 
 // fn generates a ItemChecker function that can check user access to items.
-func (c *itemChecker) fn(expectedNamespace string) claims.ItemChecker {
+func (c *itemChecker) fn(expectedNamespace string) types.ItemChecker {
 	if c.All {
 		return allowAllChecker(expectedNamespace)
 	}
