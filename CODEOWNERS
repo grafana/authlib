@@ -26,4 +26,4 @@
 * @grafana/identity-access-team
 /authn/ @grafana/identity-squad
 /authz/ @grafana/access-squad
-/claims/ @grafana/identity-squad
+/types/ @grafana/identity-squad

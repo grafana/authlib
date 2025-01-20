@@ -8,15 +8,15 @@ import (
 type key int
 
 const (
-	// claimsKey is the context key for the identity claims
-	claimsKey key = iota
+	// infoKey is the context key for the identity claims
+	infoKey key = iota
 )
 
-func From(ctx context.Context) (AuthInfo, bool) {
-	v, ok := ctx.Value(claimsKey).(AuthInfo)
+func AuthInfoFrom(ctx context.Context) (AuthInfo, bool) {
+	v, ok := ctx.Value(infoKey).(AuthInfo)
 	return v, ok
 }
 
-func WithClaims(ctx context.Context, claims AuthInfo) context.Context {
-	return context.WithValue(ctx, claimsKey, claims)
+func WithAuthInfo(ctx context.Context, auth AuthInfo) context.Context {
+	return context.WithValue(ctx, infoKey, auth)
 }

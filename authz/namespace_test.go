@@ -147,7 +147,7 @@ func TestNamespaceAuthorizationFunc(t *testing.T) {
 	})
 
 	t.Run("missing namespace", func(t *testing.T) {
-		ctx := types.WithClaims(context.Background(), authn.NewIDTokenAuthInfo(
+		ctx := types.WithAuthInfo(context.Background(), authn.NewIDTokenAuthInfo(
 			authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stacks-12"}},
 			&authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stacks-12"}},
 		))
@@ -157,7 +157,7 @@ func TestNamespaceAuthorizationFunc(t *testing.T) {
 
 	t.Run("ok", func(t *testing.T) {
 		ctx := metadata.NewIncomingContext(context.Background(), metadata.Pairs(DefaultNamespaceMetadataKey, "stacks-12"))
-		ctx = types.WithClaims(ctx, authn.NewIDTokenAuthInfo(
+		ctx = types.WithAuthInfo(ctx, authn.NewIDTokenAuthInfo(
 			authn.Claims[authn.AccessTokenClaims]{Rest: authn.AccessTokenClaims{Namespace: "stacks-12"}},
 			&authn.Claims[authn.IDTokenClaims]{Rest: authn.IDTokenClaims{Namespace: "stacks-12"}},
 		))

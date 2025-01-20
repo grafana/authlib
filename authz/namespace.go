@@ -92,7 +92,7 @@ func MetadataNamespaceExtractor(key string) NamespaceExtractor {
 // This function can be used with UnaryAuthorizeInterceptor and StreamAuthorizeInterceptor.
 func NamespaceAuthorizationFunc(na NamespaceAccessChecker, nsExtract NamespaceExtractor) AuthorizeFunc {
 	return func(ctx context.Context) error {
-		caller, ok := types.From(ctx)
+		caller, ok := types.AuthInfoFrom(ctx)
 		if !ok {
 			return ErrMissingCaller
 		}

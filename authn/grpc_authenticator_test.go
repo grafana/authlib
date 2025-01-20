@@ -250,7 +250,7 @@ func TestGrpcAuthenticator_Authenticate(t *testing.T) {
 				return
 			}
 
-			got, ok := types.From(ctx)
+			got, ok := types.AuthInfoFrom(ctx)
 			require.True(t, ok)
 
 			require.NoError(t, err)

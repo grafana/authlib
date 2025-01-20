@@ -200,7 +200,7 @@ func (ga *GrpcAuthenticator) Authenticate(ctx context.Context) (context.Context,
 		}
 	}
 
-	return types.WithClaims(ctx, &authInfo), nil
+	return types.WithAuthInfo(ctx, &authInfo), nil
 }
 
 func (ga *GrpcAuthenticator) authenticateService(ctx context.Context, md metadata.MD) (*Claims[AccessTokenClaims], error) {
