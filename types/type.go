@@ -1,4 +1,4 @@
-package claims
+package types
 
 import (
 	"errors"

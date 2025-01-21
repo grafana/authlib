@@ -17,7 +17,7 @@ import (
 
 	authzv1 "github.com/grafana/authlib/authz/proto/v1"
 	"github.com/grafana/authlib/cache"
-	"github.com/grafana/authlib/claims"
+	"github.com/grafana/authlib/types"
 )
 
 var (
@@ -30,85 +30,9 @@ var (
 	ErrMissingCaller           = errors.New("missing caller")
 	ErrMissingSubject          = errors.New("missing subject")
 
-	checkResponseDenied  = CheckResponse{Allowed: false}
-	checkResponseAllowed = CheckResponse{Allowed: true}
+	checkResponseDenied  = types.CheckResponse{Allowed: false}
+	checkResponseAllowed = types.CheckResponse{Allowed: true}
 )
-
-// CheckRequest describes the requested access.
-// This is designed bo to play nicely with the kubernetes authorization system:
-// https://github.com/kubernetes/kubernetes/blob/v1.30.3/staging/src/k8s.io/apiserver/pkg/authorization/authorizer/interfaces.go#L28
-type CheckRequest struct {
-	// The requested access verb.
-	// this includes get, list, watch, create, update, patch, delete, deletecollection, and proxy,
-	// or the lowercased HTTP verb associated with non-API requests (this includes get, put, post, patch, and delete)
-	Verb string
-
-	// API group (dashboards.grafana.app)
-	Group string
-
-	// ~Kind eg dashboards
-	Resource string
-
-	// tenant isolation
-	Namespace string
-
-	// The specific resource
-	// In grafana, this was historically called "UID", but in k8s, it is the name
-	Name string
-
-	// Optional subresource
-	Subresource string
-
-	// For non-resource requests, this will be the requested URL path
-	Path string
-
-	// Folder is the parent folder of the requested resource
-	Folder string
-}
-
-type CheckResponse struct {
-	// Allowed is true if the request is allowed, false otherwise.
-	Allowed bool
-}
-
-type AccessChecker interface {
-	// Check checks whether the user can perform the given action for all requests
-	Check(ctx context.Context, id claims.AuthInfo, req CheckRequest) (CheckResponse, error)
-}
-
-type ListRequest struct {
-	// API group (dashboards.grafana.app)
-	Group string
-
-	// ~Kind eg dashboards
-	Resource string
-
-	// tenant isolation
-	Namespace string
-
-	// Verb is the requested access verb.
-	Verb string
-
-	// Optional subresource
-	Subresource string
-}
-
-// TODO: Should the namespace be specified in the request instead.
-// I don't think we'll be able to Compile over multiple namespaces.
-// Checks access while iterating within a resource
-type ItemChecker func(namespace string, name, folder string) bool
-
-type AccessLister interface {
-	// Compile generates a function to check whether the id has access to items matching a request
-	// This is particularly useful when you want to verify access to a list of resources.
-	// Returns nil if there is no access to any matching items
-	Compile(ctx context.Context, id claims.AuthInfo, req ListRequest) (ItemChecker, error)
-}
-
-type AccessClient interface {
-	AccessChecker
-	AccessLister
-}
 
 type ClientConfig struct {
 	// RemoteAddress is the address of the authz service. It should be in the format "host:port".
@@ -119,9 +43,9 @@ type ClientConfig struct {
 	accessTokenAuthEnabled bool
 }
 
-// ClientImpl will implement the claims.AccessClient interface
+// ClientImpl will implement the types.AccessClient interface
 // Once we are able to deal with folder permissions expansion.
-var _ AccessClient = (*ClientImpl)(nil)
+var _ types.AccessClient = (*ClientImpl)(nil)
 
 type AuthzClientOption func(*ClientImpl)
 
@@ -237,7 +161,7 @@ func NewClient(cfg *ClientConfig, opts ...AuthzClientOption) (*ClientImpl, error
 // Implementation
 // -----
 
-func (c *ClientImpl) check(ctx context.Context, id claims.AuthInfo, req *CheckRequest) (bool, error) {
+func (c *ClientImpl) check(ctx context.Context, id types.AuthInfo, req *types.CheckRequest) (bool, error) {
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.hasAccess")
 	defer span.End()
 
@@ -300,7 +224,7 @@ func hasPermissionInToken(tokenPermissions []string, group, resource, verb strin
 	return false
 }
 
-func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckRequest) (CheckResponse, error) {
+func (c *ClientImpl) Check(ctx context.Context, id types.AuthInfo, req types.CheckRequest) (types.CheckResponse, error) {
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.Check")
 	defer span.End()
 
@@ -329,7 +253,7 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 		span.SetAttributes(attribute.String("path", req.Path))
 	}
 
-	isService := claims.IsIdentityType(id.GetIdentityType(), claims.TypeAccessPolicy)
+	isService := types.IsIdentityType(id.GetIdentityType(), types.TypeAccessPolicy)
 	span.SetAttributes(attribute.Bool("with_user", !isService))
 
 	// No user => check on the service permissions
@@ -341,7 +265,7 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 
 		serviceIsAllowedAction := hasPermissionInToken(id.GetTokenPermissions(), req.Group, req.Resource, req.Verb)
 		span.SetAttributes(attribute.Bool("service_allowed", serviceIsAllowedAction))
-		return CheckResponse{Allowed: serviceIsAllowedAction}, nil
+		return types.CheckResponse{Allowed: serviceIsAllowedAction}, nil
 	}
 
 	span.SetAttributes(attribute.String("subject", id.GetSubject()))
@@ -363,10 +287,10 @@ func (c *ClientImpl) Check(ctx context.Context, id claims.AuthInfo, req CheckReq
 
 	// Check if the user has access to any of the requested resources
 	span.SetAttributes(attribute.Bool("user_allowed", res))
-	return CheckResponse{Allowed: res}, nil
+	return types.CheckResponse{Allowed: res}, nil
 }
 
-func (c *ClientImpl) compile(ctx context.Context, id claims.AuthInfo, list *ListRequest) (*itemChecker, error) {
+func (c *ClientImpl) compile(ctx context.Context, id types.AuthInfo, list *types.ListRequest) (*itemChecker, error) {
 	key := itemCheckerCacheKey(id.GetSubject(), list)
 	checker, err := c.getCachedItemChecker(ctx, key)
 	if err == nil {
@@ -397,7 +321,7 @@ func (c *ClientImpl) compile(ctx context.Context, id claims.AuthInfo, list *List
 	return checker, err
 }
 
-func (c *ClientImpl) Compile(ctx context.Context, id claims.AuthInfo, list ListRequest) (ItemChecker, error) {
+func (c *ClientImpl) Compile(ctx context.Context, id types.AuthInfo, list types.ListRequest) (types.ItemChecker, error) {
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.List")
 	defer span.End()
 
@@ -420,7 +344,7 @@ func (c *ClientImpl) Compile(ctx context.Context, id claims.AuthInfo, list ListR
 	span.SetAttributes(attribute.String("resource", list.Resource))
 	span.SetAttributes(attribute.String("verb", list.Verb))
 
-	isService := claims.IsIdentityType(id.GetIdentityType(), claims.TypeAccessPolicy)
+	isService := types.IsIdentityType(id.GetIdentityType(), types.TypeAccessPolicy)
 	span.SetAttributes(attribute.Bool("with_user", !isService))
 
 	// No user => check on the service permissions
@@ -454,12 +378,12 @@ func (c *ClientImpl) Compile(ctx context.Context, id claims.AuthInfo, list ListR
 
 // Validate input
 
-func validateCheckRequest(req CheckRequest) error {
+func validateCheckRequest(req types.CheckRequest) error {
 	if req.Namespace == "" {
 		return ErrMissingRequestNamespace
 	}
 
-	if _, err := claims.ParseNamespace(req.Namespace); err != nil {
+	if _, err := types.ParseNamespace(req.Namespace); err != nil {
 		return ErrInvalidRequestNamespace
 	}
 
@@ -476,12 +400,12 @@ func validateCheckRequest(req CheckRequest) error {
 	return nil
 }
 
-func validateListRequest(req ListRequest) error {
+func validateListRequest(req types.ListRequest) error {
 	if req.Namespace == "" {
 		return ErrMissingRequestNamespace
 	}
 
-	if _, err := claims.ParseNamespace(req.Namespace); err != nil {
+	if _, err := types.ParseNamespace(req.Namespace); err != nil {
 		return ErrInvalidRequestNamespace
 	}
 
@@ -498,8 +422,8 @@ func validateListRequest(req ListRequest) error {
 	return nil
 }
 
-func (c *ClientImpl) validateCaller(caller claims.AuthInfo) error {
-	if !c.authCfg.accessTokenAuthEnabled && claims.IsIdentityType(caller.GetIdentityType(), claims.TypeAccessPolicy) {
+func (c *ClientImpl) validateCaller(caller types.AuthInfo) error {
+	if !c.authCfg.accessTokenAuthEnabled && types.IsIdentityType(caller.GetIdentityType(), types.TypeAccessPolicy) {
 		return nil
 	}
 
@@ -509,12 +433,12 @@ func (c *ClientImpl) validateCaller(caller claims.AuthInfo) error {
 	return nil
 }
 
-func (c *ClientImpl) validateCallerNamespace(caller claims.AuthInfo, expectedNamespace string) bool {
-	if !c.authCfg.accessTokenAuthEnabled && claims.IsIdentityType(caller.GetIdentityType(), claims.TypeAccessPolicy) {
+func (c *ClientImpl) validateCallerNamespace(caller types.AuthInfo, expectedNamespace string) bool {
+	if !c.authCfg.accessTokenAuthEnabled && types.IsIdentityType(caller.GetIdentityType(), types.TypeAccessPolicy) {
 		return true
 	}
 
-	return claims.NamespaceMatches(caller.GetNamespace(), expectedNamespace)
+	return types.NamespaceMatches(caller.GetNamespace(), expectedNamespace)
 }
 
 // newOutgoingContext creates a new context that will be canceled when the input context is canceled.
@@ -543,7 +467,7 @@ func newOutgoingContext(ctx context.Context) context.Context {
 // CACHE
 // -----
 
-func checkCacheKey(subj string, req *CheckRequest) string {
+func checkCacheKey(subj string, req *types.CheckRequest) string {
 	return fmt.Sprintf("check-%s-%s-%s-%s-%s-%s-%s-%s-%s", req.Namespace, subj, req.Group, req.Resource, req.Verb, req.Name, req.Subresource, req.Path, req.Folder)
 }
 
@@ -578,7 +502,7 @@ func (c *ClientImpl) getCachedCheck(ctx context.Context, key string) (bool, erro
 	return allowed, nil
 }
 
-func itemCheckerCacheKey(subj string, req *ListRequest) string {
+func itemCheckerCacheKey(subj string, req *types.ListRequest) string {
 	return fmt.Sprintf("list-%s-%s-%s-%s-%s-%s", req.Namespace, subj, req.Group, req.Resource, req.Verb, req.Subresource)
 }
 
@@ -619,7 +543,7 @@ func (c *ClientImpl) getCachedItemChecker(ctx context.Context, key string) (*ite
 
 var denyAllChecker = func(namespace string, name, folder string) bool { return false }
 
-func allowAllChecker(expectedNamespace string) ItemChecker {
+func allowAllChecker(expectedNamespace string) types.ItemChecker {
 	return func(namespace string, name, folder string) bool {
 		return expectedNamespace == namespace
 	}
@@ -654,7 +578,7 @@ func newItemChecker(resp *authzv1.ListResponse) *itemChecker {
 }
 
 // fn generates a ItemChecker function that can check user access to items.
-func (c *itemChecker) fn(expectedNamespace string) ItemChecker {
+func (c *itemChecker) fn(expectedNamespace string) types.ItemChecker {
 	if c.All {
 		return allowAllChecker(expectedNamespace)
 	}

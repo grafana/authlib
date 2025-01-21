@@ -55,14 +55,14 @@ import (
     "github.com/fullstorydev/grpchan"
     "github.com/fullstorydev/grpchan/inprocgrpc"
     authnlib "github.com/grafana/authlib/authn"
-    "github.com/grafana/authlib/claims"
+    "github.com/grafana/authlib/types"
     "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/auth"
     "google.golang.org/grpc"
 )
 
 // idTokenExtractor is a helper function to get the user ID Token from context
 func idTokenExtractor(ctx context.Context) (string, error) {
-    authInfo, ok := claims.From(ctx)
+    authInfo, ok := types.From(ctx)
     if !ok {
         return "", fmt.Errorf("no claims found")
     }
@@ -127,7 +127,7 @@ func main() {
 import (
     authnlib "github.com/grafana/authlib/authn"
     authzlib "github.com/grafana/authlib/authz"
-    "github.com/grafana/authlib/claims"
+    "github.com/grafana/authlib/types"
     "github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/auth"
     "google.golang.org/grpc"
 )
@@ -159,7 +159,7 @@ func main() (*authnlib.GrpcAuthenticator, error) {
         // The checker will verify both access and id token
         // are authorized to access the namespace.
 		authzlib.NewNamespaceAccessChecker(
-            claims.CloudNamespaceFormatter,
+            types.CloudNamespaceFormatter,
             authzlib.WithIDTokenNamespaceAccessCheckerOption(true),
         ),
         // Method to extract the namespace that is being targeted.
@@ -190,13 +190,13 @@ func main() (*authnlib.GrpcAuthenticator, error) {
 import (
     authnlib "github.com/grafana/authlib/authn"
     authzlib "github.com/grafana/authlib/authz"
-    "github.com/grafana/authlib/claims"
+    "github.com/grafana/authlib/types"
     "google.golang.org/grpc"
 )
 
 // idTokenExtractor is a helper function to get the user ID Token from context
 func idTokenExtractor(ctx context.Context) (string, error) {
-    authInfo, ok := claims.From(ctx)
+    authInfo, ok := types.From(ctx)
     if !ok {
         return "", fmt.Errorf("no claims found")
     }

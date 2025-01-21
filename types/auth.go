@@ -1,7 +1,7 @@
-package claims
+package types
 
 // AuthInfo provides access to the requested authnz info
-// This includes the identity and access claims.  This interface is also designed to
+// This includes the identity and access types.  This interface is also designed to
 // fulfil the kubernetes user requirements:
 // https://github.com/kubernetes/apiserver/blob/master/pkg/authentication/user/user.go#L20
 type AuthInfo interface {

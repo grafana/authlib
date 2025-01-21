@@ -12,7 +12,7 @@ import (
 	"github.com/grafana/authlib/authn"
 	authzv1 "github.com/grafana/authlib/authz/proto/v1"
 	"github.com/grafana/authlib/cache"
-	"github.com/grafana/authlib/claims"
+	"github.com/grafana/authlib/types"
 )
 
 func TestHasPermissionInToken(t *testing.T) {
@@ -126,14 +126,14 @@ func TestClient_Check(t *testing.T) {
 	tests := []struct {
 		name     string
 		caller   *authn.AuthInfo
-		req      CheckRequest
+		req      types.CheckRequest
 		checkRes bool
 		want     bool
 		wantErr  bool
 	}{
 		{
 			name: "No Action",
-			req: CheckRequest{
+			req: types.CheckRequest{
 				Namespace: "stacks-12",
 			},
 			wantErr: true,
@@ -141,7 +141,7 @@ func TestClient_Check(t *testing.T) {
 		{
 			name:   "No Caller",
 			caller: &authn.AuthInfo{},
-			req: CheckRequest{
+			req: types.CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -151,7 +151,7 @@ func TestClient_Check(t *testing.T) {
 		},
 		{
 			name: "Missing group",
-			req: CheckRequest{
+			req: types.CheckRequest{
 				Namespace: "stacks-12",
 				Resource:  "dashboards",
 				Verb:      "list",
@@ -161,7 +161,7 @@ func TestClient_Check(t *testing.T) {
 		},
 		{
 			name: "Missing resource (kind)",
-			req: CheckRequest{
+			req: types.CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Verb:      "list",
@@ -175,7 +175,7 @@ func TestClient_Check(t *testing.T) {
 				Claims: jwt.Claims{Subject: "service"},
 				Rest:   authn.AccessTokenClaims{Namespace: "stacks-12"},
 			}),
-			req: CheckRequest{
+			req: types.CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -189,7 +189,7 @@ func TestClient_Check(t *testing.T) {
 				Claims: jwt.Claims{Subject: "service"},
 				Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", Permissions: []string{"dashboards.grafana.app/dashboards:list"}},
 			}),
-			req: CheckRequest{
+			req: types.CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -203,7 +203,7 @@ func TestClient_Check(t *testing.T) {
 				Claims: jwt.Claims{Subject: "service"},
 				Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", Permissions: []string{"dashboards.grafana.app/dashboards/dashUID:get"}},
 			}),
-			req: CheckRequest{
+			req: types.CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -218,7 +218,7 @@ func TestClient_Check(t *testing.T) {
 				Claims: jwt.Claims{Subject: "service"},
 				Rest:   authn.AccessTokenClaims{Namespace: "stacks-13", Permissions: []string{"dashboards.grafana.app/dashboards:list"}},
 			}),
-			req: CheckRequest{
+			req: types.CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -238,7 +238,7 @@ func TestClient_Check(t *testing.T) {
 					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 				},
 			),
-			req: CheckRequest{
+			req: types.CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -258,7 +258,7 @@ func TestClient_Check(t *testing.T) {
 					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 				},
 			),
-			req: CheckRequest{
+			req: types.CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -278,7 +278,7 @@ func TestClient_Check(t *testing.T) {
 					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 				},
 			),
-			req: CheckRequest{
+			req: types.CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -299,7 +299,7 @@ func TestClient_Check(t *testing.T) {
 					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 				},
 			),
-			req: CheckRequest{
+			req: types.CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -333,7 +333,9 @@ func TestClient_Check_OnPremFmt(t *testing.T) {
 	caller := authn.NewIDTokenAuthInfo(
 		authn.Claims[authn.AccessTokenClaims]{
 			Claims: jwt.Claims{Subject: "service"},
-			Rest:   authn.AccessTokenClaims{Namespace: "default", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:list"}},
+			Rest: authn.AccessTokenClaims{
+				Namespace:            "default",
+				DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:list"}},
 		},
 		&authn.Claims[authn.IDTokenClaims]{
 			Claims: jwt.Claims{Subject: "user:1"},
@@ -341,7 +343,7 @@ func TestClient_Check_OnPremFmt(t *testing.T) {
 		},
 	)
 
-	req := CheckRequest{
+	req := types.CheckRequest{
 		Namespace: "default",
 		Group:     "dashboards.grafana.app",
 		Resource:  "dashboards",
@@ -369,7 +371,7 @@ func TestClient_Check_Cache(t *testing.T) {
 		},
 	)
 
-	req := CheckRequest{
+	req := types.CheckRequest{
 		Namespace: "stacks-12",
 		Group:     "dashboards.grafana.app",
 		Resource:  "dashboards",
@@ -416,7 +418,7 @@ func TestClient_Compile_Cache(t *testing.T) {
 		},
 	)
 
-	req := ListRequest{
+	req := types.ListRequest{
 		Namespace: "stacks-12",
 		Group:     "dashboards.grafana.app",
 		Resource:  "dashboards",
@@ -449,7 +451,7 @@ func TestClient_Check_DisableAccessToken(t *testing.T) {
 	tests := []struct {
 		name     string
 		caller   *authn.AuthInfo
-		req      CheckRequest
+		req      types.CheckRequest
 		checkRes bool
 		want     bool
 		wantErr  bool
@@ -457,7 +459,7 @@ func TestClient_Check_DisableAccessToken(t *testing.T) {
 		{
 			name:   "No user assume the service is allowed",
 			caller: &authn.AuthInfo{},
-			req: CheckRequest{
+			req: types.CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -474,7 +476,7 @@ func TestClient_Check_DisableAccessToken(t *testing.T) {
 					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 				},
 			),
-			req: CheckRequest{
+			req: types.CheckRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -511,14 +513,14 @@ func TestClient_Compile(t *testing.T) {
 	tests := []struct {
 		name    string
 		caller  *authn.AuthInfo
-		listReq ListRequest
+		listReq types.ListRequest
 		listRes *authzv1.ListResponse
 		wantErr bool
 		wantRes map[check]bool
 	}{
 		{
-			name: "Invalid ListRequest",
-			listReq: ListRequest{
+			name: "Invalid types.ListRequest",
+			listReq: types.ListRequest{
 				Namespace: "",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -529,7 +531,7 @@ func TestClient_Compile(t *testing.T) {
 		{
 			name:   "Invalid Caller",
 			caller: &authn.AuthInfo{},
-			listReq: ListRequest{
+			listReq: types.ListRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -543,7 +545,7 @@ func TestClient_Compile(t *testing.T) {
 				Claims: jwt.Claims{Subject: "service"},
 				Rest:   authn.AccessTokenClaims{Namespace: "stacks-13"},
 			}),
-			listReq: ListRequest{
+			listReq: types.ListRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -559,7 +561,7 @@ func TestClient_Compile(t *testing.T) {
 				Claims: jwt.Claims{Subject: "service"},
 				Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", Permissions: []string{"dashboards.grafana.app/dashboards:get"}},
 			}),
-			listReq: ListRequest{
+			listReq: types.ListRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -576,7 +578,7 @@ func TestClient_Compile(t *testing.T) {
 				Claims: jwt.Claims{Subject: "service"},
 				Rest:   authn.AccessTokenClaims{Namespace: "stacks-12"},
 			}),
-			listReq: ListRequest{
+			listReq: types.ListRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -595,10 +597,10 @@ func TestClient_Compile(t *testing.T) {
 				},
 				&authn.Claims[authn.IDTokenClaims]{
 					Claims: jwt.Claims{Subject: "user:1"},
-					Rest:   authn.IDTokenClaims{Namespace: "stacks-12", Type: claims.TypeUser},
+					Rest:   authn.IDTokenClaims{Namespace: "stacks-12", Type: types.TypeUser},
 				},
 			),
-			listReq: ListRequest{
+			listReq: types.ListRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -620,10 +622,10 @@ func TestClient_Compile(t *testing.T) {
 				},
 				&authn.Claims[authn.IDTokenClaims]{
 					Claims: jwt.Claims{Subject: "user:1"},
-					Rest:   authn.IDTokenClaims{Namespace: "stacks-12", Type: claims.TypeUser},
+					Rest:   authn.IDTokenClaims{Namespace: "stacks-12", Type: types.TypeUser},
 				},
 			),
-			listReq: ListRequest{Namespace: "stacks-12", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get"},
+			listReq: types.ListRequest{Namespace: "stacks-12", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get"},
 			listRes: &authzv1.ListResponse{All: true},
 			wantRes: map[check]bool{
 				{"stacks-12", "dash1", "fold1"}: false,
@@ -640,10 +642,10 @@ func TestClient_Compile(t *testing.T) {
 				},
 				&authn.Claims[authn.IDTokenClaims]{
 					Claims: jwt.Claims{Subject: "user:1"},
-					Rest:   authn.IDTokenClaims{Namespace: "stacks-12", Type: claims.TypeUser},
+					Rest:   authn.IDTokenClaims{Namespace: "stacks-12", Type: types.TypeUser},
 				},
 			),
-			listReq: ListRequest{
+			listReq: types.ListRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",
@@ -663,10 +665,10 @@ func TestClient_Compile(t *testing.T) {
 				},
 				&authn.Claims[authn.IDTokenClaims]{
 					Claims: jwt.Claims{Subject: "user:1"},
-					Rest:   authn.IDTokenClaims{Namespace: "stacks-12", Type: claims.TypeUser},
+					Rest:   authn.IDTokenClaims{Namespace: "stacks-12", Type: types.TypeUser},
 				},
 			),
-			listReq: ListRequest{
+			listReq: types.ListRequest{
 				Namespace: "stacks-12",
 				Group:     "dashboards.grafana.app",
 				Resource:  "dashboards",

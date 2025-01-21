@@ -3,10 +3,10 @@ package authn
 import (
 	"strings"
 
-	"github.com/grafana/authlib/claims"
+	"github.com/grafana/authlib/types"
 )
 
-var _ claims.AuthInfo = (*AuthInfo)(nil)
+var _ types.AuthInfo = (*AuthInfo)(nil)
 
 type AuthInfo struct {
 	at Claims[AccessTokenClaims]
@@ -44,14 +44,14 @@ func (a *AuthInfo) GetIdentifier() string {
 	if a.id != nil {
 		return a.id.Rest.Identifier
 	}
-	return strings.TrimPrefix(a.at.Subject, string(claims.TypeAccessPolicy)+":")
+	return strings.TrimPrefix(a.at.Subject, string(types.TypeAccessPolicy)+":")
 }
 
-func (a *AuthInfo) GetIdentityType() claims.IdentityType {
+func (a *AuthInfo) GetIdentityType() types.IdentityType {
 	if a.id != nil {
 		return a.id.Rest.Type
 	}
-	return claims.TypeAccessPolicy
+	return types.TypeAccessPolicy
 }
 
 func (a *AuthInfo) GetNamespace() string {
