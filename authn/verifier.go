@@ -2,6 +2,7 @@ package authn
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"time"
 
@@ -21,7 +22,48 @@ type Claims[T any] struct {
 	Rest T
 
 	// The original raw token
-	token string
+	token string `json:"-"`
+}
+
+func (c Claims[T]) MarshalJSON() ([]byte, error) {
+	// Create a combined map with fields from both Claims and Rest
+	combined := make(map[string]interface{})
+
+	// Marshal jwt.Claims to get standard claims
+	standardClaims, err := json.Marshal(c.Claims)
+	if err != nil {
+		return nil, err
+	}
+
+	// Marshal Rest to get custom claims
+	restClaims, err := json.Marshal(c.Rest)
+	if err != nil {
+		return nil, err
+	}
+
+	// Unmarshal both into the combined map
+	if err := json.Unmarshal(standardClaims, &combined); err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(restClaims, &combined); err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(combined)
+}
+
+func (c *Claims[T]) UnmarshalJSON(data []byte) error {
+	// Unmarshal into jwt.Claims
+	if err := json.Unmarshal(data, &c.Claims); err != nil {
+		return err
+	}
+
+	// Unmarshal into Rest
+	if err := json.Unmarshal(data, &c.Rest); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 type Verifier[T any] interface {
