@@ -309,6 +309,26 @@ func TestClient_Check(t *testing.T) {
 			checkRes: true,
 			want:     false,
 		},
+		{
+			name: "Service with the permission acting on behalf of a second service",
+			caller: authn.NewIDTokenAuthInfo(
+				authn.Claims[authn.AccessTokenClaims]{
+					Claims: jwt.Claims{Subject: "service"},
+					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", Permissions: []string{"dashboards.grafana.app:*"}},
+				},
+				&authn.Claims[authn.IDTokenClaims]{
+					Claims: jwt.Claims{Subject: "secondService"},
+					Rest:   authn.IDTokenClaims{Namespace: "stacks-12", Type: types.TypeAccessPolicy},
+				},
+			),
+			req: types.CheckRequest{
+				Namespace: "stacks-12",
+				Group:     "dashboards.grafana.app",
+				Resource:  "dashboards",
+				Verb:      "list",
+			},
+			want: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
