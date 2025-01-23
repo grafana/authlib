@@ -277,7 +277,6 @@ func (c *ClientImpl) Check(ctx context.Context, id types.AuthInfo, req types.Che
 	// Only check the service permissions if the access token check is enabled
 	if c.authCfg.accessTokenAuthEnabled {
 		permissions := id.GetTokenDelegatedPermissions()
-
 		serviceIsAllowedAction := hasPermissionInToken(permissions, req.Group, req.Resource, req.Verb)
 
 		span.SetAttributes(attribute.Int("delegated_permissions", len(permissions)))
