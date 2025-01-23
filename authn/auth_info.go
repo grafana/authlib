@@ -93,7 +93,11 @@ func (a *AuthInfo) GetAuthenticatedBy() string {
 }
 
 func (a *AuthInfo) GetTokenPermissions() []string {
-	if a.id != nil {
+	// If it's a service acting on behalf of a user
+	// we should not check token permission but delegated permissions instead
+	// If it's a service acting on behalf of a second service
+	// we currently just check the first service permissions
+	if a.id != nil && a.id.Rest.Type != types.TypeAccessPolicy {
 		return []string{}
 	}
 	return a.at.Rest.Permissions
