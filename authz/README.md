@@ -6,7 +6,6 @@ This library provides utilities for your Grafana applications or plugins to mana
 
 - Single-tenant RBAC client, typically used by plugins to query Grafana for user permissions and control their access.
 - **[unstable / under development]** Multi-tenant client, typically used by multi-tenant applications to enforce service and user access.
-- A composable namespace checker to authorize requests based on JWT namespaces
 
 ## Access-control `EnforcementClient`
 
@@ -61,9 +60,5 @@ func main() {
 ```
 
 ## [unstable / under development ] Multi-tenant authz client
-
-<!-- TODO -->
-
-## Namespace access
 
 <!-- TODO -->
