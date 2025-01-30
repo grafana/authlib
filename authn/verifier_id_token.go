@@ -23,6 +23,8 @@ type IDTokenClaims struct {
 	Username string `json:"username,omitempty"`
 	// Display name of the user (name attribute if it is set, otherwise the login or email)
 	DisplayName string `json:"name,omitempty"`
+	// User's role in Grafana Org
+	OrgRole string `json:"orgRole,omitempty"`
 }
 
 // Helper for the id
