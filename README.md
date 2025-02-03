@@ -38,7 +38,8 @@ The library leverages JWT (JSON Web Token) for secure communication and authoriz
 
 1. **Component Identification:** Grafana, applications, and services identify themselves using JWT access tokens.
 2. **Authentication:** Upon receiving requests, services verify the authenticity of the access token and also check if their own identifier (e.g., service name) is present in the token's audience list. This confirms the caller is authorized to interact with these specific services.
-3. **Service Delegation (aka On-Behalf-Of):** Services can perform actions on behalf of users with provided access and ID tokens. Upon receiving requests, services verify both tokens namespace match the requested resources namespace. Access tokens, contain a list of permitted delegated actions (e.g. `teams:read`), that allow for finer-grained access control.
+3. **Service Authorization:** Upon receiving requests, services verify that Access tokens contain a list of permitted actions (e.g. `dashboard.grafana.app/dashboards:read`), that allow for finer-grained access control.
+4. **Service Delegation (aka On-Behalf-Of):** Services can perform actions on behalf of users with provided access and ID tokens. Upon receiving requests, services verify both tokens namespace match the requested resources namespace. Access tokens, contain a list of permitted delegated actions (e.g. `iam.grafana.app/teams:read`), that allow for finer-grained access control.
 
 ### 1. In-Process Deployment
 
