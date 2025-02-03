@@ -17,7 +17,6 @@ The `Authlib` library provides a modular and secure approach to handling authent
   - **[`authz`](./authz/README.md):** Handles authorization logic:
     - Single-tenant RBAC client, typically used by plugins to query Grafana for user permissions and control their access.
     - **[unstable / under development]** Multi-tenant client, typically used by multi-tenant applications to enforce service and user access.
-    - A composable namespace checker to authorize requests based on JWT namespaces
 
 ### Why Choose `Authlib`?
 
@@ -39,8 +38,8 @@ The library leverages JWT (JSON Web Token) for secure communication and authoriz
 
 1. **Component Identification:** Grafana, applications, and services identify themselves using JWT access tokens.
 2. **Authentication:** Upon receiving requests, services verify the authenticity of the access token and also check if their own identifier (e.g., service name) is present in the token's audience list. This confirms the caller is authorized to interact with these specific services.
-3. **Service Authorization:** Upon receiving requests, services verify the caller is allowed to access the requested resources namespace (e.g., `stacks-22`). Access tokens, contain a list of permitted actions (e.g., `datasources:write`, `folders:create`), that allow for finer-grained access control.
-4. **Service Delegation (aka On-Behalf-Of):** Services can perform actions on behalf of users with provided access and ID tokens. Upon receiving requests, services verify both tokens namespace match the requested resources namespace. Access tokens, contain a list of permitted delegated actions (e.g. `teams:read`), that allow for finer-grained access control.
+3. **Service Authorization:** Upon receiving requests, services verify that Access tokens contain a list of permitted actions (e.g. `dashboard.grafana.app/dashboards:read`), that allow for finer-grained access control.
+4. **Service Delegation (aka On-Behalf-Of):** Services can perform actions on behalf of users with provided access and ID tokens. Upon receiving requests, services verify both tokens namespace match the requested resources namespace. Access tokens, contain a list of permitted delegated actions (e.g. `iam.grafana.app/teams:read`), that allow for finer-grained access control.
 
 ### 1. In-Process Deployment
 
@@ -152,30 +151,14 @@ func main() (*authnlib.GrpcAuthenticator, error) {
         authnlib.WithIDTokenAuthOption(true),
     )
 
-    //  Beyond token verification, this enforces access control at the
-    //  namespace level. Only authorized users/services can access
-    //  resources within a given namespace.
-    namespaceAuthz = authzlib.NamespaceAuthorizationFunc(
-        // The checker will verify both access and id token
-        // are authorized to access the namespace.
-		authzlib.NewNamespaceAccessChecker(
-            types.CloudNamespaceFormatter,
-            authzlib.WithIDTokenNamespaceAccessCheckerOption(true),
-        ),
-        // Method to extract the namespace that is being targeted.
-        // Here we use gRPC metadata.
-		authzlib.MetadataNamespaceExtractor(authzlib.DefaultNamespaceMetadataKey),
-	)
 
     // Create a new grpc server
     server = grpc.NewServer(
         grpc.ChainUnaryInterceptor(
             auth.UnaryServerInterceptor(authenticator.Authenticate),
-            authzlib.UnaryAuthorizeInterceptor(namespaceAuthz),
         ),
         grpc.ChainStreamInterceptor(
             auth.StreamServerInterceptor(authenticator.Authenticate),
-            authzlib.StreamAuthorizeInterceptor(namespaceAuthz),
         ),
     )
     server.RegisterService(&authzv1.MyService_ServiceDesc, service)
@@ -209,15 +192,11 @@ func idTokenExtractor(ctx context.Context) (string, error) {
     return "", fmt.Errorf("id-token not found")
 }
 
-// namespaceExtractor is a helper function used to populate gRPC metadata with the namespace
-func namespaceExtractor(ctx context.Context) (key string, values []string, err error) {
-	return authzlib.DefaultNamespaceMetadataKey, []string{"stacks-22"}, nil
-}
 
 func main() {
     // The client interceptor authenticates requests to the gRPC server using
 	// the provided TokenExchangeConfig. It automatically handles token exchange
-	// and injects the ID token along with the extracted namespace into the request metadata.
+	// and injects the ID token.
 	clientInt, err := authnlib.NewGrpcClientInterceptor(
         &authnlib.GrpcClientConfig{
             TokenClientConfig: &authnlib.TokenExchangeConfig{
@@ -230,7 +209,6 @@ func main() {
             },
         },
 		authnlib.WithIDTokenExtractorOption(idTokenExtractor),
-		authnlib.WithMetadataExtractorOption(namespaceExtractor),
     )
 	if err != nil {
 		os.Exit(1)
