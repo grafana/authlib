@@ -553,7 +553,7 @@ var denyAllChecker = func(namespace string, name, folder string) bool { return f
 
 func allowAllChecker(expectedNamespace string) types.ItemChecker {
 	return func(namespace string, name, folder string) bool {
-		return expectedNamespace == namespace
+		return types.NamespaceMatches(namespace, expectedNamespace)
 	}
 }
 
@@ -596,10 +596,9 @@ func (c *itemChecker) fn(expectedNamespace string) types.ItemChecker {
 	}
 
 	return func(namespace string, name, folder string) bool {
-		if namespace != expectedNamespace {
+		if !types.NamespaceMatches(namespace, expectedNamespace) {
 			return false
 		}
-
 		return c.Items[name] || c.Folders[folder]
 	}
 }
