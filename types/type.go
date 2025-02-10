@@ -22,6 +22,7 @@ const (
 	TypeRenderService  IdentityType = "render"
 	TypeAccessPolicy   IdentityType = "access-policy"
 	TypeProvisioning   IdentityType = "provisioning"
+	TypePublic         IdentityType = "public"
 	TypeEmpty          IdentityType = ""
 )
 
@@ -61,6 +62,8 @@ func ParseType(str string) (IdentityType, error) {
 		return TypeRenderService, nil
 	case string(TypeAccessPolicy):
 		return TypeAccessPolicy, nil
+	case string(TypePublic):
+		return TypePublic, nil
 	default:
 		return "", ErrInvalidTypedID
 	}
