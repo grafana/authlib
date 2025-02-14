@@ -702,6 +702,56 @@ func TestClient_Compile(t *testing.T) {
 				{"stacks-12", "dash2", "fold3"}: false,
 			},
 		},
+		{
+			name: "User can't list k6 resources",
+			caller: authn.NewIDTokenAuthInfo(
+				authn.Claims[authn.AccessTokenClaims]{
+					Claims: jwt.Claims{Subject: "service"},
+					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"folders.grafana.app/folders:get"}},
+				},
+				&authn.Claims[authn.IDTokenClaims]{
+					Claims: jwt.Claims{Subject: "user:1"},
+					Rest:   authn.IDTokenClaims{Namespace: "stacks-12", Type: types.TypeUser},
+				},
+			),
+			listReq: types.ListRequest{
+				Namespace: "stacks-12",
+				Group:     "folders.grafana.app",
+				Resource:  "folders",
+				Verb:      "get",
+			},
+			listRes: &authzv1.ListResponse{Items: []string{"app-k6", "app-k6-child", "another-folder"}},
+			wantRes: map[check]bool{
+				{"stacks-12", "k6-app", ""}:             false,
+				{"stacks-12", "k6-app-child", "k6-app"}: false,
+				{"stacks-12", "another-folder", ""}:     true,
+			},
+		},
+		{
+			name: "Service account can list k6 resources",
+			caller: authn.NewIDTokenAuthInfo(
+				authn.Claims[authn.AccessTokenClaims]{
+					Claims: jwt.Claims{Subject: "service"},
+					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"folders.grafana.app/folders:get"}},
+				},
+				&authn.Claims[authn.IDTokenClaims]{
+					Claims: jwt.Claims{Subject: "service-account:1"},
+					Rest:   authn.IDTokenClaims{Namespace: "stacks-12", Type: types.TypeServiceAccount},
+				},
+			),
+			listReq: types.ListRequest{
+				Namespace: "stacks-12",
+				Group:     "folders.grafana.app",
+				Resource:  "folders",
+				Verb:      "get",
+			},
+			listRes: &authzv1.ListResponse{Items: []string{"app-k6", "app-k6-child", "another-folder"}},
+			wantRes: map[check]bool{
+				{"stacks-12", "k6-app", ""}:             false,
+				{"stacks-12", "k6-app-child", "k6-app"}: false,
+				{"stacks-12", "another-folder", ""}:     true,
+			},
+		},
 	}
 
 	for _, tt := range tests {

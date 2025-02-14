@@ -165,6 +165,11 @@ func (c *ClientImpl) check(ctx context.Context, id types.AuthInfo, req *types.Ch
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.hasAccess")
 	defer span.End()
 
+	idIsServiceAccount := types.IsIdentityType(id.GetIdentityType(), types.TypeServiceAccount)
+	if !idIsServiceAccount && (req.Name == "k6-app" || req.Folder == "k6-app") {
+		return false, nil
+	}
+
 	key := checkCacheKey(id.GetSubject(), req)
 	res, err := c.getCachedCheck(ctx, key)
 	if err == nil {
@@ -359,11 +364,11 @@ func (c *ClientImpl) Compile(ctx context.Context, id types.AuthInfo, list types.
 	if isService {
 		// access token check is disabled => we can skip the authz service
 		if !c.authCfg.accessTokenAuthEnabled {
-			return allowAllChecker(list.Namespace), nil
+			return allowAllChecker(list.Namespace, true), nil
 		}
 
 		if hasPermissionInToken(id.GetTokenPermissions(), list.Group, list.Resource, list.Verb) {
-			return allowAllChecker(list.Namespace), nil
+			return allowAllChecker(list.Namespace, true), nil
 		}
 		return denyAllChecker, nil
 	}
@@ -381,7 +386,7 @@ func (c *ClientImpl) Compile(ctx context.Context, id types.AuthInfo, list types.
 		return denyAllChecker, err
 	}
 
-	return checker.fn(list.Namespace), nil
+	return checker.fn(list.Namespace, id), nil
 }
 
 // Validate input
@@ -551,8 +556,11 @@ func (c *ClientImpl) getCachedItemChecker(ctx context.Context, key string) (*ite
 
 var denyAllChecker = func(namespace string, name, folder string) bool { return false }
 
-func allowAllChecker(expectedNamespace string) types.ItemChecker {
+func allowAllChecker(expectedNamespace string, isServiceAccount bool) types.ItemChecker {
 	return func(namespace string, name, folder string) bool {
+		if !isServiceAccount && (name == "k6-app" || folder == "k6-app") {
+			return false
+		}
 		return types.NamespaceMatches(namespace, expectedNamespace)
 	}
 }
@@ -586,9 +594,10 @@ func newItemChecker(resp *authzv1.ListResponse) *itemChecker {
 }
 
 // fn generates a ItemChecker function that can check user access to items.
-func (c *itemChecker) fn(expectedNamespace string) types.ItemChecker {
+func (c *itemChecker) fn(expectedNamespace string, id types.AuthInfo) types.ItemChecker {
+	idIsSvcAccount := types.IsIdentityType(id.GetIdentityType(), types.TypeServiceAccount)
 	if c.All {
-		return allowAllChecker(expectedNamespace)
+		return allowAllChecker(expectedNamespace, idIsSvcAccount)
 	}
 
 	if len(c.Items) == 0 && len(c.Folders) == 0 {
@@ -597,6 +606,9 @@ func (c *itemChecker) fn(expectedNamespace string) types.ItemChecker {
 
 	return func(namespace string, name, folder string) bool {
 		if !types.NamespaceMatches(namespace, expectedNamespace) {
+			return false
+		}
+		if !idIsSvcAccount && (name == "k6-app" || folder == "k6-app") {
 			return false
 		}
 		return c.Items[name] || c.Folders[folder]
