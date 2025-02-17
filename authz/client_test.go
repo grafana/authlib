@@ -467,63 +467,6 @@ func TestClient_Compile_Cache(t *testing.T) {
 	require.True(t, check("stacks-12", "dash1", "fold1"))
 }
 
-func TestClient_Check_DisableAccessToken(t *testing.T) {
-	tests := []struct {
-		name     string
-		caller   *authn.AuthInfo
-		req      types.CheckRequest
-		checkRes bool
-		want     bool
-		wantErr  bool
-	}{
-		{
-			name:   "No user assume the service is allowed",
-			caller: &authn.AuthInfo{},
-			req: types.CheckRequest{
-				Namespace: "stacks-12",
-				Group:     "dashboards.grafana.app",
-				Resource:  "dashboards",
-				Verb:      "list",
-			},
-			want: true,
-		},
-		{
-			name: "User has the action",
-			caller: authn.NewIDTokenAuthInfo(
-				authn.Claims[authn.AccessTokenClaims]{},
-				&authn.Claims[authn.IDTokenClaims]{
-					Claims: jwt.Claims{Subject: "user:1"},
-					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
-				},
-			),
-			req: types.CheckRequest{
-				Namespace: "stacks-12",
-				Group:     "dashboards.grafana.app",
-				Resource:  "dashboards",
-				Verb:      "list",
-			},
-			checkRes: true,
-			want:     true,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			client, authz := setupAccessClient()
-			WithDisableAccessTokenClientOption()(client)
-
-			authz.checkRes = &authzv1.CheckResponse{Allowed: tt.checkRes}
-
-			got, err := client.Check(context.Background(), tt.caller, tt.req)
-			if tt.wantErr {
-				require.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-			require.Equal(t, tt.want, got.Allowed)
-		})
-	}
-}
-
 func TestClient_Compile(t *testing.T) {
 	type check struct {
 		namespace string
@@ -777,7 +720,6 @@ func TestClient_Compile(t *testing.T) {
 func setupAccessClient() (*ClientImpl, *FakeAuthzServiceClient) {
 	fakeClient := &FakeAuthzServiceClient{}
 	return &ClientImpl{
-		authCfg:  &ClientConfig{accessTokenAuthEnabled: true},
 		clientV1: fakeClient,
 		cache:    cache.NewLocalCache(cache.Config{}),
 		tracer:   noop.NewTracerProvider().Tracer("noopTracer"),

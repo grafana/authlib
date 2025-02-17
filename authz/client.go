@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
@@ -21,29 +20,17 @@ import (
 )
 
 var (
-	ErrMissingConfig           = errors.New("missing config")
 	ErrMissingRequestNamespace = errors.New("missing request namespace")
 	ErrInvalidRequestNamespace = errors.New("invalid request namespace")
 	ErrMissingRequestGroup     = errors.New("missing request group")
 	ErrMissingRequestResource  = errors.New("missing request resource")
 	ErrMissingRequestVerb      = errors.New("missing request verb")
 	ErrMissingCaller           = errors.New("missing caller")
-	ErrMissingSubject          = errors.New("missing subject")
 
 	checkResponseDenied  = types.CheckResponse{Allowed: false}
-	checkResponseAllowed = types.CheckResponse{Allowed: true}
 
 	k6FolderUID = "k6-app"
 )
-
-type ClientConfig struct {
-	// RemoteAddress is the address of the authz service. It should be in the format "host:port".
-	RemoteAddress string
-
-	// accessTokenAuthEnabled is a flag to enable access token authentication.
-	// If disabled, no service authentication will be performed. Defaults to true.
-	accessTokenAuthEnabled bool
-}
 
 // ClientImpl will implement the types.AccessClient interface
 // Once we are able to deal with folder permissions expansion.
@@ -52,21 +39,9 @@ var _ types.AccessClient = (*ClientImpl)(nil)
 type AuthzClientOption func(*ClientImpl)
 
 type ClientImpl struct {
-	authCfg     *ClientConfig
-	clientV1    authzv1.AuthzServiceClient
-	cache       cache.Cache
-	grpcConn    grpc.ClientConnInterface
-	grpcOptions []grpc.DialOption
-	tracer      trace.Tracer
-}
-
-type tracerProvider struct {
-	trace.TracerProvider
-	tracer trace.Tracer
-}
-
-func (tp *tracerProvider) Tracer(name string, options ...trace.TracerOption) trace.Tracer {
-	return tp.tracer
+	clientV1 authzv1.AuthzServiceClient
+	cache    cache.Cache
+	tracer   trace.Tracer
 }
 
 // -----
@@ -79,33 +54,9 @@ func WithCacheClientOption(cache cache.Cache) AuthzClientOption {
 	}
 }
 
-// WithGrpcDialOptionsClientOption sets the gRPC dial options for client connection setup.
-// Useful for adding client interceptors. These options are ignored if WithGrpcConnection is used.
-func WithGrpcDialOptionsClientOption(opts ...grpc.DialOption) AuthzClientOption {
-	return func(c *ClientImpl) {
-		c.grpcOptions = opts
-	}
-}
-
-// WithGrpcConnectionClientOption sets the gRPC client connection directly.
-// Useful for running the client in the same process as the authorization service.
-func WithGrpcConnectionClientOption(conn grpc.ClientConnInterface) AuthzClientOption {
-	return func(c *ClientImpl) {
-		c.grpcConn = conn
-	}
-}
-
 func WithTracerClientOption(tracer trace.Tracer) AuthzClientOption {
 	return func(c *ClientImpl) {
 		c.tracer = tracer
-	}
-}
-
-// WithDisableAccessTokenClientOption is an option to disable access token authorization.
-// Warning: Using this option means there won't be any service authorization.
-func WithDisableAccessTokenClientOption() AuthzClientOption {
-	return func(c *ClientImpl) {
-		c.authCfg.accessTokenAuthEnabled = false
 	}
 }
 
@@ -113,13 +64,11 @@ func WithDisableAccessTokenClientOption() AuthzClientOption {
 // Initialization
 // -----
 
-func NewClient(cfg *ClientConfig, opts ...AuthzClientOption) (*ClientImpl, error) {
-	if cfg == nil {
-		return nil, ErrMissingConfig
+func NewClient(cc grpc.ClientConnInterface, opts ...AuthzClientOption) (*ClientImpl, error) {
+	client := &ClientImpl{
+		clientV1: authzv1.NewAuthzServiceClient(cc),
+		tracer:   noop.Tracer{},
 	}
-	cfg.accessTokenAuthEnabled = true
-
-	client := &ClientImpl{authCfg: cfg}
 
 	// Apply options
 	for _, opt := range opts {
@@ -133,28 +82,6 @@ func NewClient(cfg *ClientConfig, opts ...AuthzClientOption) (*ClientImpl, error
 			CleanupInterval: 10 * time.Minute,
 		})
 	}
-
-	if client.tracer == nil {
-		client.tracer = noop.Tracer{}
-	}
-
-	// Instantiate the client
-	if client.grpcConn == nil {
-		if cfg.RemoteAddress == "" {
-			return nil, fmt.Errorf("missing remote address: %w", ErrMissingConfig)
-		}
-
-		tp := tracerProvider{tracer: client.tracer}
-		grpcOpts := client.grpcOptions
-		grpcOpts = append(grpcOpts, grpc.WithStatsHandler(otelgrpc.NewClientHandler(otelgrpc.WithTracerProvider(&tp))))
-
-		conn, err := grpc.NewClient(cfg.RemoteAddress, grpcOpts...)
-		if err != nil {
-			return nil, err
-		}
-		client.grpcConn = conn
-	}
-	client.clientV1 = authzv1.NewAuthzServiceClient(client.grpcConn)
 
 	return client, nil
 }
@@ -240,12 +167,12 @@ func (c *ClientImpl) Check(ctx context.Context, id types.AuthInfo, req types.Che
 		return checkResponseDenied, err
 	}
 
-	if err := c.validateCaller(id); err != nil {
-		span.RecordError(err)
-		return checkResponseDenied, err
+	if id.GetSubject() == "" {
+		span.RecordError(ErrMissingCaller)
+		return checkResponseDenied, ErrMissingCaller
 	}
 
-	if !c.validateCallerNamespace(id, req.Namespace) {
+	if !types.NamespaceMatches(id.GetNamespace(), req.Namespace) {
 		return checkResponseDenied, nil
 	}
 
@@ -265,11 +192,6 @@ func (c *ClientImpl) Check(ctx context.Context, id types.AuthInfo, req types.Che
 
 	// No user => check on the service permissions
 	if isService {
-		// access token check is disabled => we can skip the authz service
-		if !c.authCfg.accessTokenAuthEnabled {
-			return checkResponseAllowed, nil
-		}
-
 		permissions := id.GetTokenPermissions()
 		serviceIsAllowedAction := hasPermissionInToken(permissions, req.Group, req.Resource, req.Verb)
 
@@ -282,16 +204,14 @@ func (c *ClientImpl) Check(ctx context.Context, id types.AuthInfo, req types.Che
 	span.SetAttributes(attribute.String("subject", id.GetSubject()))
 
 	// Only check the service permissions if the access token check is enabled
-	if c.authCfg.accessTokenAuthEnabled {
-		permissions := id.GetTokenDelegatedPermissions()
-		serviceIsAllowedAction := hasPermissionInToken(permissions, req.Group, req.Resource, req.Verb)
+	permissions := id.GetTokenDelegatedPermissions()
+	serviceIsAllowedAction := hasPermissionInToken(permissions, req.Group, req.Resource, req.Verb)
 
-		span.SetAttributes(attribute.Int("delegated_permissions", len(permissions)))
-		span.SetAttributes(attribute.Bool("service_allowed", serviceIsAllowedAction))
+	span.SetAttributes(attribute.Int("delegated_permissions", len(permissions)))
+	span.SetAttributes(attribute.Bool("service_allowed", serviceIsAllowedAction))
 
-		if !serviceIsAllowedAction {
-			return checkResponseDenied, nil
-		}
+	if !serviceIsAllowedAction {
+		return checkResponseDenied, nil
 	}
 
 	res, err := c.check(ctx, id, &req)
@@ -345,12 +265,12 @@ func (c *ClientImpl) Compile(ctx context.Context, id types.AuthInfo, list types.
 		return nil, err
 	}
 
-	if err := c.validateCaller(id); err != nil {
-		span.RecordError(err)
-		return nil, err
+	if id.GetSubject() == "" {
+		span.RecordError(ErrMissingCaller)
+		return nil, ErrMissingCaller
 	}
 
-	if !c.validateCallerNamespace(id, list.Namespace) {
+	if !types.NamespaceMatches(id.GetNamespace(), list.Namespace) {
 		return denyAllChecker, nil
 	}
 
@@ -364,11 +284,6 @@ func (c *ClientImpl) Compile(ctx context.Context, id types.AuthInfo, list types.
 
 	// No user => check on the service permissions
 	if isService {
-		// access token check is disabled => we can skip the authz service
-		if !c.authCfg.accessTokenAuthEnabled {
-			return allowAllChecker(list.Namespace, true), nil
-		}
-
 		if hasPermissionInToken(id.GetTokenPermissions(), list.Group, list.Resource, list.Verb) {
 			return allowAllChecker(list.Namespace, true), nil
 		}
@@ -376,10 +291,8 @@ func (c *ClientImpl) Compile(ctx context.Context, id types.AuthInfo, list types.
 	}
 
 	// Only check the service permissions if the access token check is enabled
-	if c.authCfg.accessTokenAuthEnabled {
-		if !hasPermissionInToken(id.GetTokenDelegatedPermissions(), list.Group, list.Resource, list.Verb) {
-			return denyAllChecker, nil
-		}
+	if !hasPermissionInToken(id.GetTokenDelegatedPermissions(), list.Group, list.Resource, list.Verb) {
+		return denyAllChecker, nil
 	}
 
 	checker, err := c.compile(ctx, id, &list)
@@ -435,25 +348,6 @@ func validateListRequest(req types.ListRequest) error {
 	}
 
 	return nil
-}
-
-func (c *ClientImpl) validateCaller(caller types.AuthInfo) error {
-	if !c.authCfg.accessTokenAuthEnabled && types.IsIdentityType(caller.GetIdentityType(), types.TypeAccessPolicy) {
-		return nil
-	}
-
-	if caller.GetSubject() == "" {
-		return ErrMissingCaller
-	}
-	return nil
-}
-
-func (c *ClientImpl) validateCallerNamespace(caller types.AuthInfo, expectedNamespace string) bool {
-	if !c.authCfg.accessTokenAuthEnabled && types.IsIdentityType(caller.GetIdentityType(), types.TypeAccessPolicy) {
-		return true
-	}
-
-	return types.NamespaceMatches(caller.GetNamespace(), expectedNamespace)
 }
 
 // newOutgoingContext creates a new context that will be canceled when the input context is canceled.
