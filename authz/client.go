@@ -64,7 +64,7 @@ func WithTracerClientOption(tracer trace.Tracer) AuthzClientOption {
 // Initialization
 // -----
 
-func NewClient(cc grpc.ClientConnInterface, opts ...AuthzClientOption) (*ClientImpl, error) {
+func NewClient(cc grpc.ClientConnInterface, opts ...AuthzClientOption) *ClientImpl {
 	client := &ClientImpl{
 		clientV1: authzv1.NewAuthzServiceClient(cc),
 		tracer:   noop.Tracer{},
@@ -83,7 +83,7 @@ func NewClient(cc grpc.ClientConnInterface, opts ...AuthzClientOption) (*ClientI
 		})
 	}
 
-	return client, nil
+	return client
 }
 
 // -----
