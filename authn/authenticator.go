@@ -60,7 +60,7 @@ type GRPCTokenProvider struct {
 }
 
 func (p GRPCTokenProvider) AccessToken(_ context.Context) (string, bool) {
-	const key = DefaultAccessTokenMetadataKey
+	const key = "X-Access-Token"
 	values := p.md.Get(key)
 	if len(values) == 0 {
 		return "", false
@@ -72,7 +72,7 @@ func (p GRPCTokenProvider) AccessToken(_ context.Context) (string, bool) {
 
 func (p GRPCTokenProvider) IDToken(_ context.Context) (string, bool) {
 	// FIXME: we should use the same key as we do over http.
-	const key = DefaultIdTokenMetadataKey
+	const key = "X-Id-Token"
 	values := p.md.Get(key)
 	if len(values) == 0 {
 		return "", false
