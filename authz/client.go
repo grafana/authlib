@@ -32,6 +32,8 @@ var (
 
 	checkResponseDenied  = types.CheckResponse{Allowed: false}
 	checkResponseAllowed = types.CheckResponse{Allowed: true}
+
+	k6FolderUID = "k6-app"
 )
 
 type ClientConfig struct {
@@ -166,7 +168,7 @@ func (c *ClientImpl) check(ctx context.Context, id types.AuthInfo, req *types.Ch
 	defer span.End()
 
 	idIsServiceAccount := types.IsIdentityType(id.GetIdentityType(), types.TypeServiceAccount)
-	if !idIsServiceAccount && (req.Name == "k6-app" || req.Folder == "k6-app") {
+	if !idIsServiceAccount && (req.Name == k6FolderUID || req.Folder == k6FolderUID) {
 		return false, nil
 	}
 
@@ -558,7 +560,7 @@ var denyAllChecker = func(namespace string, name, folder string) bool { return f
 
 func allowAllChecker(expectedNamespace string, isServiceAccount bool) types.ItemChecker {
 	return func(namespace string, name, folder string) bool {
-		if !isServiceAccount && (name == "k6-app" || folder == "k6-app") {
+		if !isServiceAccount && (name == k6FolderUID || folder == k6FolderUID) {
 			return false
 		}
 		return types.NamespaceMatches(namespace, expectedNamespace)
@@ -608,7 +610,7 @@ func (c *itemChecker) fn(expectedNamespace string, id types.AuthInfo) types.Item
 		if !types.NamespaceMatches(namespace, expectedNamespace) {
 			return false
 		}
-		if !idIsSvcAccount && (name == "k6-app" || folder == "k6-app") {
+		if !idIsSvcAccount && (name == k6FolderUID || folder == k6FolderUID) {
 			return false
 		}
 		return c.Items[name] || c.Folders[folder]

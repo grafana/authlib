@@ -722,9 +722,9 @@ func TestClient_Compile(t *testing.T) {
 			},
 			listRes: &authzv1.ListResponse{Items: []string{"app-k6", "app-k6-child", "another-folder"}},
 			wantRes: map[check]bool{
-				{"stacks-12", "k6-app", ""}:             false,
-				{"stacks-12", "k6-app-child", "k6-app"}: false,
-				{"stacks-12", "another-folder", ""}:     true,
+				{"stacks-12", k6FolderUID, ""}:             false,
+				{"stacks-12", "k6-app-child", k6FolderUID}: false,
+				{"stacks-12", "another-folder", ""}:        true,
 			},
 		},
 		{
@@ -747,9 +747,9 @@ func TestClient_Compile(t *testing.T) {
 			},
 			listRes: &authzv1.ListResponse{Items: []string{"app-k6", "app-k6-child", "another-folder"}},
 			wantRes: map[check]bool{
-				{"stacks-12", "k6-app", ""}:             false,
-				{"stacks-12", "k6-app-child", "k6-app"}: false,
-				{"stacks-12", "another-folder", ""}:     true,
+				{"stacks-12", k6FolderUID, ""}:             false,
+				{"stacks-12", "k6-app-child", k6FolderUID}: false,
+				{"stacks-12", "another-folder", ""}:        true,
 			},
 		},
 	}
