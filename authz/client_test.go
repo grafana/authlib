@@ -670,7 +670,6 @@ func TestClient_Compile(t *testing.T) {
 func setupAccessClient() (*ClientImpl, *FakeAuthzServiceClient) {
 	fakeClient := &FakeAuthzServiceClient{}
 	return &ClientImpl{
-		authCfg:  &ClientConfig{},
 		clientV1: fakeClient,
 		cache:    cache.NewLocalCache(cache.Config{}),
 		tracer:   noop.NewTracerProvider().Tracer("noopTracer"),

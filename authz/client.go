@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
@@ -21,22 +20,15 @@ import (
 )
 
 var (
-	ErrMissingConfig           = errors.New("missing config")
 	ErrMissingRequestNamespace = errors.New("missing request namespace")
 	ErrInvalidRequestNamespace = errors.New("invalid request namespace")
 	ErrMissingRequestGroup     = errors.New("missing request group")
 	ErrMissingRequestResource  = errors.New("missing request resource")
 	ErrMissingRequestVerb      = errors.New("missing request verb")
 	ErrMissingCaller           = errors.New("missing caller")
-	ErrMissingSubject          = errors.New("missing subject")
 
-	checkResponseDenied  = types.CheckResponse{Allowed: false}
+	checkResponseDenied = types.CheckResponse{Allowed: false}
 )
-
-type ClientConfig struct {
-	// RemoteAddress is the address of the authz service. It should be in the format "host:port".
-	RemoteAddress string
-}
 
 // ClientImpl will implement the types.AccessClient interface
 // Once we are able to deal with folder permissions expansion.
@@ -45,21 +37,9 @@ var _ types.AccessClient = (*ClientImpl)(nil)
 type AuthzClientOption func(*ClientImpl)
 
 type ClientImpl struct {
-	authCfg     *ClientConfig
-	clientV1    authzv1.AuthzServiceClient
-	cache       cache.Cache
-	grpcConn    grpc.ClientConnInterface
-	grpcOptions []grpc.DialOption
-	tracer      trace.Tracer
-}
-
-type tracerProvider struct {
-	trace.TracerProvider
-	tracer trace.Tracer
-}
-
-func (tp *tracerProvider) Tracer(name string, options ...trace.TracerOption) trace.Tracer {
-	return tp.tracer
+	clientV1 authzv1.AuthzServiceClient
+	cache    cache.Cache
+	tracer   trace.Tracer
 }
 
 // -----
@@ -69,22 +49,6 @@ func (tp *tracerProvider) Tracer(name string, options ...trace.TracerOption) tra
 func WithCacheClientOption(cache cache.Cache) AuthzClientOption {
 	return func(c *ClientImpl) {
 		c.cache = cache
-	}
-}
-
-// WithGrpcDialOptionsClientOption sets the gRPC dial options for client connection setup.
-// Useful for adding client interceptors. These options are ignored if WithGrpcConnection is used.
-func WithGrpcDialOptionsClientOption(opts ...grpc.DialOption) AuthzClientOption {
-	return func(c *ClientImpl) {
-		c.grpcOptions = opts
-	}
-}
-
-// WithGrpcConnectionClientOption sets the gRPC client connection directly.
-// Useful for running the client in the same process as the authorization service.
-func WithGrpcConnectionClientOption(conn grpc.ClientConnInterface) AuthzClientOption {
-	return func(c *ClientImpl) {
-		c.grpcConn = conn
 	}
 }
 
@@ -98,12 +62,11 @@ func WithTracerClientOption(tracer trace.Tracer) AuthzClientOption {
 // Initialization
 // -----
 
-func NewClient(cfg *ClientConfig, opts ...AuthzClientOption) (*ClientImpl, error) {
-	if cfg == nil {
-		return nil, ErrMissingConfig
+func NewClient(cc grpc.ClientConnInterface, opts ...AuthzClientOption) (*ClientImpl, error) {
+	client := &ClientImpl{
+		clientV1: authzv1.NewAuthzServiceClient(cc),
+		tracer:   noop.Tracer{},
 	}
-
-	client := &ClientImpl{authCfg: cfg}
 
 	// Apply options
 	for _, opt := range opts {
@@ -117,28 +80,6 @@ func NewClient(cfg *ClientConfig, opts ...AuthzClientOption) (*ClientImpl, error
 			CleanupInterval: 10 * time.Minute,
 		})
 	}
-
-	if client.tracer == nil {
-		client.tracer = noop.Tracer{}
-	}
-
-	// Instantiate the client
-	if client.grpcConn == nil {
-		if cfg.RemoteAddress == "" {
-			return nil, fmt.Errorf("missing remote address: %w", ErrMissingConfig)
-		}
-
-		tp := tracerProvider{tracer: client.tracer}
-		grpcOpts := client.grpcOptions
-		grpcOpts = append(grpcOpts, grpc.WithStatsHandler(otelgrpc.NewClientHandler(otelgrpc.WithTracerProvider(&tp))))
-
-		conn, err := grpc.NewClient(cfg.RemoteAddress, grpcOpts...)
-		if err != nil {
-			return nil, err
-		}
-		client.grpcConn = conn
-	}
-	client.clientV1 = authzv1.NewAuthzServiceClient(client.grpcConn)
 
 	return client, nil
 }
