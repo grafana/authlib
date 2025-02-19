@@ -12,8 +12,6 @@ var (
 	ErrMissingRequestResource  = errors.New("missing request resource")
 	ErrMissingRequestVerb      = errors.New("missing request verb")
 	ErrMissingCaller           = errors.New("missing caller")
-
-	CheckResponseDenied = CheckResponse{Allowed: false}
 )
 
 // CheckRequest describes the requested access.
