@@ -36,11 +36,11 @@ func WithHTTPClient(client *http.Client) ExchangeClientOpts {
 
 func NewTokenExchangeClient(cfg TokenExchangeConfig, opts ...ExchangeClientOpts) (*TokenExchangeClient, error) {
 	if cfg.Token == "" {
-		return nil, fmt.Errorf("missing required token")
+		return nil, fmt.Errorf("%w: missing required token", ErrMissingConfig)
 	}
 
 	if cfg.TokenExchangeURL == "" {
-		return nil, fmt.Errorf("missing required token exchange url")
+		return nil, fmt.Errorf("%w: missing required token exchange url", ErrMissingConfig)
 	}
 
 	c := &TokenExchangeClient{
