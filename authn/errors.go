@@ -23,6 +23,6 @@ var (
 	ErrInvalidExchangeResponse = errors.New("invalid exchange response")
 )
 
-func IsUnauthorizedErr(err error) bool {
+func IsUnauthenticatedErr(err error) bool {
 	return errors.Is(err, errInvalidToken)
 }
