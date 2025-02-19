@@ -12,10 +12,6 @@ import (
 	"github.com/grafana/authlib/types"
 )
 
-var (
-	ErrMissingRequiredToken = errors.New("missing required token")
-)
-
 // TokenProvider is used to extract tokens.
 type TokenProvider interface {
 	AccessToken(ctx context.Context) (string, bool)
