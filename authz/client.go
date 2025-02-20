@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/gob"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -20,14 +19,7 @@ import (
 )
 
 var (
-	ErrMissingRequestNamespace = errors.New("missing request namespace")
-	ErrInvalidRequestNamespace = errors.New("invalid request namespace")
-	ErrMissingRequestGroup     = errors.New("missing request group")
-	ErrMissingRequestResource  = errors.New("missing request resource")
-	ErrMissingRequestVerb      = errors.New("missing request verb")
-	ErrMissingCaller           = errors.New("missing caller")
-
-	checkResponseDenied  = types.CheckResponse{Allowed: false}
+	checkResponseDenied = types.CheckResponse{Allowed: false}
 
 	k6FolderUID = "k6-app"
 )
@@ -162,14 +154,14 @@ func (c *ClientImpl) Check(ctx context.Context, id types.AuthInfo, req types.Che
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.Check")
 	defer span.End()
 
-	if err := validateCheckRequest(req); err != nil {
+	if err := types.ValidateCheckRequest(req); err != nil {
 		span.RecordError(err)
 		return checkResponseDenied, err
 	}
 
 	if id.GetSubject() == "" {
-		span.RecordError(ErrMissingCaller)
-		return checkResponseDenied, ErrMissingCaller
+		span.RecordError(types.ErrMissingCaller)
+		return checkResponseDenied, types.ErrMissingCaller
 	}
 
 	if !types.NamespaceMatches(id.GetNamespace(), req.Namespace) {
@@ -260,14 +252,14 @@ func (c *ClientImpl) Compile(ctx context.Context, id types.AuthInfo, list types.
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.List")
 	defer span.End()
 
-	if err := validateListRequest(list); err != nil {
+	if err := types.ValidateListRequest(list); err != nil {
 		span.RecordError(err)
 		return nil, err
 	}
 
 	if id.GetSubject() == "" {
-		span.RecordError(ErrMissingCaller)
-		return nil, ErrMissingCaller
+		span.RecordError(types.ErrMissingCaller)
+		return nil, types.ErrMissingCaller
 	}
 
 	if !types.NamespaceMatches(id.GetNamespace(), list.Namespace) {
@@ -302,52 +294,6 @@ func (c *ClientImpl) Compile(ctx context.Context, id types.AuthInfo, list types.
 	}
 
 	return checker.fn(list.Namespace, id), nil
-}
-
-// Validate input
-
-func validateCheckRequest(req types.CheckRequest) error {
-	if req.Namespace == "" {
-		return ErrMissingRequestNamespace
-	}
-
-	if _, err := types.ParseNamespace(req.Namespace); err != nil {
-		return ErrInvalidRequestNamespace
-	}
-
-	if req.Resource == "" {
-		return ErrMissingRequestResource
-	}
-	if req.Group == "" {
-		return ErrMissingRequestGroup
-	}
-	if req.Verb == "" {
-		return ErrMissingRequestVerb
-	}
-
-	return nil
-}
-
-func validateListRequest(req types.ListRequest) error {
-	if req.Namespace == "" {
-		return ErrMissingRequestNamespace
-	}
-
-	if _, err := types.ParseNamespace(req.Namespace); err != nil {
-		return ErrInvalidRequestNamespace
-	}
-
-	if req.Resource == "" {
-		return ErrMissingRequestResource
-	}
-	if req.Group == "" {
-		return ErrMissingRequestGroup
-	}
-	if req.Verb == "" {
-		return ErrMissingRequestVerb
-	}
-
-	return nil
 }
 
 // newOutgoingContext creates a new context that will be canceled when the input context is canceled.

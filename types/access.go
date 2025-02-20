@@ -1,6 +1,18 @@
 package types
 
-import "context"
+import (
+	"context"
+	"errors"
+)
+
+var (
+	ErrMissingRequestNamespace = errors.New("missing request namespace")
+	ErrInvalidRequestNamespace = errors.New("invalid request namespace")
+	ErrMissingRequestGroup     = errors.New("missing request group")
+	ErrMissingRequestResource  = errors.New("missing request resource")
+	ErrMissingRequestVerb      = errors.New("missing request verb")
+	ErrMissingCaller           = errors.New("missing caller")
+)
 
 // CheckRequest describes the requested access.
 // This is designed bo to play nicely with the kubernetes authorization system:
@@ -89,12 +101,64 @@ type fixedClient struct {
 
 // Check implements AccessClient.
 func (n *fixedClient) Check(ctx context.Context, id AuthInfo, req CheckRequest) (CheckResponse, error) {
+	if err := ValidateCheckRequest(req); err != nil {
+		return CheckResponse{Allowed: false}, err
+	}
 	return CheckResponse{Allowed: n.allowed}, nil
 }
 
 // Compile implements AccessClient.
 func (n *fixedClient) Compile(ctx context.Context, id AuthInfo, req ListRequest) (ItemChecker, error) {
+	if err := ValidateListRequest(req); err != nil {
+		return nil, err
+	}
 	return func(namespace string, name, folder string) bool {
 		return n.allowed
 	}, nil
+}
+
+// Validate input
+
+func ValidateCheckRequest(req CheckRequest) error {
+	if req.Namespace == "" {
+		return ErrMissingRequestNamespace
+	}
+
+	if _, err := ParseNamespace(req.Namespace); err != nil {
+		return ErrInvalidRequestNamespace
+	}
+
+	if req.Resource == "" {
+		return ErrMissingRequestResource
+	}
+	if req.Group == "" {
+		return ErrMissingRequestGroup
+	}
+	if req.Verb == "" {
+		return ErrMissingRequestVerb
+	}
+
+	return nil
+}
+
+func ValidateListRequest(req ListRequest) error {
+	if req.Namespace == "" {
+		return ErrMissingRequestNamespace
+	}
+
+	if _, err := ParseNamespace(req.Namespace); err != nil {
+		return ErrInvalidRequestNamespace
+	}
+
+	if req.Resource == "" {
+		return ErrMissingRequestResource
+	}
+	if req.Group == "" {
+		return ErrMissingRequestGroup
+	}
+	if req.Verb == "" {
+		return ErrMissingRequestVerb
+	}
+
+	return nil
 }
