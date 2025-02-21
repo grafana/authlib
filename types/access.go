@@ -73,10 +73,8 @@ type ListRequest struct {
 	Subresource string
 }
 
-// TODO: Should the namespace be specified in the request instead.
-// I don't think we'll be able to Compile over multiple namespaces.
 // Checks access while iterating within a resource
-type ItemChecker func(namespace string, name, folder string) bool
+type ItemChecker func(name, folder string) bool
 
 type AccessLister interface {
 	// Compile generates a function to check whether the id has access to items matching a request
@@ -112,7 +110,7 @@ func (n *fixedClient) Compile(ctx context.Context, id AuthInfo, req ListRequest)
 	if err := ValidateListRequest(req); err != nil {
 		return nil, err
 	}
-	return func(namespace string, name, folder string) bool {
+	return func(name, folder string) bool {
 		return n.allowed
 	}, nil
 }

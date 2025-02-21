@@ -464,7 +464,7 @@ func TestClient_Compile_Cache(t *testing.T) {
 	check, err = client.Compile(context.Background(), caller, req)
 	require.NoError(t, err)
 	require.NotNil(t, check)
-	require.True(t, check("stacks-12", "dash1", "fold1"))
+	require.True(t, check("dash1", "fold1"))
 }
 
 func TestClient_Compile(t *testing.T) {
@@ -573,7 +573,6 @@ func TestClient_Compile(t *testing.T) {
 			wantRes: map[check]bool{
 				{"stacks-12", "dash1", "fold1"}: true,
 				{"stacks-12", "dash2", "fold2"}: true,
-				{"stacks-13", "dash2", "fold2"}: false,
 			},
 		},
 		{
@@ -640,7 +639,6 @@ func TestClient_Compile(t *testing.T) {
 			listRes: &authzv1.ListResponse{Items: []string{"dash1"}, Folders: []string{"fold2"}},
 			wantRes: map[check]bool{
 				{"stacks-12", "dash1", "fold1"}: true,
-				{"stacks-13", "dash1", "fold1"}: false,
 				{"stacks-12", "dash2", "fold2"}: true,
 				{"stacks-12", "dash2", "fold3"}: false,
 			},
@@ -710,7 +708,7 @@ func TestClient_Compile(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, gotFunc)
 			for check, want := range tt.wantRes {
-				got := gotFunc(check.namespace, check.item, check.folder)
+				got := gotFunc(check.item, check.folder)
 				require.Equal(t, want, got)
 			}
 		})
