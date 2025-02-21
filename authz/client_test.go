@@ -686,10 +686,53 @@ func TestClient_Compile(t *testing.T) {
 			},
 			listRes: &authzv1.ListResponse{Items: []string{"app-k6", "app-k6-child", "another-folder"}},
 			wantRes: map[check]bool{
-				{"stacks-12", k6FolderUID, ""}:             false,
-				{"stacks-12", "k6-app-child", k6FolderUID}: false,
-				{"stacks-12", "another-folder", ""}:        true,
+				{"stacks-12", k6FolderUID, ""}:                               false,
+				{"stacks-12", "k6-appauthn/auth_info.go-child", k6FolderUID}: false,
+				{"stacks-12", "another-folder", ""}:                          true,
 			},
+		},
+		{
+			name: "Access policy with wildcard namespace can list in all namespaces",
+			caller: authn.NewAccessTokenAuthInfo(
+				authn.Claims[authn.AccessTokenClaims]{
+					Claims: jwt.Claims{Subject: "service"},
+					Rest: authn.AccessTokenClaims{
+						Namespace: "*", Permissions: []string{"folders.grafana.app/folders:get"}},
+				},
+			),
+			listReq: types.ListRequest{
+				Group:    "folders.grafana.app",
+				Resource: "folders",
+				Verb:     "get",
+			},
+			listRes: &authzv1.ListResponse{Items: []string{"app-k6", "app-k6-child", "another-folder"}},
+			wantRes: map[check]bool{
+				{"stacks-1", "stack-1", "folder-1"}: true,
+				{"stacks-2", "stack2", "folder-2"}:  true,
+			},
+		},
+		{
+			name: "User cannot list accross namespaces",
+			caller: authn.NewIDTokenAuthInfo(
+				authn.Claims[authn.AccessTokenClaims]{
+					Claims: jwt.Claims{Subject: "service"},
+					Rest: authn.AccessTokenClaims{
+						Namespace: "*", Permissions: []string{"folders.grafana.app/folders:get"}},
+				},
+				&authn.Claims[authn.IDTokenClaims]{
+					Claims: jwt.Claims{},
+					Rest: authn.IDTokenClaims{
+						Type:      types.TypeUser,
+						Namespace: "stacks-1",
+					},
+				},
+			),
+			listReq: types.ListRequest{
+				Group:    "folders.grafana.app",
+				Resource: "folders",
+				Verb:     "get",
+			},
+			wantErr: true,
 		},
 	}
 
