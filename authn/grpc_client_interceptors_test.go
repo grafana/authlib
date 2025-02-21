@@ -9,39 +9,22 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-type FakeTokenExchanger struct {
-	token string
-}
-
-func (f *FakeTokenExchanger) Exchange(ctx context.Context, req TokenExchangeRequest) (*TokenExchangeResponse, error) {
-	return &TokenExchangeResponse{Token: f.token}, nil
-}
-
-func setupGrpcClientInterceptor(t *testing.T) (*GrpcClientInterceptor, *FakeTokenExchanger) {
-	tokenClient := &FakeTokenExchanger{token: "some-token"}
-
-	client, err := NewGrpcClientInterceptor(
-		&GrpcClientConfig{TokenRequest: &TokenExchangeRequest{Namespace: "some-namespace", Audiences: []string{"some-service"}}},
-		WithTokenClientOption(tokenClient),
-	)
-	require.NoError(t, err)
-
-	return client, tokenClient
-}
-
 func TestGrpcClientInterceptor_wrapContext(t *testing.T) {
-	gci, _ := setupGrpcClientInterceptor(t)
-
 	type idKey struct{}
 
-	// Decorate client with IDTokenExtractorOption
-	WithIDTokenExtractorOption(func(ctx context.Context) (string, error) {
-		idToken, ok := ctx.Value(idKey{}).(string)
-		if !ok {
-			return "", errors.New("id_token not found in context")
-		}
-		return idToken, nil
-	})(gci)
+	interceptor := NewGrpcClientInterceptor(
+		NewStaticTokenExchanger("some-token"),
+		WithClientInterceptorNamespace("some-namespace"),
+		WithClientInterceptorAudience([]string{"some-service"}),
+		WithClientInterceptorIDTokenExtractor(func(ctx context.Context) (string, error) {
+			idToken, ok := ctx.Value(idKey{}).(string)
+			if !ok {
+				return "", errors.New("id_token not found in context")
+			}
+			return idToken, nil
+
+		}),
+	)
 
 	// Setup existing outgoing headers
 	ctx := metadata.AppendToOutgoingContext(context.Background(),
@@ -50,21 +33,21 @@ func TestGrpcClientInterceptor_wrapContext(t *testing.T) {
 		"x-header-ab", "bbb",
 	)
 
-	// Add id_token to context
+	// Add ID token to context
 	ctx = context.WithValue(ctx, idKey{}, "some-id-token")
 
-	ctx, err := gci.wrapContext(ctx)
+	ctx, err := interceptor.wrapContext(ctx)
 	require.NoError(t, err)
 
 	md, ok := metadata.FromOutgoingContext(ctx)
 	require.True(t, ok)
 	require.Len(t, md, 4)
-	mdAtKey := md.Get(DefaultAccessTokenMetadataKey)
+	mdAtKey := md.Get(metadataKeyAccessToken)
 	require.Len(t, mdAtKey, 1)
 	token := mdAtKey[0]
 	require.Equal(t, token, "some-token")
 
-	mdIdKey := md.Get(DefaultIdTokenMetadataKey)
+	mdIdKey := md.Get(metadataKeyIDTokenMetadata)
 	require.Len(t, mdIdKey, 1)
 	idToken := mdIdKey[0]
 	require.Equal(t, idToken, "some-id-token")
@@ -72,34 +55,4 @@ func TestGrpcClientInterceptor_wrapContext(t *testing.T) {
 	// The existing headers
 	require.Equal(t, []string{"one"}, md.Get("x-header-one"))
 	require.Equal(t, []string{"aaa", "bbb"}, md.Get("x-header-ab"))
-}
-
-func TestGrpcClientInterceptor_wrapContextNoAccessToken(t *testing.T) {
-	gci, err := NewGrpcClientInterceptor(&GrpcClientConfig{}, WithDisableAccessTokenOption())
-	require.NoError(t, err)
-
-	type idKey struct{}
-
-	// Decorate client with IDTokenExtractorOption
-	WithIDTokenExtractorOption(func(ctx context.Context) (string, error) {
-		idToken, ok := ctx.Value(idKey{}).(string)
-		if !ok {
-			return "", errors.New("id_token not found in context")
-		}
-		return idToken, nil
-	})(gci)
-
-	// Add id_token to context
-	ctx := context.WithValue(context.Background(), idKey{}, "some-id-token")
-
-	ctx, err = gci.wrapContext(ctx)
-	require.NoError(t, err)
-
-	md, ok := metadata.FromOutgoingContext(ctx)
-	require.True(t, ok)
-	require.Len(t, md, 1)
-	mdIdKey := md.Get(DefaultIdTokenMetadataKey)
-	require.Len(t, mdIdKey, 1)
-	idToken := mdIdKey[0]
-	require.Equal(t, idToken, "some-id-token")
 }

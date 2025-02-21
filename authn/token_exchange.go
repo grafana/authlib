@@ -199,3 +199,18 @@ func (c *TokenExchangeClient) setCache(ctx context.Context, token string, key st
 
 	return c.cache.Set(ctx, key, []byte(token), time.Until(claims.Expiry.Time())-cacheLeeway)
 }
+
+var _ TokenExchanger = StaticTokenExchanger{}
+
+// NewStaticTokenExchanger Constructs a TokenExchanger that always returned provided token
+func NewStaticTokenExchanger(token string) StaticTokenExchanger {
+	return StaticTokenExchanger{token}
+}
+
+type StaticTokenExchanger struct {
+	token string
+}
+
+func (s StaticTokenExchanger) Exchange(ctx context.Context, r TokenExchangeRequest) (*TokenExchangeResponse, error) {
+	return &TokenExchangeResponse{Token: s.token}, nil
+}
