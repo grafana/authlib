@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -23,6 +24,8 @@ var (
 
 	k6FolderUID = "k6-app"
 )
+
+var ErrMissingAuthInfo = errors.New("missing auth info")
 
 // ClientImpl will implement the types.AccessClient interface
 // Once we are able to deal with folder permissions expansion.
@@ -154,18 +157,14 @@ func (c *ClientImpl) Check(ctx context.Context, id types.AuthInfo, req types.Che
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.Check")
 	defer span.End()
 
-	if err := types.ValidateCheckRequest(req); err != nil {
+	if err := types.ValidateCheckRequest(req, id); err != nil {
 		span.RecordError(err)
 		return checkResponseDenied, err
 	}
 
 	if id.GetSubject() == "" {
-		span.RecordError(types.ErrMissingCaller)
-		return checkResponseDenied, types.ErrMissingCaller
-	}
-
-	if !types.NamespaceMatches(id.GetNamespace(), req.Namespace) {
-		return checkResponseDenied, nil
+		span.RecordError(ErrMissingAuthInfo)
+		return checkResponseDenied, ErrMissingAuthInfo
 	}
 
 	span.SetAttributes(attribute.String("namespace", req.Namespace))
@@ -252,18 +251,14 @@ func (c *ClientImpl) Compile(ctx context.Context, id types.AuthInfo, list types.
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.List")
 	defer span.End()
 
-	if err := types.ValidateListRequest(list); err != nil {
+	if err := types.ValidateListRequest(list, id); err != nil {
 		span.RecordError(err)
 		return nil, err
 	}
 
 	if id.GetSubject() == "" {
-		span.RecordError(types.ErrMissingCaller)
-		return nil, types.ErrMissingCaller
-	}
-
-	if !types.NamespaceMatches(id.GetNamespace(), list.Namespace) {
-		return denyAllChecker, nil
+		span.RecordError(ErrMissingAuthInfo)
+		return nil, ErrMissingAuthInfo
 	}
 
 	span.SetAttributes(attribute.String("namespace", list.Namespace))
@@ -277,7 +272,7 @@ func (c *ClientImpl) Compile(ctx context.Context, id types.AuthInfo, list types.
 	// No user => check on the service permissions
 	if isService {
 		if hasPermissionInToken(id.GetTokenPermissions(), list.Group, list.Resource, list.Verb) {
-			return allowAllChecker(list.Namespace, true), nil
+			return allowAllChecker(true), nil
 		}
 		return denyAllChecker, nil
 	}
@@ -293,7 +288,7 @@ func (c *ClientImpl) Compile(ctx context.Context, id types.AuthInfo, list types.
 		return denyAllChecker, err
 	}
 
-	return checker.fn(list.Namespace, id), nil
+	return checker.fn(id), nil
 }
 
 // newOutgoingContext creates a new context that will be canceled when the input context is canceled.
@@ -392,18 +387,15 @@ func (c *ClientImpl) getCachedItemChecker(ctx context.Context, key string) (*ite
 	return resp, nil
 }
 
-// -----
-// ItemChecker
-// -----
+var denyAllChecker = func(name, folder string) bool { return false }
 
-var denyAllChecker = func(namespace string, name, folder string) bool { return false }
-
-func allowAllChecker(expectedNamespace string, isServiceAccount bool) types.ItemChecker {
-	return func(namespace string, name, folder string) bool {
+func allowAllChecker(isServiceAccount bool) types.ItemChecker {
+	return func(name, folder string) bool {
 		if !isServiceAccount && (name == k6FolderUID || folder == k6FolderUID) {
 			return false
 		}
-		return types.NamespaceMatches(namespace, expectedNamespace)
+
+		return true
 	}
 }
 
@@ -436,20 +428,17 @@ func newItemChecker(resp *authzv1.ListResponse) *itemChecker {
 }
 
 // fn generates a ItemChecker function that can check user access to items.
-func (c *itemChecker) fn(expectedNamespace string, id types.AuthInfo) types.ItemChecker {
+func (c *itemChecker) fn(id types.AuthInfo) types.ItemChecker {
 	idIsSvcAccount := types.IsIdentityType(id.GetIdentityType(), types.TypeServiceAccount)
 	if c.All {
-		return allowAllChecker(expectedNamespace, idIsSvcAccount)
+		return allowAllChecker(idIsSvcAccount)
 	}
 
 	if len(c.Items) == 0 && len(c.Folders) == 0 {
 		return denyAllChecker
 	}
 
-	return func(namespace string, name, folder string) bool {
-		if !types.NamespaceMatches(namespace, expectedNamespace) {
-			return false
-		}
+	return func(name, folder string) bool {
 		if !idIsSvcAccount && (name == k6FolderUID || folder == k6FolderUID) {
 			return false
 		}
