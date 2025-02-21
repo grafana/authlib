@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/gob"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -23,6 +24,8 @@ var (
 
 	k6FolderUID = "k6-app"
 )
+
+var ErrMissingAuthInfo = errors.New("missing auth info")
 
 // ClientImpl will implement the types.AccessClient interface
 // Once we are able to deal with folder permissions expansion.
@@ -154,18 +157,14 @@ func (c *ClientImpl) Check(ctx context.Context, id types.AuthInfo, req types.Che
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.Check")
 	defer span.End()
 
-	if err := types.ValidateCheckRequest(req); err != nil {
+	if err := types.ValidateCheckRequest(req, id); err != nil {
 		span.RecordError(err)
 		return checkResponseDenied, err
 	}
 
 	if id.GetSubject() == "" {
-		span.RecordError(types.ErrMissingCaller)
-		return checkResponseDenied, types.ErrMissingCaller
-	}
-
-	if !types.NamespaceMatches(id.GetNamespace(), req.Namespace) {
-		return checkResponseDenied, nil
+		span.RecordError(ErrMissingAuthInfo)
+		return checkResponseDenied, ErrMissingAuthInfo
 	}
 
 	span.SetAttributes(attribute.String("namespace", req.Namespace))
@@ -252,18 +251,14 @@ func (c *ClientImpl) Compile(ctx context.Context, id types.AuthInfo, list types.
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.List")
 	defer span.End()
 
-	if err := types.ValidateListRequest(list); err != nil {
+	if err := types.ValidateListRequest(list, id); err != nil {
 		span.RecordError(err)
 		return nil, err
 	}
 
 	if id.GetSubject() == "" {
-		span.RecordError(types.ErrMissingCaller)
-		return nil, types.ErrMissingCaller
-	}
-
-	if !types.NamespaceMatches(id.GetNamespace(), list.Namespace) {
-		return denyAllChecker, nil
+		span.RecordError(ErrMissingAuthInfo)
+		return nil, ErrMissingAuthInfo
 	}
 
 	span.SetAttributes(attribute.String("namespace", list.Namespace))

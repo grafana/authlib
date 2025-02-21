@@ -3,15 +3,14 @@ package types
 import (
 	"context"
 	"errors"
+	"fmt"
 )
 
 var (
-	ErrMissingRequestNamespace = errors.New("missing request namespace")
-	ErrInvalidRequestNamespace = errors.New("invalid request namespace")
-	ErrMissingRequestGroup     = errors.New("missing request group")
-	ErrMissingRequestResource  = errors.New("missing request resource")
-	ErrMissingRequestVerb      = errors.New("missing request verb")
-	ErrMissingCaller           = errors.New("missing caller")
+	ErrNamespaceMissmatch     = errors.New("namespace missmatch")
+	ErrMissingRequestGroup    = errors.New("missing request group")
+	ErrMissingRequestResource = errors.New("missing request resource")
+	ErrMissingRequestVerb     = errors.New("missing request verb")
 )
 
 // CheckRequest describes the requested access.
@@ -53,7 +52,7 @@ type CheckResponse struct {
 
 type AccessChecker interface {
 	// Check checks whether the user can perform the given action for all requests
-	Check(ctx context.Context, id AuthInfo, req CheckRequest) (CheckResponse, error)
+	Check(ctx context.Context, info AuthInfo, req CheckRequest) (CheckResponse, error)
 }
 
 type ListRequest struct {
@@ -80,7 +79,7 @@ type AccessLister interface {
 	// Compile generates a function to check whether the id has access to items matching a request
 	// This is particularly useful when you want to verify access to a list of resources.
 	// Returns nil if there is no access to any matching items
-	Compile(ctx context.Context, id AuthInfo, req ListRequest) (ItemChecker, error)
+	Compile(ctx context.Context, info AuthInfo, req ListRequest) (ItemChecker, error)
 }
 
 type AccessClient interface {
@@ -97,17 +96,15 @@ type fixedClient struct {
 	allowed bool
 }
 
-// Check implements AccessClient.
-func (n *fixedClient) Check(ctx context.Context, id AuthInfo, req CheckRequest) (CheckResponse, error) {
-	if err := ValidateCheckRequest(req); err != nil {
+func (n *fixedClient) Check(ctx context.Context, info AuthInfo, req CheckRequest) (CheckResponse, error) {
+	if err := ValidateCheckRequest(req, info); err != nil {
 		return CheckResponse{Allowed: false}, err
 	}
 	return CheckResponse{Allowed: n.allowed}, nil
 }
 
-// Compile implements AccessClient.
-func (n *fixedClient) Compile(ctx context.Context, id AuthInfo, req ListRequest) (ItemChecker, error) {
-	if err := ValidateListRequest(req); err != nil {
+func (n *fixedClient) Compile(ctx context.Context, info AuthInfo, req ListRequest) (ItemChecker, error) {
+	if err := ValidateListRequest(req, info); err != nil {
 		return nil, err
 	}
 	return func(name, folder string) bool {
@@ -115,17 +112,7 @@ func (n *fixedClient) Compile(ctx context.Context, id AuthInfo, req ListRequest)
 	}, nil
 }
 
-// Validate input
-
-func ValidateCheckRequest(req CheckRequest) error {
-	if req.Namespace == "" {
-		return ErrMissingRequestNamespace
-	}
-
-	if _, err := ParseNamespace(req.Namespace); err != nil {
-		return ErrInvalidRequestNamespace
-	}
-
+func ValidateCheckRequest(req CheckRequest, info AuthInfo) error {
 	if req.Resource == "" {
 		return ErrMissingRequestResource
 	}
@@ -134,20 +121,16 @@ func ValidateCheckRequest(req CheckRequest) error {
 	}
 	if req.Verb == "" {
 		return ErrMissingRequestVerb
+	}
+
+	if !NamespaceMatches(info.GetNamespace(), req.Namespace) {
+		return namespaceMissmatchError(info.GetName(), req.Namespace)
 	}
 
 	return nil
 }
 
-func ValidateListRequest(req ListRequest) error {
-	if req.Namespace == "" {
-		return ErrMissingRequestNamespace
-	}
-
-	if _, err := ParseNamespace(req.Namespace); err != nil {
-		return ErrInvalidRequestNamespace
-	}
-
+func ValidateListRequest(req ListRequest, info AuthInfo) error {
 	if req.Resource == "" {
 		return ErrMissingRequestResource
 	}
@@ -158,5 +141,13 @@ func ValidateListRequest(req ListRequest) error {
 		return ErrMissingRequestVerb
 	}
 
+	if !NamespaceMatches(info.GetNamespace(), req.Namespace) {
+		return namespaceMissmatchError(info.GetName(), req.Namespace)
+	}
+
 	return nil
+}
+
+func namespaceMissmatchError(a, b string) error {
+	return fmt.Errorf("%w: got %s but expected %s", ErrNamespaceMissmatch, a, b)
 }

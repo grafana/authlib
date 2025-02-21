@@ -224,7 +224,8 @@ func TestClient_Check(t *testing.T) {
 				Resource:  "dashboards",
 				Verb:      "list",
 			},
-			want: false,
+			want:    false,
+			wantErr: true,
 		},
 		{
 			name: "On behalf of, service does not have the action",
@@ -484,10 +485,9 @@ func TestClient_Compile(t *testing.T) {
 		{
 			name: "Invalid types.ListRequest",
 			listReq: types.ListRequest{
-				Namespace: "",
-				Group:     "dashboards.grafana.app",
-				Resource:  "dashboards",
-				Verb:      "get",
+				Group:    "dashboards.grafana.app",
+				Resource: "dashboards",
+				Verb:     "",
 			},
 			wantErr: true,
 		},
@@ -514,9 +514,7 @@ func TestClient_Compile(t *testing.T) {
 				Resource:  "dashboards",
 				Verb:      "get",
 			},
-			wantRes: map[check]bool{
-				{"stacks-12", "dash1", "fold1"}: false,
-			},
+			wantErr: true,
 		},
 		{
 			name: "Service has the action",
