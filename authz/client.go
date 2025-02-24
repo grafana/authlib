@@ -160,7 +160,7 @@ func (c *ClientImpl) Check(ctx context.Context, id types.AuthInfo, req types.Che
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.Check")
 	defer span.End()
 
-	if err := types.ValidateCheckRequest(req, id); err != nil {
+	if err := types.ValidateCheckRequest(req); err != nil {
 		span.RecordError(err)
 		return checkResponseDenied, err
 	}
@@ -258,7 +258,7 @@ func (c *ClientImpl) Compile(ctx context.Context, id types.AuthInfo, list types.
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.List")
 	defer span.End()
 
-	if err := types.ValidateListRequest(list, id); err != nil {
+	if err := types.ValidateListRequest(list); err != nil {
 		span.RecordError(err)
 		return nil, err
 	}
