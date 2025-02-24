@@ -25,7 +25,10 @@ var (
 	k6FolderUID = "k6-app"
 )
 
-var ErrMissingAuthInfo = errors.New("missing auth info")
+var (
+	ErrMissingAuthInfo    = errors.New("missing auth info")
+	ErrNamespaceMissmatch = errors.New("namespace missmatch")
+)
 
 // ClientImpl will implement the types.AccessClient interface
 // Once we are able to deal with folder permissions expansion.
@@ -167,6 +170,10 @@ func (c *ClientImpl) Check(ctx context.Context, id types.AuthInfo, req types.Che
 		return checkResponseDenied, ErrMissingAuthInfo
 	}
 
+	if !types.NamespaceMatches(id.GetNamespace(), req.Namespace) {
+		return checkResponseDenied, namespaceMissmatchError(id.GetNamespace(), req.Namespace)
+	}
+
 	span.SetAttributes(attribute.String("namespace", req.Namespace))
 	span.SetAttributes(attribute.String("verb", req.Verb))
 	span.SetAttributes(attribute.String("group", req.Group))
@@ -259,6 +266,10 @@ func (c *ClientImpl) Compile(ctx context.Context, id types.AuthInfo, list types.
 	if id.GetSubject() == "" {
 		span.RecordError(ErrMissingAuthInfo)
 		return nil, ErrMissingAuthInfo
+	}
+
+	if !types.NamespaceMatches(id.GetNamespace(), list.Namespace) {
+		return nil, namespaceMissmatchError(id.GetNamespace(), list.Namespace)
 	}
 
 	span.SetAttributes(attribute.String("namespace", list.Namespace))
@@ -444,4 +455,8 @@ func (c *itemChecker) fn(id types.AuthInfo) types.ItemChecker {
 		}
 		return c.Items[name] || c.Folders[folder]
 	}
+}
+
+func namespaceMissmatchError(a, b string) error {
+	return fmt.Errorf("%w: got %s but expected %s", ErrNamespaceMissmatch, a, b)
 }

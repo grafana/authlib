@@ -96,15 +96,15 @@ type fixedClient struct {
 	allowed bool
 }
 
-func (n *fixedClient) Check(ctx context.Context, info AuthInfo, req CheckRequest) (CheckResponse, error) {
-	if err := ValidateCheckRequest(req, info); err != nil {
+func (n *fixedClient) Check(ctx context.Context, _ AuthInfo, req CheckRequest) (CheckResponse, error) {
+	if err := ValidateCheckRequest(req); err != nil {
 		return CheckResponse{Allowed: false}, err
 	}
 	return CheckResponse{Allowed: n.allowed}, nil
 }
 
-func (n *fixedClient) Compile(ctx context.Context, info AuthInfo, req ListRequest) (ItemChecker, error) {
-	if err := ValidateListRequest(req, info); err != nil {
+func (n *fixedClient) Compile(ctx context.Context, _ AuthInfo, req ListRequest) (ItemChecker, error) {
+	if err := ValidateListRequest(req); err != nil {
 		return nil, err
 	}
 	return func(name, folder string) bool {
@@ -112,7 +112,7 @@ func (n *fixedClient) Compile(ctx context.Context, info AuthInfo, req ListReques
 	}, nil
 }
 
-func ValidateCheckRequest(req CheckRequest, info AuthInfo) error {
+func ValidateCheckRequest(req CheckRequest) error {
 	if req.Resource == "" {
 		return ErrMissingRequestResource
 	}
@@ -121,16 +121,12 @@ func ValidateCheckRequest(req CheckRequest, info AuthInfo) error {
 	}
 	if req.Verb == "" {
 		return ErrMissingRequestVerb
-	}
-
-	if !NamespaceMatches(info.GetNamespace(), req.Namespace) {
-		return namespaceMissmatchError(info.GetName(), req.Namespace)
 	}
 
 	return nil
 }
 
-func ValidateListRequest(req ListRequest, info AuthInfo) error {
+func ValidateListRequest(req ListRequest) error {
 	if req.Resource == "" {
 		return ErrMissingRequestResource
 	}
@@ -139,10 +135,6 @@ func ValidateListRequest(req ListRequest, info AuthInfo) error {
 	}
 	if req.Verb == "" {
 		return ErrMissingRequestVerb
-	}
-
-	if !NamespaceMatches(info.GetNamespace(), req.Namespace) {
-		return namespaceMissmatchError(info.GetName(), req.Namespace)
 	}
 
 	return nil
