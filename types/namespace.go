@@ -28,14 +28,20 @@ func disambiguateNamespace(namespace string) string {
 	return strings.Replace(namespace, "stack-", "stacks-", 1)
 }
 
-func NamespaceMatches(a, b string) bool {
-	actual := disambiguateNamespace(a)
-	expected := disambiguateNamespace(b)
-	// actual should never be a "*" where ID token claims are concerned
-	if actual == "*" {
+// NamespaceMatches check if provided namespace matches the expected one.
+// This function always cosider the namespace to match if namespace is `*`.
+func NamespaceMatches(namespace, expected string) bool {
+	if namespace == "*" {
 		return true
 	}
-	return actual == expected
+
+	// We should only be able to work with cluster scoped resources or across several namespaces if
+	// caller has `*`
+	if expected == "" {
+		return false
+	}
+
+	return disambiguateNamespace(namespace) == disambiguateNamespace(expected)
 }
 
 type NamespaceInfo struct {
@@ -93,6 +99,5 @@ func ParseNamespace(ns string) (NamespaceInfo, error) {
 		return info, err
 	}
 
-	// NOTE: we can't return errors. This breaks things like cluster-scoped resources and discovery
 	return info, nil
 }

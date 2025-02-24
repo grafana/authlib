@@ -224,7 +224,8 @@ func TestClient_Check(t *testing.T) {
 				Resource:  "dashboards",
 				Verb:      "list",
 			},
-			want: false,
+			want:    false,
+			wantErr: true,
 		},
 		{
 			name: "On behalf of, service does not have the action",
@@ -464,7 +465,7 @@ func TestClient_Compile_Cache(t *testing.T) {
 	check, err = client.Compile(context.Background(), caller, req)
 	require.NoError(t, err)
 	require.NotNil(t, check)
-	require.True(t, check("stacks-12", "dash1", "fold1"))
+	require.True(t, check("dash1", "fold1"))
 }
 
 func TestClient_Compile(t *testing.T) {
@@ -484,10 +485,9 @@ func TestClient_Compile(t *testing.T) {
 		{
 			name: "Invalid types.ListRequest",
 			listReq: types.ListRequest{
-				Namespace: "",
-				Group:     "dashboards.grafana.app",
-				Resource:  "dashboards",
-				Verb:      "get",
+				Group:    "dashboards.grafana.app",
+				Resource: "dashboards",
+				Verb:     "",
 			},
 			wantErr: true,
 		},
@@ -514,9 +514,7 @@ func TestClient_Compile(t *testing.T) {
 				Resource:  "dashboards",
 				Verb:      "get",
 			},
-			wantRes: map[check]bool{
-				{"stacks-12", "dash1", "fold1"}: false,
-			},
+			wantErr: true,
 		},
 		{
 			name: "Service has the action",
@@ -573,7 +571,6 @@ func TestClient_Compile(t *testing.T) {
 			wantRes: map[check]bool{
 				{"stacks-12", "dash1", "fold1"}: true,
 				{"stacks-12", "dash2", "fold2"}: true,
-				{"stacks-13", "dash2", "fold2"}: false,
 			},
 		},
 		{
@@ -640,7 +637,6 @@ func TestClient_Compile(t *testing.T) {
 			listRes: &authzv1.ListResponse{Items: []string{"dash1"}, Folders: []string{"fold2"}},
 			wantRes: map[check]bool{
 				{"stacks-12", "dash1", "fold1"}: true,
-				{"stacks-13", "dash1", "fold1"}: false,
 				{"stacks-12", "dash2", "fold2"}: true,
 				{"stacks-12", "dash2", "fold3"}: false,
 			},
@@ -690,10 +686,53 @@ func TestClient_Compile(t *testing.T) {
 			},
 			listRes: &authzv1.ListResponse{Items: []string{"app-k6", "app-k6-child", "another-folder"}},
 			wantRes: map[check]bool{
-				{"stacks-12", k6FolderUID, ""}:             false,
-				{"stacks-12", "k6-app-child", k6FolderUID}: false,
-				{"stacks-12", "another-folder", ""}:        true,
+				{"stacks-12", k6FolderUID, ""}:                               false,
+				{"stacks-12", "k6-appauthn/auth_info.go-child", k6FolderUID}: false,
+				{"stacks-12", "another-folder", ""}:                          true,
 			},
+		},
+		{
+			name: "Access policy with wildcard namespace can list in all namespaces",
+			caller: authn.NewAccessTokenAuthInfo(
+				authn.Claims[authn.AccessTokenClaims]{
+					Claims: jwt.Claims{Subject: "service"},
+					Rest: authn.AccessTokenClaims{
+						Namespace: "*", Permissions: []string{"folders.grafana.app/folders:get"}},
+				},
+			),
+			listReq: types.ListRequest{
+				Group:    "folders.grafana.app",
+				Resource: "folders",
+				Verb:     "get",
+			},
+			listRes: &authzv1.ListResponse{Items: []string{"app-k6", "app-k6-child", "another-folder"}},
+			wantRes: map[check]bool{
+				{"stacks-1", "stack-1", "folder-1"}: true,
+				{"stacks-2", "stack2", "folder-2"}:  true,
+			},
+		},
+		{
+			name: "User cannot list accross namespaces",
+			caller: authn.NewIDTokenAuthInfo(
+				authn.Claims[authn.AccessTokenClaims]{
+					Claims: jwt.Claims{Subject: "service"},
+					Rest: authn.AccessTokenClaims{
+						Namespace: "*", Permissions: []string{"folders.grafana.app/folders:get"}},
+				},
+				&authn.Claims[authn.IDTokenClaims]{
+					Claims: jwt.Claims{},
+					Rest: authn.IDTokenClaims{
+						Type:      types.TypeUser,
+						Namespace: "stacks-1",
+					},
+				},
+			),
+			listReq: types.ListRequest{
+				Group:    "folders.grafana.app",
+				Resource: "folders",
+				Verb:     "get",
+			},
+			wantErr: true,
 		},
 	}
 
@@ -710,7 +749,7 @@ func TestClient_Compile(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, gotFunc)
 			for check, want := range tt.wantRes {
-				got := gotFunc(check.namespace, check.item, check.folder)
+				got := gotFunc(check.item, check.folder)
 				require.Equal(t, want, got)
 			}
 		})

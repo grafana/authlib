@@ -1,21 +1,79 @@
-package types_test
+package types
 
 import (
 	"testing"
 
-	"github.com/grafana/authlib/types"
+	"github.com/stretchr/testify/assert"
 )
+
+func TestNamespaceMatches(t *testing.T) {
+	tests := []struct {
+		desc              string
+		namespace         string
+		expectedNamespace string
+		expected          bool
+	}{
+		{
+			desc:              "equal namespace and expected",
+			namespace:         "stacks-1",
+			expectedNamespace: "stacks-1",
+			expected:          true,
+		},
+		{
+			desc:              "deprecated namespace format and correct expected",
+			namespace:         "stack-1",
+			expectedNamespace: "stacks-1",
+			expected:          true,
+		},
+		{
+			desc:              "correct namespace format and deprecated expected format",
+			namespace:         "stacks-1",
+			expectedNamespace: "stack-1",
+			expected:          true,
+		},
+		{
+			desc:              "wildcard namespace",
+			namespace:         "*",
+			expectedNamespace: "stack-1",
+			expected:          true,
+		},
+		{
+			desc:              "wildcard namespace and empty expected namespace",
+			namespace:         "*",
+			expectedNamespace: "",
+			expected:          true,
+		},
+		{
+			desc:              "namespace missmatch",
+			namespace:         "stacks-1",
+			expectedNamespace: "stacks-2",
+			expected:          false,
+		},
+		{
+			desc:              "empty namespace and expectedNamespace should not be considered a match",
+			namespace:         "",
+			expectedNamespace: "",
+			expected:          false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			assert.Equal(t, tt.expected, NamespaceMatches(tt.namespace, tt.expectedNamespace))
+		})
+	}
+}
 
 func TestParseNamespace(t *testing.T) {
 	tests := []struct {
 		name      string
 		namespace string
-		expected  types.NamespaceInfo
+		expected  NamespaceInfo
 		expectErr bool
 	}{
 		{
 			name: "empty namespace",
-			expected: types.NamespaceInfo{
+			expected: NamespaceInfo{
 				OrgID: -1,
 			},
 		},
@@ -23,7 +81,7 @@ func TestParseNamespace(t *testing.T) {
 			name:      "incorrect number of parts",
 			namespace: "org-123-a",
 			expectErr: true,
-			expected: types.NamespaceInfo{
+			expected: NamespaceInfo{
 				OrgID: -1,
 			},
 		},
@@ -31,14 +89,14 @@ func TestParseNamespace(t *testing.T) {
 			name:      "org id not a number",
 			namespace: "org-invalid",
 			expectErr: true,
-			expected: types.NamespaceInfo{
+			expected: NamespaceInfo{
 				OrgID: -1,
 			},
 		},
 		{
 			name:      "valid org id",
 			namespace: "org-123",
-			expected: types.NamespaceInfo{
+			expected: NamespaceInfo{
 				OrgID: 123,
 			},
 		},
@@ -46,7 +104,7 @@ func TestParseNamespace(t *testing.T) {
 			name:      "org should not be 1 in the namespace",
 			namespace: "org-1",
 			expectErr: true,
-			expected: types.NamespaceInfo{
+			expected: NamespaceInfo{
 				OrgID: -1,
 			},
 		},
@@ -54,7 +112,7 @@ func TestParseNamespace(t *testing.T) {
 			name:      "can not be negative",
 			namespace: "org--5",
 			expectErr: true,
-			expected: types.NamespaceInfo{
+			expected: NamespaceInfo{
 				OrgID: -1,
 			},
 		},
@@ -62,14 +120,14 @@ func TestParseNamespace(t *testing.T) {
 			name:      "can not be zero",
 			namespace: "org-0",
 			expectErr: true,
-			expected: types.NamespaceInfo{
+			expected: NamespaceInfo{
 				OrgID: -1,
 			},
 		},
 		{
 			name:      "default is org 1",
 			namespace: "default",
-			expected: types.NamespaceInfo{
+			expected: NamespaceInfo{
 				OrgID: 1,
 			},
 		},
@@ -77,7 +135,7 @@ func TestParseNamespace(t *testing.T) {
 			name:      "invalid stack id (must be an int)",
 			expectErr: true,
 			namespace: "stacks-abcdef",
-			expected: types.NamespaceInfo{
+			expected: NamespaceInfo{
 				OrgID: -1,
 			},
 		},
@@ -85,7 +143,7 @@ func TestParseNamespace(t *testing.T) {
 			name:      "invalid stack id in deprecated claim (must be an int)",
 			expectErr: true,
 			namespace: "stack-abcdef",
-			expected: types.NamespaceInfo{
+			expected: NamespaceInfo{
 				OrgID: -1,
 			},
 		},
@@ -93,7 +151,7 @@ func TestParseNamespace(t *testing.T) {
 			name:      "invalid stack id (must be provided)",
 			namespace: "stacks-",
 			expectErr: true,
-			expected: types.NamespaceInfo{
+			expected: NamespaceInfo{
 				OrgID: -1,
 			},
 		},
@@ -101,14 +159,14 @@ func TestParseNamespace(t *testing.T) {
 			name:      "invalid stack id (cannot be 0)",
 			namespace: "stacks-0",
 			expectErr: true,
-			expected: types.NamespaceInfo{
+			expected: NamespaceInfo{
 				OrgID: -1,
 			},
 		},
 		{
 			name:      "valid stack",
 			namespace: "stacks-1",
-			expected: types.NamespaceInfo{
+			expected: NamespaceInfo{
 				OrgID:   1,
 				StackID: 1,
 			},
@@ -116,7 +174,7 @@ func TestParseNamespace(t *testing.T) {
 		{
 			name:      "valid stack is read from deprecated claim",
 			namespace: "stack-1",
-			expected: types.NamespaceInfo{
+			expected: NamespaceInfo{
 				OrgID:   1,
 				StackID: 1,
 			},
@@ -124,7 +182,7 @@ func TestParseNamespace(t *testing.T) {
 		{
 			name:      "other namespace",
 			namespace: "anything",
-			expected: types.NamespaceInfo{
+			expected: NamespaceInfo{
 				OrgID: -1,
 				Value: "anything",
 			},
@@ -133,7 +191,7 @@ func TestParseNamespace(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			info, err := types.ParseNamespace(tt.namespace)
+			info, err := ParseNamespace(tt.namespace)
 			if tt.expectErr != (err != nil) {
 				t.Errorf("ParseNamespace() returned %+v, expected an error", info)
 			}
