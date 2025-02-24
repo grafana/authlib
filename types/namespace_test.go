@@ -49,6 +49,12 @@ func TestNamespaceMatches(t *testing.T) {
 			expectedNamespace: "stacks-2",
 			expected:          false,
 		},
+		{
+			desc:              "empty namespace and expectedNamespace should not be considered a match",
+			namespace:         "",
+			expectedNamespace: "",
+			expected:          false,
+		},
 	}
 
 	for _, tt := range tests {

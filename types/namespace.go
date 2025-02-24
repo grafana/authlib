@@ -34,6 +34,13 @@ func NamespaceMatches(namespace, expected string) bool {
 	if namespace == "*" {
 		return true
 	}
+
+	// We should only be able to work with cluster scoped resources or across several namespaces if
+	// caller has `*`
+	if expected == "" {
+		return false
+	}
+
 	return disambiguateNamespace(namespace) == disambiguateNamespace(expected)
 }
 
