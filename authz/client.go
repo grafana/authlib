@@ -6,6 +6,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -131,9 +132,11 @@ func (c *ClientImpl) check(ctx context.Context, id types.AuthInfo, req *types.Ch
 }
 
 func hasPermissionInToken(tokenPermissions []string, group, resource, verb string) bool {
+	verbs := []string{verb}
+
 	// we always map list to get
 	if verb == "list" {
-		verb = "get"
+		verbs = append(verbs, "get")
 	}
 
 	for _, p := range tokenPermissions {
@@ -142,7 +145,7 @@ func hasPermissionInToken(tokenPermissions []string, group, resource, verb strin
 			continue
 		}
 		pVerb := parts[1]
-		if pVerb != "*" && pVerb != verb {
+		if pVerb != "*" && !slices.Contains(verbs, pVerb) {
 			continue
 		}
 
