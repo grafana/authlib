@@ -26,7 +26,7 @@ func TestHasPermissionInToken(t *testing.T) {
 	}{
 		{
 			name:             "Permission matches group/resource",
-			tokenPermissions: []string{"dashboard.grafana.app/dashboards:list"},
+			tokenPermissions: []string{"dashboard.grafana.app/dashboards:get"},
 			group:            "dashboard.grafana.app",
 			resource:         "dashboards",
 			verb:             "list",
@@ -37,7 +37,7 @@ func TestHasPermissionInToken(t *testing.T) {
 			tokenPermissions: []string{"dashboard.grafana.app/dashboards:list"},
 			group:            "dashboard.grafana.app",
 			resource:         "dashboards",
-			verb:             "get",
+			verb:             "update",
 			want:             false,
 		},
 		{
@@ -58,15 +58,15 @@ func TestHasPermissionInToken(t *testing.T) {
 		},
 		{
 			name:             "Permission on the wrong group",
-			tokenPermissions: []string{"other-group.grafana.app/dashboards:list"},
+			tokenPermissions: []string{"other-group.grafana.app/dashboards:get"},
 			group:            "dashboard.grafana.app",
 			resource:         "dashboards",
-			verb:             "list",
+			verb:             "get",
 			want:             false,
 		},
 		{
 			name:             "Permission on the wrong resource",
-			tokenPermissions: []string{"dashboard.grafana.app/other-resource:list"},
+			tokenPermissions: []string{"dashboard.grafana.app/other-resource:get"},
 			group:            "dashboard.grafana.app",
 			resource:         "dashboards",
 			verb:             "list",
@@ -82,7 +82,7 @@ func TestHasPermissionInToken(t *testing.T) {
 		},
 		{
 			name:             "Group level permission",
-			tokenPermissions: []string{"dashboard.grafana.app:list"},
+			tokenPermissions: []string{"dashboard.grafana.app:get"},
 			group:            "dashboard.grafana.app",
 			resource:         "dashboards",
 			verb:             "list",

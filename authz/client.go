@@ -131,6 +131,11 @@ func (c *ClientImpl) check(ctx context.Context, id types.AuthInfo, req *types.Ch
 }
 
 func hasPermissionInToken(tokenPermissions []string, group, resource, verb string) bool {
+	// we always map list to get
+	if verb == "list" {
+		verb = "get"
+	}
+
 	for _, p := range tokenPermissions {
 		parts := strings.SplitN(p, ":", 2)
 		if len(parts) != 2 {
