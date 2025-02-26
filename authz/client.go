@@ -134,7 +134,8 @@ func (c *ClientImpl) check(ctx context.Context, id types.AuthInfo, req *types.Ch
 func hasPermissionInToken(tokenPermissions []string, group, resource, verb string) bool {
 	verbs := []string{verb}
 
-	// we always map list to get
+	// we always map list to get for authz
+	// to be backward compatible with access tokens we accept both for now
 	if verb == "list" {
 		verbs = append(verbs, "get")
 	}
