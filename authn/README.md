@@ -55,8 +55,8 @@ This package simplifies the implementation of authentication within your gRPC se
 
 In this first example:
 
-- We configure the client interceptor to interact with the `MyService` gRPC service. This interceptor uses its own `myClientToken` to request an access token from the token signing service at "/v1/sign-access-token". The requested access token will grant access to the `MyService` for the `stacks-22` namespace. The interceptor will also add the incoming user's ID token to the metadata, along with the query namespace using the `X-Namespace` key. We assume that `MyService` requires this additional Namespace metadata to determine which tenant is being queried.
-- On the server side, we set up the interceptor for the `MyService` service. This interceptor extracts the access and ID tokens from the gRPC metadata. It then populates the application context with an `AuthInfo` object. Functions within `MyService` can use this `AuthInfo` object to access information about the caller (such as their permissions).
+- We configure the client interceptor to interact with the `MyService` gRPC service. This interceptor uses its own token to request an access token from the token signing service at configured url. The requested access token will grant access to the `MyService` for the `stacks-22` namespace. The interceptor will also add the incoming user's ID token to the metadata.
+- On the server side, we set up the interceptor for the `MyService` service. This interceptor extracts the access and ID tokens from the gRPC metadata and perform validation using public keys retrived configured endpoint. It then populates the application context with an `AuthInfo` object. Functions within `MyService` can use this `AuthInfo` object to access information about the caller (such as their permissions).
 
 **Diagram:**
 
@@ -107,8 +107,8 @@ func main() {
 	// and injects the ID token.
 	clientInt := authn.NewGrpcClientInterceptor(
 		ts,
-		authn.WithClientInterceptorAudience([]string{"target-audience"}),
-		authn.WithClientInterceptorNamespace("target-namespace"),
+		authn.WithClientInterceptorAudience([]string{"myservice"}),
+		authn.WithClientInterceptorNamespace("stacks-22"),
 		authn.WithClientInterceptorIDTokenExtractor(idTokenExtractor),
 	)
 
