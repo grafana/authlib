@@ -31,10 +31,6 @@ var (
 	ErrNamespaceMissmatch = errors.New("namespace missmatch")
 )
 
-func IsUnauthenticatedErr(err error) bool {
-	return errors.Is(err, ErrMissingAuthInfo)
-}
-
 func IsUnauthorizedErr(err error) bool {
 	return errors.Is(err, ErrNamespaceMissmatch)
 }
