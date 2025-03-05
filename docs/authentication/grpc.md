@@ -4,11 +4,11 @@ To perform authentication between two services using access and id tokens we nee
 
 ### Example server side
 
-For a grpc server we can leverage our generic [`Authenticator`](../authn/authenticator.go). To set it up we need to configure a [`KeyRetriever`](../authn/jwks.go) and set up [`AccessTokenVerifier`](../authn/verifier_access_token.go) and  
-[`IDTokenVerifier`](../authn/verifier_id_token.go). The example setup below will extract id and access tokens from grpc metadata and validate that:
+For a grpc server we can leverage our generic [`Authenticator`](../../authn/authenticator.go). To set it up we need to configure a [`KeyRetriever`](../../authn/jwks.go) and set up [`AccessTokenVerifier`](../../authn/verifier_access_token.go) and  
+[`IDTokenVerifier`](../../authn/verifier_id_token.go). The example setup below will extract id and access tokens from grpc metadata and validate that:
 1. The signature is correct
 2. The token contains the audience we configured it to check.
-3. On success set [`AuthInfo`](../types/auth.go) in context that we can extract later using `types.AuthInfoFrom`.
+3. On success set [`AuthInfo`](../../types/auth.go) in context that we can extract later using `types.AuthInfoFrom`.
 
 ```go
 import (
@@ -85,7 +85,7 @@ func main() {
 ### Example client side
 
 On client side we need to "exchange" our provisioned token for an access token for outgoing requests. We should also add id token to the request if we have it in context to propagate the identity of the original caller.
-To do this we need to set up [`TokenExchanger`](../authn/token_exchange.go) and a [`GrpcClientInterceptor`](../authn/grpc_client_interceptor.go). 
+To do this we need to set up [`TokenExchanger`](../../authn/token_exchange.go) and a [`GrpcClientInterceptor`](../../authn/grpc_client_interceptor.go). 
 
 ```go
 // idTokenExtractor is a helper function to get the user ID Token from context
