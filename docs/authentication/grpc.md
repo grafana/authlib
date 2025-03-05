@@ -1,6 +1,6 @@
 # Authentication using GRPC
 
-To perform authentication between two services using access and id tokens we need to setup a grpc compatible authenticator on for the server and have a way for the client to generate the access token.
+To perform authentication between two services using access and id tokens we need to setup a grpc compatible authenticator for the server and have a way for the client to generate the access token.
 
 ### Example server side
 
