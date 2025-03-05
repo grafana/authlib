@@ -31,6 +31,10 @@ var (
 	ErrNamespaceMissmatch = errors.New("namespace missmatch")
 )
 
+func IsUnauthorizedErr(err error) bool {
+	return errors.Is(err, ErrNamespaceMissmatch)
+}
+
 // ClientImpl will implement the types.AccessClient interface
 // Once we are able to deal with folder permissions expansion.
 var _ types.AccessClient = (*ClientImpl)(nil)
