@@ -4,7 +4,7 @@ To perform authentication between two services using access and id tokens we nee
 
 ### Example server side
 
-For a grpc server we can leverage our generic [`Authenticator`](../authn/authenticator.go). To set it up we need to configure a [`KeyRetriever`](../authn/jwks.go) and setup [`AccessTokenVerifier`](../authn/verifier_access_token.go) and  
+For a grpc server we can leverage our generic [`Authenticator`](../authn/authenticator.go). To set it up we need to configure a [`KeyRetriever`](../authn/jwks.go) and set up [`AccessTokenVerifier`](../authn/verifier_access_token.go) and  
 [`IDTokenVerifier`](../authn/verifier_id_token.go). The example setup below will extract id and access tokens from grpc metadata and validate that:
 1. The signature is correct
 2. The token contains the audience we configured it to check.
