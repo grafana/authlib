@@ -26,3 +26,8 @@ var (
 func IsUnauthenticatedErr(err error) bool {
 	return errors.Is(err, errInvalidToken)
 }
+
+func IsInvalidTokenErr(err error) bool {
+	// Keeping this for backwards compatibility
+	return errors.Is(err, errInvalidToken)
+}
