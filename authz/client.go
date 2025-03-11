@@ -154,7 +154,7 @@ func hasPermissionInToken(tokenPermissions []string, group, resource, verb strin
 			continue
 		}
 
-		parts = strings.SplitN(parts[0], "/", 3)
+		parts = strings.SplitN(parts[0], "/", 2)
 		switch len(parts) {
 		case 1:
 			if parts[0] == group {
