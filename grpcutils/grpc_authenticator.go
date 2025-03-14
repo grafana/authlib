@@ -20,9 +20,9 @@ type Authenticator interface {
 	Authenticate(ctx context.Context) (context.Context, error)
 }
 
-type GAuthenticatorFunc func(context.Context) (context.Context, error)
+type AuthenticatorFunc func(context.Context) (context.Context, error)
 
-func (fn GAuthenticatorFunc) Authenticate(ctx context.Context) (context.Context, error) {
+func (fn AuthenticatorFunc) Authenticate(ctx context.Context) (context.Context, error) {
 	return fn(ctx)
 }
 
@@ -55,7 +55,7 @@ func NewAuthenticator(cfg *GrpcAuthenticatorConfig, tracer trace.Tracer) Authent
 }
 
 func NewAuthenticatorInterceptor(auth authn.Authenticator, tracer trace.Tracer) Authenticator {
-	return GAuthenticatorFunc(func(ctx context.Context) (context.Context, error) {
+	return AuthenticatorFunc(func(ctx context.Context) (context.Context, error) {
 		ctx, span := tracer.Start(ctx, "grpcutils.Authenticate")
 		defer span.End()
 
