@@ -16,7 +16,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type AuthenticatorConfig interface {
+type Authenticator interface {
 	Authenticate(ctx context.Context) (context.Context, error)
 }
 
