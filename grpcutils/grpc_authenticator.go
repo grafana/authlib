@@ -26,7 +26,7 @@ func (fn GAuthenticatorFunc) Authenticate(ctx context.Context) (context.Context,
 	return fn(ctx)
 }
 
-func NewUnsafeAuthenticator() AuthenticatorConfig {
+func NewUnsafeAuthenticator(tracer trace.Tracer) AuthenticatorConfig {
 	return NewAuthenticatorInterceptor(
 		authn.NewDefaultAuthenticator(
 			authn.NewUnsafeAccessTokenVerifier(authn.VerifierConfig{}),
