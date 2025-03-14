@@ -7,7 +7,7 @@ toolchain go1.23.7
 require (
 	github.com/go-jose/go-jose/v3 v3.0.4
 	github.com/google/go-querystring v1.1.0
-	github.com/grafana/authlib/types v0.0.0-20250224151205-5ef97131cc82
+	github.com/grafana/authlib/types v0.0.0-20250314102521-a77865c746c0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.20.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/stretchr/testify v1.9.0
@@ -23,7 +23,6 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/net v0.26.0 // indirect
