@@ -26,7 +26,7 @@ func (fn GAuthenticatorFunc) Authenticate(ctx context.Context) (context.Context,
 	return fn(ctx)
 }
 
-func NewUnsafeAuthenticator(tracer trace.Tracer) AuthenticatorConfig {
+func NewUnsafeAuthenticator(tracer trace.Tracer) Authenticator {
 	return NewAuthenticatorInterceptor(
 		authn.NewDefaultAuthenticator(
 			authn.NewUnsafeAccessTokenVerifier(authn.VerifierConfig{}),
@@ -36,7 +36,7 @@ func NewUnsafeAuthenticator(tracer trace.Tracer) AuthenticatorConfig {
 	)
 }
 
-func NewAuthenticator(cfg *GrpcAuthenticatorConfig, tracer trace.Tracer) AuthenticatorConfig {
+func NewAuthenticator(cfg *GrpcAuthenticatorConfig, tracer trace.Tracer) Authenticator {
 	client := http.DefaultClient
 	if cfg.AllowInsecure {
 		client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
@@ -54,7 +54,7 @@ func NewAuthenticator(cfg *GrpcAuthenticatorConfig, tracer trace.Tracer) Authent
 	return NewAuthenticatorInterceptor(auth, tracer)
 }
 
-func NewAuthenticatorInterceptor(auth authn.Authenticator, tracer trace.Tracer) AuthenticatorConfig {
+func NewAuthenticatorInterceptor(auth authn.Authenticator, tracer trace.Tracer) Authenticator {
 	return GAuthenticatorFunc(func(ctx context.Context) (context.Context, error) {
 		ctx, span := tracer.Start(ctx, "grpcutils.Authenticate")
 		defer span.End()
