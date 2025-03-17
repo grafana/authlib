@@ -16,12 +16,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type AuthenticatorFunc func(context.Context) (context.Context, error)
-
-func (fn AuthenticatorFunc) Authenticate(ctx context.Context) (context.Context, error) {
-	return fn(ctx)
-}
-
 func NewUnsafeAuthenticator(tracer trace.Tracer) func(ctx context.Context) (context.Context, error) {
 	return NewAuthenticatorInterceptor(
 		authn.NewDefaultAuthenticator(
@@ -32,7 +26,7 @@ func NewUnsafeAuthenticator(tracer trace.Tracer) func(ctx context.Context) (cont
 	)
 }
 
-func NewAuthenticator(cfg *GrpcAuthenticatorConfig, tracer trace.Tracer) func(ctx context.Context) (context.Context, error) {
+func NewAuthenticator(cfg *AuthenticatorConfig, tracer trace.Tracer) func(ctx context.Context) (context.Context, error) {
 	client := http.DefaultClient
 	if cfg.AllowInsecure {
 		client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
@@ -51,7 +45,7 @@ func NewAuthenticator(cfg *GrpcAuthenticatorConfig, tracer trace.Tracer) func(ct
 }
 
 func NewAuthenticatorInterceptor(auth authn.Authenticator, tracer trace.Tracer) func(ctx context.Context) (context.Context, error) {
-	return AuthenticatorFunc(func(ctx context.Context) (context.Context, error) {
+	return func(ctx context.Context) (context.Context, error) {
 		ctx, span := tracer.Start(ctx, "grpcutils.Authenticate")
 		defer span.End()
 
@@ -74,5 +68,5 @@ func NewAuthenticatorInterceptor(auth authn.Authenticator, tracer trace.Tracer) 
 		span.SetAttributes(attribute.String("subject", info.GetUID()))
 		span.SetAttributes(attribute.Bool("service", types.IsIdentityType(info.GetIdentityType(), types.TypeAccessPolicy)))
 		return types.WithAuthInfo(ctx, info), nil
-	})
+	}
 }

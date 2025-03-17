@@ -1,6 +1,6 @@
 package grpcutils
 
-type GrpcAuthenticatorConfig struct {
+type AuthenticatorConfig struct {
 	SigningKeysURL   string
 	AllowedAudiences []string
 	AllowInsecure    bool
