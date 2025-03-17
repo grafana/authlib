@@ -10,7 +10,6 @@ import (
 	"github.com/grafana/authlib/types"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-	"go.opentelemetry.io/otel/trace/noop"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -22,7 +21,7 @@ func NewUnsafeAuthenticator(tracer trace.Tracer) func(ctx context.Context) (cont
 			authn.NewUnsafeAccessTokenVerifier(authn.VerifierConfig{}),
 			authn.NewUnsafeIDTokenVerifier(authn.VerifierConfig{}),
 		),
-		noop.NewTracerProvider().Tracer(""),
+		tracer,
 	)
 }
 
