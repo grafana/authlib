@@ -16,17 +16,13 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-type Authenticator interface {
-	Authenticate(ctx context.Context) (context.Context, error)
-}
-
 type AuthenticatorFunc func(context.Context) (context.Context, error)
 
 func (fn AuthenticatorFunc) Authenticate(ctx context.Context) (context.Context, error) {
 	return fn(ctx)
 }
 
-func NewUnsafeAuthenticator(tracer trace.Tracer) Authenticator {
+func NewUnsafeAuthenticator(tracer trace.Tracer) func(ctx context.Context) (context.Context, error) {
 	return NewAuthenticatorInterceptor(
 		authn.NewDefaultAuthenticator(
 			authn.NewUnsafeAccessTokenVerifier(authn.VerifierConfig{}),
@@ -36,7 +32,7 @@ func NewUnsafeAuthenticator(tracer trace.Tracer) Authenticator {
 	)
 }
 
-func NewAuthenticator(cfg *GrpcAuthenticatorConfig, tracer trace.Tracer) Authenticator {
+func NewAuthenticator(cfg *GrpcAuthenticatorConfig, tracer trace.Tracer) func(ctx context.Context) (context.Context, error) {
 	client := http.DefaultClient
 	if cfg.AllowInsecure {
 		client = &http.Client{Transport: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}}}
@@ -54,7 +50,7 @@ func NewAuthenticator(cfg *GrpcAuthenticatorConfig, tracer trace.Tracer) Authent
 	return NewAuthenticatorInterceptor(auth, tracer)
 }
 
-func NewAuthenticatorInterceptor(auth authn.Authenticator, tracer trace.Tracer) Authenticator {
+func NewAuthenticatorInterceptor(auth authn.Authenticator, tracer trace.Tracer) func(ctx context.Context) (context.Context, error) {
 	return AuthenticatorFunc(func(ctx context.Context) (context.Context, error) {
 		ctx, span := tracer.Start(ctx, "grpcutils.Authenticate")
 		defer span.End()
