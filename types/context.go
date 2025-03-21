@@ -14,7 +14,22 @@ const (
 
 func AuthInfoFrom(ctx context.Context) (AuthInfo, bool) {
 	v, ok := ctx.Value(infoKey).(AuthInfo)
-	return v, ok
+	if !ok {
+		return nil, false
+	}
+
+	// Validate required fields are not empty
+	if v.GetUID() == "" {
+		return nil, false
+	}
+	if v.GetIdentityType() == "" {
+		return nil, false
+	}
+	if v.GetNamespace() == "" {
+		return nil, false
+	}
+
+	return v, true
 }
 
 func WithAuthInfo(ctx context.Context, auth AuthInfo) context.Context {
