@@ -5,10 +5,8 @@ import (
 )
 
 type ActorClaims struct {
-	Subject              string       `json:"sub"`
-	Permissions          []string     `json:"permissions,omitempty"`
-	DelegatedPermissions []string     `json:"delegated_permissions,omitempty"`
-	Actor                *ActorClaims `json:"act,omitempty"`
+	Subject string       `json:"sub"`
+	Actor   *ActorClaims `json:"act,omitempty"`
 }
 
 type AccessTokenClaims struct {
