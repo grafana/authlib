@@ -4,6 +4,13 @@ import (
 	"context"
 )
 
+type ActorClaims struct {
+	Subject              string       `json:"sub"`
+	Permissions          []string     `json:"permissions,omitempty"`
+	DelegatedPermissions []string     `json:"delegated_permissions,omitempty"`
+	Actor                *ActorClaims `json:"act,omitempty"`
+}
+
 type AccessTokenClaims struct {
 	// Namespace takes the form of '<type>-<id>', '*' means all namespaces.
 	// Type can be either org or stack.
@@ -14,6 +21,8 @@ type AccessTokenClaims struct {
 	Permissions []string `json:"permissions"`
 	// On-behalf-of user
 	DelegatedPermissions []string `json:"delegatedPermissions"`
+	// Actor is the user/service that is acting on behalf of the subject.
+	Actor *ActorClaims `json:"act,omitempty"`
 }
 
 func NewAccessTokenVerifier(cfg VerifierConfig, keys KeyRetriever) *AccessTokenVerifier {
