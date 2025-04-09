@@ -75,7 +75,7 @@ func Test_TokenExchangeClient_Exchange(t *testing.T) {
 		assert.Nil(t, res)
 	})
 
-	t.Run("should cache and return token on successful request", func(t *testing.T) {
+	t.Run("should cache and return token on successful sign request", func(t *testing.T) {
 		var calls int
 		c := setup(httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			calls++
@@ -103,11 +103,54 @@ func Test_TokenExchangeClient_Exchange(t *testing.T) {
 		assert.NotNil(t, res)
 		require.Equal(t, 2, calls)
 
-		// different different audiences should issue new token request
+		// different audiences should issue new token request
 		res, err = c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service-2"}})
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 		require.Equal(t, 3, calls)
+	})
+
+	t.Run("should cache and return token on successful exchange request", func(t *testing.T) {
+		var calls int
+		c := setup(httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			calls++
+			require.Equal(t, r.Header.Get("Authorization"), "Bearer some-token")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data": {"token": "` + signAccessToken(t) + `"}}`))
+			bytes.NewBuffer([]byte(`{}`))
+			json.NewEncoder(&bytes.Buffer{})
+		})))
+
+		tokenToBeExchanged := signAccessToken(t)
+
+		res, err := c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service"}, SubjectToken: tokenToBeExchanged})
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		require.Equal(t, 1, calls)
+
+		// same namespace and audiences should load token from cache
+		res, err = c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service"}, SubjectToken: tokenToBeExchanged})
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		require.Equal(t, 1, calls)
+
+		// different namespace should issue new token request
+		res, err = c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "stacks-1", Audiences: []string{"some-service"}})
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		require.Equal(t, 2, calls)
+
+		// different audiences should issue new token request
+		res, err = c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service-2"}})
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		require.Equal(t, 3, calls)
+
+		// different subjectToken should issue new token request
+		res, err = c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service-2"}, SubjectToken: signAccessToken(t)})
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		require.Equal(t, 4, calls)
 	})
 }
 
