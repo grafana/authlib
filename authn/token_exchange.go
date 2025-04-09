@@ -76,6 +76,8 @@ type TokenExchangeRequest struct {
 	Namespace string `json:"namespace"`
 	// Audiences token should be signed with.
 	Audiences []string `json:"audiences"`
+	// SubjectToken is the token to exchange in case of a token exchange request.
+	SubjectToken string `json:"subjectToken,omitempty"`
 }
 
 type TokenExchangeResponse struct {
@@ -88,6 +90,7 @@ func (r TokenExchangeRequest) hash() string {
 	br.WriteByte('-')
 	sort.Strings(r.Audiences)
 	br.WriteString(strings.Join(r.Audiences, "-"))
+	br.WriteString(r.SubjectToken)
 
 	return br.String()
 }
