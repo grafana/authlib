@@ -109,7 +109,7 @@ func (c *ClientImpl) check(ctx context.Context, id types.AuthInfo, req *types.Ch
 	}
 
 	checkReq := &authzv1.CheckRequest{
-		Subject:     id.GetSubject(),
+		Subject:     id.GetUID(),
 		Verb:        req.Verb,
 		Group:       req.Group,
 		Resource:    req.Resource,
@@ -248,7 +248,7 @@ func (c *ClientImpl) compile(ctx context.Context, id types.AuthInfo, list *types
 
 	// Query the authz service
 	listReq := &authzv1.ListRequest{
-		Subject:     id.GetSubject(),
+		Subject:     id.GetUID(),
 		Group:       list.Group,
 		Resource:    list.Resource,
 		Verb:        list.Verb,
