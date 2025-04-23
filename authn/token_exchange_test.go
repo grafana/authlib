@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -41,6 +42,7 @@ func TestNewTokenExchangeClient(t *testing.T) {
 }
 
 func Test_TokenExchangeClient_Exchange(t *testing.T) {
+	expiresIn := 10 * time.Minute
 	setup := func(srv *httptest.Server) *TokenExchangeClient {
 		c, err := NewTokenExchangeClient(TokenExchangeConfig{
 			Token:            "some-token",
@@ -81,7 +83,7 @@ func Test_TokenExchangeClient_Exchange(t *testing.T) {
 			calls++
 			require.Equal(t, r.Header.Get("Authorization"), "Bearer some-token")
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"data": {"token": "` + signAccessToken(t) + `"}}`))
+			_, _ = w.Write([]byte(`{"data": {"token": "` + signAccessToken(t, expiresIn) + `"}}`))
 			bytes.NewBuffer([]byte(`{}`))
 			json.NewEncoder(&bytes.Buffer{})
 		})))
@@ -116,12 +118,12 @@ func Test_TokenExchangeClient_Exchange(t *testing.T) {
 			calls++
 			require.Equal(t, r.Header.Get("Authorization"), "Bearer some-token")
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"data": {"token": "` + signAccessToken(t) + `"}}`))
+			_, _ = w.Write([]byte(`{"data": {"token": "` + signAccessToken(t, expiresIn) + `"}}`))
 			bytes.NewBuffer([]byte(`{}`))
 			json.NewEncoder(&bytes.Buffer{})
 		})))
 
-		tokenToBeExchanged := signAccessToken(t)
+		tokenToBeExchanged := signAccessToken(t, expiresIn)
 
 		res, err := c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service"}, SubjectToken: tokenToBeExchanged})
 		assert.NoError(t, err)
@@ -147,14 +149,43 @@ func Test_TokenExchangeClient_Exchange(t *testing.T) {
 		require.Equal(t, 3, calls)
 
 		// different subjectToken should issue new token request
-		res, err = c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service-2"}, SubjectToken: signAccessToken(t)})
+		res, err = c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service-2"}, SubjectToken: signAccessToken(t, expiresIn)})
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 		require.Equal(t, 4, calls)
 	})
+
+	t.Run("should include expiration in request when provided", func(t *testing.T) {
+		c := setup(httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			requestBody, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			w.WriteHeader(http.StatusOK)
+			var request TokenExchangeRequest
+			err = json.Unmarshal(requestBody, &request)
+			require.NoError(t, err)
+			_, _ = w.Write([]byte(`{"data": {"token": "` + signAccessToken(t, time.Duration(*request.ExpiresIn)*time.Second) + `"}}`))
+		})))
+
+		expiresIn := 30
+		res, err := c.Exchange(context.Background(), TokenExchangeRequest{
+			Namespace: "*",
+			Audiences: []string{"some-service"},
+			ExpiresIn: &expiresIn,
+		})
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+
+		resultToken, err := jwt.ParseSigned(res.Token)
+		require.NoError(t, err)
+		var claims jwt.Claims
+		err = resultToken.UnsafeClaimsWithoutVerification(&claims)
+		require.NoError(t, err)
+		expectedExpiry := time.Now().Add(time.Duration(expiresIn) * time.Second)
+		require.InDelta(t, expectedExpiry.Unix(), claims.Expiry.Time().Unix(), 1)
+	})
 }
 
-func signAccessToken(t *testing.T) string {
+func signAccessToken(t *testing.T, expiresIn time.Duration) string {
 	signer, err := jose.NewSigner(jose.SigningKey{
 		Algorithm: jose.HS256,
 		Key:       []byte("key"),
@@ -162,7 +193,7 @@ func signAccessToken(t *testing.T) string {
 	require.NoError(t, err)
 
 	token, err := jwt.Signed(signer).
-		Claims(&jwt.Claims{Expiry: jwt.NewNumericDate(time.Now().Add(10 * time.Minute))}).
+		Claims(&jwt.Claims{Expiry: jwt.NewNumericDate(time.Now().Add(expiresIn))}).
 		CompactSerialize()
 
 	require.NoError(t, err)
