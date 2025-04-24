@@ -21,6 +21,8 @@ type AccessTokenClaims struct {
 	DelegatedPermissions []string `json:"delegatedPermissions"`
 	// Actor is the user/service that is acting on behalf of the subject.
 	Actor *ActorClaims `json:"act,omitempty"`
+	// ServiceIdentity is the name/identity of the service that has been created/signed the access token.
+	ServiceIdentity string `json:"serviceIdentity,omitempty"`
 }
 
 func NewAccessTokenVerifier(cfg VerifierConfig, keys KeyRetriever) *AccessTokenVerifier {
