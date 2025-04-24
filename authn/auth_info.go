@@ -82,6 +82,16 @@ func (a *AuthInfo) GetSubject() string {
 	if a.id != nil {
 		return a.id.Subject
 	}
+
+	// Find the subject of the most nested actor
+	currentActor := a.at.Rest.Actor
+	if currentActor != nil {
+		for currentActor.Actor != nil {
+			currentActor = currentActor.Actor
+		}
+		return currentActor.Subject
+	}
+
 	return a.at.Subject
 }
 
