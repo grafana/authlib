@@ -187,6 +187,7 @@ func (c *ClientImpl) Check(ctx context.Context, id types.AuthInfo, req types.Che
 		return checkResponseDenied, namespaceMissmatchError(id.GetNamespace(), req.Namespace)
 	}
 
+	span.SetAttributes(attribute.String("subject", id.GetSubject()))
 	span.SetAttributes(attribute.String("namespace", req.Namespace))
 	span.SetAttributes(attribute.String("verb", req.Verb))
 	span.SetAttributes(attribute.String("group", req.Group))
@@ -211,8 +212,6 @@ func (c *ClientImpl) Check(ctx context.Context, id types.AuthInfo, req types.Che
 
 		return types.CheckResponse{Allowed: serviceIsAllowedAction}, nil
 	}
-
-	span.SetAttributes(attribute.String("subject", id.GetSubject()))
 
 	// Only check the service permissions if the access token check is enabled
 	permissions := id.GetTokenDelegatedPermissions()
