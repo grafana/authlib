@@ -30,27 +30,39 @@ func (a *AuthInfo) GetName() string {
 	if a.id != nil {
 		return a.id.Rest.getK8sName()
 	}
-	return a.at.Subject
+	return a.GetSubject()
 }
 
 func (a *AuthInfo) GetUID() string {
 	if a.id != nil {
 		return a.id.Rest.getTypedUID()
 	}
-	return a.at.Subject
+	return a.GetSubject()
 }
 
 func (a *AuthInfo) GetIdentifier() string {
 	if a.id != nil {
 		return a.id.Rest.Identifier
 	}
-	return strings.TrimPrefix(a.at.Subject, string(types.TypeAccessPolicy)+":")
+
+	s := strings.Split(a.at.Subject, ":")
+	return s[len(s)-1]
 }
 
 func (a *AuthInfo) GetIdentityType() types.IdentityType {
 	if a.id != nil {
 		return a.id.Rest.Type
 	}
+
+	// Find the type of the most nested actor
+	currentActor := a.at.Rest.Actor
+	if currentActor != nil {
+		for currentActor.Actor != nil {
+			currentActor = currentActor.Actor
+		}
+		return currentActor.Type
+	}
+
 	return types.TypeAccessPolicy
 }
 

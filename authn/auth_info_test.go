@@ -161,3 +161,7 @@ func TestGetSubject(t *testing.T) {
 		})
 	}
 }
+
+func TestGetIdentityType(t *testing.T) {
+	// TODO
+}

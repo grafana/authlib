@@ -2,11 +2,22 @@ package authn
 
 import (
 	"context"
+
+	"github.com/grafana/authlib/types"
 )
 
 type ActorClaims struct {
 	Subject string       `json:"sub"`
 	Actor   *ActorClaims `json:"act,omitempty"`
+
+	// Fields for on behalf of flow.
+	Identifier  string             `json:"identifier,omitempty"`
+	Type        types.IdentityType `json:"type,omitempty"`
+	Namespace   string             `json:"namespace,omitempty"`
+	Email       string             `json:"email,omitempty"`
+	Username    string             `json:"username,omitempty"`
+	DisplayName string             `json:"name,omitempty"`
+	Role        string             `json:"role,omitempty"`
 }
 
 type AccessTokenClaims struct {
