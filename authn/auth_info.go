@@ -71,7 +71,13 @@ func (a *AuthInfo) GetExtra() map[string][]string {
 		// but this should be removed in the not-to-distant future
 		return map[string][]string{"id-token": {a.id.token}}
 	}
-	return map[string][]string{}
+
+	result := map[string][]string{}
+	if a.at.Rest.ServiceIdentity != "" {
+		result["serviceIdentity"] = []string{a.at.Rest.ServiceIdentity}
+	}
+
+	return result
 }
 
 func (a *AuthInfo) GetAudience() []string {
