@@ -6,6 +6,9 @@ import "google/api/annotations.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 
 service AuthzService {
+
+  // TODO add BatchCheck request and responses here
+
   rpc Check(CheckRequest) returns (CheckResponse) {
     option (google.api.http) = {
       post: "/v1/namespace/{namespace}/check"

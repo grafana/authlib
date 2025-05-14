@@ -419,6 +419,8 @@ func TestClient_Check_Cache(t *testing.T) {
 	require.True(t, got.Allowed)
 }
 
+// TODO func TestClient_BatchCheck_Cache(t *testing.T) {}
+
 func TestClient_Compile_Cache(t *testing.T) {
 	client, authz := setupAccessClient()
 	// User has the action on dash1 and fold1

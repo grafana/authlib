@@ -47,6 +47,104 @@ type ClientImpl struct {
 	tracer   trace.Tracer
 }
 
+func (c *ClientImpl) BatchCheck(ctx context.Context, info types.AuthInfo, req types.BatchCheckRequest) (types.BatchCheckResponse, error) {
+	ctx, span := c.tracer.Start(ctx, "ClientImpl.BatchCheck")
+	defer span.End()
+
+	if err := validateAuthInfo(info, req.Namespace, span); err != nil {
+		return BatchCheckResponseDenied(req), err
+	}
+
+	span.SetAttributes(attribute.String("subject", info.GetSubject()))
+	span.SetAttributes(attribute.String("namespace", req.Namespace))
+
+	isService := types.IsIdentityType(info.GetIdentityType(), types.TypeAccessPolicy)
+	span.SetAttributes(attribute.Bool("with_user", !isService))
+
+	batchRes := types.BatchCheckResponse{
+		Groups: make(map[string]types.BatchCheckGroupResponse),
+	}
+
+	for _, item := range req.Items {
+		// TODO refactor to make this call Check to avoid code duplication
+
+		// TODO record BatchCheckItem info in the span?
+		groupResource := types.FormatGroupResource(item.Group, item.Resource, item.Subresource)
+		if _, ok := batchRes.Groups[groupResource]; !ok {
+			batchRes.Groups[groupResource] = types.BatchCheckGroupResponse{
+				Items: make(map[string]types.BatchCheckItemResponse),
+			}
+		}
+
+		if err := types.ValidateBatchCheckItem(item); err != nil {
+			batchRes.Groups[groupResource].Items[item.Name] = types.BatchCheckItemResponse{Allowed: false}
+			continue
+		}
+
+		// No user => check on the service permissions
+		if isService {
+			permissions := info.GetTokenPermissions()
+			serviceIsAllowedAction := hasPermissionInToken(permissions, item.Group, item.Resource, item.Verb)
+
+			//span.SetAttributes(attribute.Int("permissions", len(permissions)))
+			//span.SetAttributes(attribute.Bool("service_allowed", serviceIsAllowedAction))
+
+			batchRes.Groups[groupResource].Items[item.Name] = types.BatchCheckItemResponse{Allowed: serviceIsAllowedAction}
+			continue
+		}
+
+		// Only check the service permissions if the access token check is enabled
+		permissions := info.GetTokenDelegatedPermissions()
+		serviceIsAllowedAction := hasPermissionInToken(permissions, item.Group, item.Resource, item.Verb)
+
+		//span.SetAttributes(attribute.Int("delegated_permissions", len(permissions)))
+		//span.SetAttributes(attribute.Bool("service_allowed", serviceIsAllowedAction))
+
+		if !serviceIsAllowedAction {
+			batchRes.Groups[groupResource].Items[item.Name] = types.BatchCheckItemResponse{Allowed: false}
+			continue
+		}
+
+		check, err := c.check(ctx, info, BatchItemToCheckRequest(req.Namespace, &item))
+		if err != nil {
+			batchRes.Groups[groupResource].Items[item.Name] = types.BatchCheckItemResponse{Allowed: false}
+			continue
+		}
+		batchRes.Groups[groupResource].Items[item.Name] = types.BatchCheckItemResponse{Allowed: check}
+	}
+	return batchRes, nil
+}
+
+func BatchItemToCheckRequest(namespace string, item *types.BatchCheckItem) *types.CheckRequest {
+	return &types.CheckRequest{
+		Namespace:   namespace,
+		Group:       item.Group,
+		Resource:    item.Resource,
+		Verb:        item.Verb,
+		Name:        item.Name,
+		Subresource: item.Subresource,
+		Folder:      item.Folder,
+	}
+}
+
+func BatchCheckResponseDenied(req types.BatchCheckRequest) types.BatchCheckResponse {
+	batchRes := types.BatchCheckResponse{
+		Groups: make(map[string]types.BatchCheckGroupResponse),
+	}
+
+	for _, item := range req.Items {
+		groupResource := types.FormatGroupResource(item.Group, item.Resource, item.Subresource)
+		if _, ok := batchRes.Groups[groupResource]; !ok {
+			batchRes.Groups[groupResource] = types.BatchCheckGroupResponse{
+				Items: make(map[string]types.BatchCheckItemResponse),
+			}
+		}
+		batchRes.Groups[groupResource].Items[item.Name] = types.BatchCheckItemResponse{Allowed: false}
+	}
+
+	return batchRes
+}
+
 // -----
 // Options
 // -----
@@ -97,6 +195,7 @@ func (c *ClientImpl) check(ctx context.Context, id types.AuthInfo, req *types.Ch
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.hasAccess")
 	defer span.End()
 
+	// TODO idIsServiceAccount is always false here? Can remove this check?
 	idIsServiceAccount := types.IsIdentityType(id.GetIdentityType(), types.TypeServiceAccount)
 	if !idIsServiceAccount && (req.Name == k6FolderUID || req.Folder == k6FolderUID) {
 		return false, nil
@@ -178,13 +277,8 @@ func (c *ClientImpl) Check(ctx context.Context, id types.AuthInfo, req types.Che
 		return checkResponseDenied, err
 	}
 
-	if id.GetSubject() == "" {
-		span.RecordError(ErrMissingAuthInfo)
-		return checkResponseDenied, ErrMissingAuthInfo
-	}
-
-	if !types.NamespaceMatches(id.GetNamespace(), req.Namespace) {
-		return checkResponseDenied, namespaceMissmatchError(id.GetNamespace(), req.Namespace)
+	if err := validateAuthInfo(id, req.Namespace, span); err != nil {
+		return checkResponseDenied, err
 	}
 
 	span.SetAttributes(attribute.String("subject", id.GetSubject()))
@@ -275,13 +369,8 @@ func (c *ClientImpl) Compile(ctx context.Context, id types.AuthInfo, list types.
 		return nil, err
 	}
 
-	if id.GetSubject() == "" {
-		span.RecordError(ErrMissingAuthInfo)
-		return nil, ErrMissingAuthInfo
-	}
-
-	if !types.NamespaceMatches(id.GetNamespace(), list.Namespace) {
-		return nil, namespaceMissmatchError(id.GetNamespace(), list.Namespace)
+	if err := validateAuthInfo(id, list.Namespace, span); err != nil {
+		return nil, err
 	}
 
 	span.SetAttributes(attribute.String("namespace", list.Namespace))
@@ -312,6 +401,20 @@ func (c *ClientImpl) Compile(ctx context.Context, id types.AuthInfo, list types.
 	}
 
 	return checker.fn(id), nil
+}
+
+func validateAuthInfo(info types.AuthInfo, namespace string, span trace.Span) error {
+	if info.GetSubject() == "" {
+		span.RecordError(ErrMissingAuthInfo)
+		return ErrMissingAuthInfo
+	}
+
+	if !types.NamespaceMatches(info.GetNamespace(), namespace) {
+		// TODO why don't we record namespace error on the span?
+		return namespaceMismatchError(info.GetNamespace(), namespace)
+	}
+
+	return nil
 }
 
 // newOutgoingContext creates a new context that will be canceled when the input context is canceled.
@@ -469,6 +572,6 @@ func (c *itemChecker) fn(id types.AuthInfo) types.ItemChecker {
 	}
 }
 
-func namespaceMissmatchError(a, b string) error {
+func namespaceMismatchError(a, b string) error {
 	return fmt.Errorf("%w: got %s but expected %s", ErrNamespaceMissmatch, a, b)
 }
