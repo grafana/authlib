@@ -161,3 +161,6 @@ func TestGetSubject(t *testing.T) {
 		})
 	}
 }
+
+// TODO(Melendez): Planning to write tests for all the changes in the auth_info.go file,
+// but am waiting to confirm that these changes make sense before writing all the tests.

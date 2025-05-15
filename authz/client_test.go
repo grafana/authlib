@@ -228,7 +228,7 @@ func TestClient_Check(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			name: "On behalf of, service does not have the action",
+			name: "On behalf of, id token, service does not have the action",
 			caller: authn.NewIDTokenAuthInfo(
 				authn.Claims[authn.AccessTokenClaims]{
 					Claims: jwt.Claims{Subject: "service"},
@@ -248,7 +248,7 @@ func TestClient_Check(t *testing.T) {
 			want: false,
 		},
 		{
-			name: "On behalf of, service does have the action, but user not",
+			name: "On behalf of, id token, service does have the action, but user not",
 			caller: authn.NewIDTokenAuthInfo(
 				authn.Claims[authn.AccessTokenClaims]{
 					Claims: jwt.Claims{Subject: "service"},
@@ -268,7 +268,7 @@ func TestClient_Check(t *testing.T) {
 			want: false,
 		},
 		{
-			name: "On behalf of, service and user have the action",
+			name: "On behalf of, id token, service and user have the action",
 			caller: authn.NewIDTokenAuthInfo(
 				authn.Claims[authn.AccessTokenClaims]{
 					Claims: jwt.Claims{Subject: "service"},
@@ -289,7 +289,7 @@ func TestClient_Check(t *testing.T) {
 			want:     true,
 		},
 		{
-			name: "On behalf of, service has the action but with an extra part",
+			name: "On behalf of, id token, service has the action but with an extra part",
 			caller: authn.NewIDTokenAuthInfo(
 				authn.Claims[authn.AccessTokenClaims]{
 					Claims: jwt.Claims{Subject: "service"},
@@ -329,6 +329,109 @@ func TestClient_Check(t *testing.T) {
 				Verb:      "list",
 			},
 			want: true,
+		},
+		{
+			name: "On behalf of, access token, service does not have the action",
+			caller: authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{
+				Claims: jwt.Claims{Subject: "service"},
+				Rest:   authn.AccessTokenClaims{Namespace: "stacks-12"},
+			}),
+			req: types.CheckRequest{
+				Namespace: "stacks-12",
+				Group:     "dashboards.grafana.app",
+				Resource:  "dashboards",
+				Verb:      "list",
+			},
+			want: false,
+		},
+		{
+			name: "On behalf of, access token, service does have the action, but user not",
+			caller: authn.NewAccessTokenAuthInfo(
+				authn.Claims[authn.AccessTokenClaims]{
+					Claims: jwt.Claims{Subject: "service"},
+					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:list"}},
+				},
+			),
+			req: types.CheckRequest{
+				Namespace: "stacks-12",
+				Group:     "dashboards.grafana.app",
+				Resource:  "dashboards",
+				Verb:      "list",
+			},
+			want: false,
+		},
+		{
+			name: "On behalf of, access token, service and user have the action",
+			caller: authn.NewAccessTokenAuthInfo(
+				authn.Claims[authn.AccessTokenClaims]{
+					Claims: jwt.Claims{Subject: "service"},
+					Rest: authn.AccessTokenClaims{
+						Namespace:            "stacks-12",
+						DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:list"},
+						Actor: &authn.ActorClaims{
+							Subject: "user:1",
+						},
+					},
+				},
+			),
+			req: types.CheckRequest{
+				Namespace: "stacks-12",
+				Group:     "dashboards.grafana.app",
+				Resource:  "dashboards",
+				Verb:      "list",
+			},
+			checkRes: true,
+			want:     true,
+		},
+		{
+			name: "On behalf of, access token, service has the action but with an extra part",
+			caller: authn.NewAccessTokenAuthInfo(
+				authn.Claims[authn.AccessTokenClaims]{
+					Claims: jwt.Claims{Subject: "service"},
+					Rest: authn.AccessTokenClaims{
+						Namespace:            "stacks-12",
+						DelegatedPermissions: []string{"dashboards.grafana.app/dashboards/dashUID:list"},
+						Actor: &authn.ActorClaims{
+							Subject: "user:1",
+						},
+					},
+				},
+			),
+			req: types.CheckRequest{
+				Namespace: "stacks-12",
+				Group:     "dashboards.grafana.app",
+				Resource:  "dashboards",
+				Verb:      "list",
+				Name:      "dashUID",
+			},
+			checkRes: true,
+			want:     false,
+		},
+		{
+			name: "On behalf of, access token, propogated to a second service",
+			caller: authn.NewAccessTokenAuthInfo(
+				authn.Claims[authn.AccessTokenClaims]{
+					Claims: jwt.Claims{Subject: "service"},
+					Rest: authn.AccessTokenClaims{
+						Namespace:            "stacks-12",
+						DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:list"},
+						Actor: &authn.ActorClaims{
+							Subject: "secondService",
+							Actor: &authn.ActorClaims{
+								Subject: "user:1",
+							},
+						},
+					},
+				},
+			),
+			req: types.CheckRequest{
+				Namespace: "stacks-12",
+				Group:     "dashboards.grafana.app",
+				Resource:  "dashboards",
+				Verb:      "list",
+			},
+			checkRes: true,
+			want:     true,
 		},
 	}
 	for _, tt := range tests {

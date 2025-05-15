@@ -93,23 +93,23 @@ func NewClient(cc grpc.ClientConnInterface, opts ...AuthzClientOption) *ClientIm
 // Implementation
 // -----
 
-func (c *ClientImpl) check(ctx context.Context, id types.AuthInfo, req *types.CheckRequest) (bool, error) {
+func (c *ClientImpl) check(ctx context.Context, authInfo types.AuthInfo, req *types.CheckRequest) (bool, error) {
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.hasAccess")
 	defer span.End()
 
-	idIsServiceAccount := types.IsIdentityType(id.GetIdentityType(), types.TypeServiceAccount)
+	idIsServiceAccount := types.IsIdentityType(authInfo.GetIdentityType(), types.TypeServiceAccount)
 	if !idIsServiceAccount && (req.Name == k6FolderUID || req.Folder == k6FolderUID) {
 		return false, nil
 	}
 
-	key := checkCacheKey(id.GetSubject(), req)
+	key := checkCacheKey(authInfo.GetSubject(), req)
 	res, err := c.getCachedCheck(ctx, key)
 	if err == nil {
 		return res, nil
 	}
 
 	checkReq := &authzv1.CheckRequest{
-		Subject:     id.GetUID(),
+		Subject:     authInfo.GetUID(),
 		Verb:        req.Verb,
 		Group:       req.Group,
 		Resource:    req.Resource,
@@ -169,7 +169,7 @@ func hasPermissionInToken(tokenPermissions []string, group, resource, verb strin
 	return false
 }
 
-func (c *ClientImpl) Check(ctx context.Context, id types.AuthInfo, req types.CheckRequest) (types.CheckResponse, error) {
+func (c *ClientImpl) Check(ctx context.Context, authInfo types.AuthInfo, req types.CheckRequest) (types.CheckResponse, error) {
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.Check")
 	defer span.End()
 
@@ -178,16 +178,16 @@ func (c *ClientImpl) Check(ctx context.Context, id types.AuthInfo, req types.Che
 		return checkResponseDenied, err
 	}
 
-	if id.GetSubject() == "" {
+	if authInfo.GetSubject() == "" {
 		span.RecordError(ErrMissingAuthInfo)
 		return checkResponseDenied, ErrMissingAuthInfo
 	}
 
-	if !types.NamespaceMatches(id.GetNamespace(), req.Namespace) {
-		return checkResponseDenied, namespaceMissmatchError(id.GetNamespace(), req.Namespace)
+	if !types.NamespaceMatches(authInfo.GetNamespace(), req.Namespace) {
+		return checkResponseDenied, namespaceMissmatchError(authInfo.GetNamespace(), req.Namespace)
 	}
 
-	span.SetAttributes(attribute.String("subject", id.GetSubject()))
+	span.SetAttributes(attribute.String("subject", authInfo.GetSubject()))
 	span.SetAttributes(attribute.String("namespace", req.Namespace))
 	span.SetAttributes(attribute.String("verb", req.Verb))
 	span.SetAttributes(attribute.String("group", req.Group))
@@ -199,12 +199,12 @@ func (c *ClientImpl) Check(ctx context.Context, id types.AuthInfo, req types.Che
 		span.SetAttributes(attribute.String("path", req.Path))
 	}
 
-	isService := types.IsIdentityType(id.GetIdentityType(), types.TypeAccessPolicy)
+	isService := types.IsIdentityType(authInfo.GetIdentityType(), types.TypeAccessPolicy)
 	span.SetAttributes(attribute.Bool("with_user", !isService))
 
 	// No user => check on the service permissions
 	if isService {
-		permissions := id.GetTokenPermissions()
+		permissions := authInfo.GetTokenPermissions()
 		serviceIsAllowedAction := hasPermissionInToken(permissions, req.Group, req.Resource, req.Verb)
 
 		span.SetAttributes(attribute.Int("permissions", len(permissions)))
@@ -214,7 +214,7 @@ func (c *ClientImpl) Check(ctx context.Context, id types.AuthInfo, req types.Che
 	}
 
 	// Only check the service permissions if the access token check is enabled
-	permissions := id.GetTokenDelegatedPermissions()
+	permissions := authInfo.GetTokenDelegatedPermissions()
 	serviceIsAllowedAction := hasPermissionInToken(permissions, req.Group, req.Resource, req.Verb)
 
 	span.SetAttributes(attribute.Int("delegated_permissions", len(permissions)))
@@ -224,7 +224,7 @@ func (c *ClientImpl) Check(ctx context.Context, id types.AuthInfo, req types.Che
 		return checkResponseDenied, nil
 	}
 
-	res, err := c.check(ctx, id, &req)
+	res, err := c.check(ctx, authInfo, &req)
 	if err != nil {
 		span.RecordError(err)
 		return checkResponseDenied, err
@@ -235,8 +235,8 @@ func (c *ClientImpl) Check(ctx context.Context, id types.AuthInfo, req types.Che
 	return types.CheckResponse{Allowed: res}, nil
 }
 
-func (c *ClientImpl) compile(ctx context.Context, id types.AuthInfo, list *types.ListRequest) (*itemChecker, error) {
-	key := itemCheckerCacheKey(id.GetSubject(), list)
+func (c *ClientImpl) compile(ctx context.Context, authInfo types.AuthInfo, list *types.ListRequest) (*itemChecker, error) {
+	key := itemCheckerCacheKey(authInfo.GetSubject(), list)
 	checker, err := c.getCachedItemChecker(ctx, key)
 	if err == nil {
 		return checker, nil
@@ -247,7 +247,7 @@ func (c *ClientImpl) compile(ctx context.Context, id types.AuthInfo, list *types
 
 	// Query the authz service
 	listReq := &authzv1.ListRequest{
-		Subject:     id.GetUID(),
+		Subject:     authInfo.GetUID(),
 		Group:       list.Group,
 		Resource:    list.Resource,
 		Verb:        list.Verb,
@@ -266,7 +266,7 @@ func (c *ClientImpl) compile(ctx context.Context, id types.AuthInfo, list *types
 	return checker, err
 }
 
-func (c *ClientImpl) Compile(ctx context.Context, id types.AuthInfo, list types.ListRequest) (types.ItemChecker, error) {
+func (c *ClientImpl) Compile(ctx context.Context, authInfo types.AuthInfo, list types.ListRequest) (types.ItemChecker, error) {
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.List")
 	defer span.End()
 
@@ -275,13 +275,13 @@ func (c *ClientImpl) Compile(ctx context.Context, id types.AuthInfo, list types.
 		return nil, err
 	}
 
-	if id.GetSubject() == "" {
+	if authInfo.GetSubject() == "" {
 		span.RecordError(ErrMissingAuthInfo)
 		return nil, ErrMissingAuthInfo
 	}
 
-	if !types.NamespaceMatches(id.GetNamespace(), list.Namespace) {
-		return nil, namespaceMissmatchError(id.GetNamespace(), list.Namespace)
+	if !types.NamespaceMatches(authInfo.GetNamespace(), list.Namespace) {
+		return nil, namespaceMissmatchError(authInfo.GetNamespace(), list.Namespace)
 	}
 
 	span.SetAttributes(attribute.String("namespace", list.Namespace))
@@ -289,29 +289,29 @@ func (c *ClientImpl) Compile(ctx context.Context, id types.AuthInfo, list types.
 	span.SetAttributes(attribute.String("resource", list.Resource))
 	span.SetAttributes(attribute.String("verb", list.Verb))
 
-	isService := types.IsIdentityType(id.GetIdentityType(), types.TypeAccessPolicy)
+	isService := types.IsIdentityType(authInfo.GetIdentityType(), types.TypeAccessPolicy)
 	span.SetAttributes(attribute.Bool("with_user", !isService))
 
 	// No user => check on the service permissions
 	if isService {
-		if hasPermissionInToken(id.GetTokenPermissions(), list.Group, list.Resource, list.Verb) {
+		if hasPermissionInToken(authInfo.GetTokenPermissions(), list.Group, list.Resource, list.Verb) {
 			return allowAllChecker(true), nil
 		}
 		return denyAllChecker, nil
 	}
 
 	// Only check the service permissions if the access token check is enabled
-	if !hasPermissionInToken(id.GetTokenDelegatedPermissions(), list.Group, list.Resource, list.Verb) {
+	if !hasPermissionInToken(authInfo.GetTokenDelegatedPermissions(), list.Group, list.Resource, list.Verb) {
 		return denyAllChecker, nil
 	}
 
-	checker, err := c.compile(ctx, id, &list)
+	checker, err := c.compile(ctx, authInfo, &list)
 	if err != nil {
 		span.RecordError(err)
 		return denyAllChecker, err
 	}
 
-	return checker.fn(id), nil
+	return checker.fn(authInfo), nil
 }
 
 // newOutgoingContext creates a new context that will be canceled when the input context is canceled.
@@ -451,8 +451,8 @@ func newItemChecker(resp *authzv1.ListResponse) *itemChecker {
 }
 
 // fn generates a ItemChecker function that can check user access to items.
-func (c *itemChecker) fn(id types.AuthInfo) types.ItemChecker {
-	idIsSvcAccount := types.IsIdentityType(id.GetIdentityType(), types.TypeServiceAccount)
+func (c *itemChecker) fn(authInfo types.AuthInfo) types.ItemChecker {
+	idIsSvcAccount := types.IsIdentityType(authInfo.GetIdentityType(), types.TypeServiceAccount)
 	if c.All {
 		return allowAllChecker(idIsSvcAccount)
 	}

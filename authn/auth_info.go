@@ -30,6 +30,16 @@ func (a *AuthInfo) GetName() string {
 	if a.id != nil {
 		return a.id.Rest.getK8sName()
 	}
+
+	actor := a.at.Rest.getInnermostActor()
+	if actor != nil {
+		if actor.Type == types.TypeUser {
+			return actor.getK8sName()
+		}
+
+		return actor.Subject
+	}
+
 	return a.at.Subject
 }
 
@@ -37,6 +47,16 @@ func (a *AuthInfo) GetUID() string {
 	if a.id != nil {
 		return a.id.Rest.getTypedUID()
 	}
+
+	actor := a.at.Rest.getInnermostActor()
+	if actor != nil {
+		if actor.Type == types.TypeUser {
+			return actor.getTypedUID()
+		}
+
+		return actor.Subject
+	}
+
 	return a.at.Subject
 }
 
@@ -44,6 +64,16 @@ func (a *AuthInfo) GetIdentifier() string {
 	if a.id != nil {
 		return a.id.Rest.Identifier
 	}
+
+	actor := a.at.Rest.getInnermostActor()
+	if actor != nil {
+		if actor.Type == types.TypeUser {
+			return actor.Identifier
+		}
+
+		return strings.TrimPrefix(actor.Subject, string(types.TypeAccessPolicy)+":")
+	}
+
 	return strings.TrimPrefix(a.at.Subject, string(types.TypeAccessPolicy)+":")
 }
 
@@ -51,6 +81,14 @@ func (a *AuthInfo) GetIdentityType() types.IdentityType {
 	if a.id != nil {
 		return a.id.Rest.Type
 	}
+
+	actor := a.at.Rest.getInnermostActor()
+	if actor != nil {
+		if actor.Type == types.TypeUser {
+			return types.TypeUser
+		}
+	}
+
 	return types.TypeAccessPolicy
 }
 
@@ -89,13 +127,9 @@ func (a *AuthInfo) GetSubject() string {
 		return a.id.Subject
 	}
 
-	// Find the subject of the most nested actor
-	currentActor := a.at.Rest.Actor
-	if currentActor != nil {
-		for currentActor.Actor != nil {
-			currentActor = currentActor.Actor
-		}
-		return currentActor.Subject
+	actor := a.at.Rest.getInnermostActor()
+	if actor != nil {
+		return actor.Subject
 	}
 
 	return a.at.Subject
@@ -105,6 +139,14 @@ func (a *AuthInfo) GetAuthenticatedBy() string {
 	if a.id != nil {
 		return a.id.Rest.AuthenticatedBy
 	}
+
+	actor := a.at.Rest.getInnermostActor()
+	if actor != nil {
+		if actor.Type == types.TypeUser {
+			return actor.AuthenticatedBy
+		}
+	}
+
 	return ""
 }
 
@@ -127,6 +169,14 @@ func (a *AuthInfo) GetEmail() string {
 	if a.id != nil {
 		return a.id.Rest.Email
 	}
+
+	actor := a.at.Rest.getInnermostActor()
+	if actor != nil {
+		if actor.Type == types.TypeUser {
+			return actor.Email
+		}
+	}
+
 	return ""
 }
 
@@ -134,6 +184,14 @@ func (a *AuthInfo) GetEmailVerified() bool {
 	if a.id != nil {
 		return a.id.Rest.EmailVerified
 	}
+
+	actor := a.at.Rest.getInnermostActor()
+	if actor != nil {
+		if actor.Type == types.TypeUser {
+			return actor.EmailVerified
+		}
+	}
+
 	return false
 }
 
@@ -141,6 +199,14 @@ func (a *AuthInfo) GetUsername() string {
 	if a.id != nil {
 		return a.id.Rest.Username
 	}
+
+	actor := a.at.Rest.getInnermostActor()
+	if actor != nil {
+		if actor.Type == types.TypeUser {
+			return actor.Username
+		}
+	}
+
 	return ""
 }
 
@@ -148,5 +214,6 @@ func (a *AuthInfo) GetIDToken() string {
 	if a.id != nil {
 		return a.id.token
 	}
-	return ""
+
+	return a.at.token
 }

@@ -2,11 +2,15 @@ package authn
 
 import (
 	"context"
+	"fmt"
 )
 
 type ActorClaims struct {
 	Subject string       `json:"sub"`
 	Actor   *ActorClaims `json:"act,omitempty"`
+
+	// Embed IDTokenClaims for on behalf of flow.
+	IDTokenClaims
 }
 
 type AccessTokenClaims struct {
@@ -23,6 +27,34 @@ type AccessTokenClaims struct {
 	Actor *ActorClaims `json:"act,omitempty"`
 	// ServiceIdentity is the name/identity of the service that has been created/signed the access token.
 	ServiceIdentity string `json:"serviceIdentity,omitempty"`
+}
+
+func (c ActorClaims) getTypedUID() string {
+	return fmt.Sprintf("%s:%s", c.Type, c.Identifier)
+}
+
+func (c ActorClaims) getK8sName() string {
+	if c.DisplayName != "" {
+		return c.DisplayName
+	}
+	if c.Username != "" {
+		return c.Username
+	}
+	if c.Email != "" {
+		return c.Email
+	}
+	return c.Identifier
+}
+
+func (c AccessTokenClaims) getInnermostActor() *ActorClaims {
+	currentActor := c.Actor
+	if currentActor != nil {
+		for currentActor.Actor != nil {
+			currentActor = currentActor.Actor
+		}
+	}
+
+	return currentActor
 }
 
 func NewAccessTokenVerifier(cfg VerifierConfig, keys KeyRetriever) *AccessTokenVerifier {
