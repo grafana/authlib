@@ -74,7 +74,7 @@ func (a *AuthInfo) GetExtra() map[string][]string {
 
 	result := map[string][]string{}
 	if a.at.Rest.ServiceIdentity != "" {
-		result["serviceIdentity"] = []string{a.at.Rest.ServiceIdentity}
+		result[ServiceIdentityKey] = []string{a.at.Rest.ServiceIdentity}
 	}
 
 	return result
