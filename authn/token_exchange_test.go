@@ -43,11 +43,11 @@ func TestNewTokenExchangeClient(t *testing.T) {
 
 func Test_TokenExchangeClient_Exchange(t *testing.T) {
 	expiresIn := 10 * time.Minute
-	setup := func(srv *httptest.Server) *TokenExchangeClient {
+	setup := func(srv *httptest.Server, opts ...ExchangeClientOpts) *TokenExchangeClient {
 		c, err := NewTokenExchangeClient(TokenExchangeConfig{
 			Token:            "some-token",
 			TokenExchangeURL: srv.URL,
-		})
+		}, opts...)
 		require.NoError(t, err)
 		return c
 	}
@@ -182,6 +182,38 @@ func Test_TokenExchangeClient_Exchange(t *testing.T) {
 		require.NoError(t, err)
 		expectedExpiry := time.Now().Add(time.Duration(expiresIn) * time.Second)
 		require.InDelta(t, expectedExpiry.Unix(), claims.Expiry.Time().Unix(), 1)
+	})
+
+	t.Run("should use an alternate cache if provided", func(t *testing.T) {
+		testcache := &testCache{data: make(map[string][]byte)}
+
+		var calls int
+		c := setup(httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			calls++
+			require.Equal(t, r.Header.Get("Authorization"), "Bearer some-token")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data": {"token": "` + signAccessToken(t, expiresIn) + `"}}`))
+			bytes.NewBuffer([]byte(`{}`))
+			json.NewEncoder(&bytes.Buffer{})
+		})), WithTokenExchangeClientCache(testcache))
+
+		tokenToBeExchanged := signAccessToken(t, expiresIn)
+
+		res1, err := c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service"}, SubjectToken: tokenToBeExchanged})
+		assert.NoError(t, err)
+		assert.NotNil(t, res1)
+		require.Equal(t, 1, calls)
+		require.Len(t, testcache.data, 1)
+
+		// same namespace and audiences should load token from cache
+		res2, err := c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service"}, SubjectToken: tokenToBeExchanged})
+		assert.NoError(t, err)
+		assert.NotNil(t, res2)
+		require.Equal(t, 1, calls)
+		require.Len(t, testcache.data, 1)
+		require.Equal(t, res1, res2)
+
+		// This is only testing that the cache is used, so we do not repeat the other cases here.
 	})
 }
 
