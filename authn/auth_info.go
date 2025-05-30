@@ -3,6 +3,7 @@ package authn
 import (
 	"strings"
 
+	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/grafana/authlib/types"
 )
 
@@ -15,11 +16,14 @@ type AuthInfo struct {
 
 func NewAccessTokenAuthInfo(at Claims[AccessTokenClaims]) *AuthInfo {
 	var id *Claims[IDTokenClaims]
-	actorIdentity := at.Rest.getIdentity()
-	if actorIdentity != nil {
+	identityActor := at.Rest.getIdentityActor()
+	if identityActor != nil {
 		id = &Claims[IDTokenClaims]{
-			Rest:  *actorIdentity,
+			Rest:  identityActor.IDTokenClaims,
 			token: at.token,
+			Claims: jwt.Claims{
+				Subject: identityActor.Subject,
+			},
 		}
 	}
 
@@ -31,11 +35,14 @@ func NewAccessTokenAuthInfo(at Claims[AccessTokenClaims]) *AuthInfo {
 
 func NewIDTokenAuthInfo(at Claims[AccessTokenClaims], id *Claims[IDTokenClaims]) *AuthInfo {
 	if id == nil {
-		actorIdentity := at.Rest.getIdentity()
-		if actorIdentity != nil {
+		identityActor := at.Rest.getIdentityActor()
+		if identityActor != nil {
 			id = &Claims[IDTokenClaims]{
-				Rest:  *actorIdentity,
+				Rest:  identityActor.IDTokenClaims,
 				token: at.token,
+				Claims: jwt.Claims{
+					Subject: identityActor.Subject,
+				},
 			}
 		}
 	}

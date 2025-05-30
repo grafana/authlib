@@ -41,10 +41,10 @@ func (c AccessTokenClaims) getInnermostActor() *ActorClaims {
 	return currentActor
 }
 
-func (c AccessTokenClaims) getIdentity() *IDTokenClaims {
+func (c AccessTokenClaims) getIdentityActor() *ActorClaims {
 	actor := c.getInnermostActor()
 	if actor != nil && types.IsIdentityType(actor.IDTokenClaims.Type, types.TypeUser) {
-		return &actor.IDTokenClaims
+		return actor
 	}
 	return nil
 }

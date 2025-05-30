@@ -366,10 +366,13 @@ func TestClient_Check(t *testing.T) {
 				authn.Claims[authn.AccessTokenClaims]{
 					Claims: jwt.Claims{Subject: "service"},
 					Rest: authn.AccessTokenClaims{
-						Namespace:            "stacks-12",
 						DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:list"},
 						Actor: &authn.ActorClaims{
 							Subject: "user:1",
+							IDTokenClaims: authn.IDTokenClaims{
+								Type:      types.TypeUser,
+								Namespace: "stacks-12",
+							},
 						},
 					},
 				},
@@ -413,12 +416,15 @@ func TestClient_Check(t *testing.T) {
 				authn.Claims[authn.AccessTokenClaims]{
 					Claims: jwt.Claims{Subject: "service"},
 					Rest: authn.AccessTokenClaims{
-						Namespace:            "stacks-12",
 						DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:list"},
 						Actor: &authn.ActorClaims{
 							Subject: "secondService",
 							Actor: &authn.ActorClaims{
 								Subject: "user:1",
+								IDTokenClaims: authn.IDTokenClaims{
+									Type:      types.TypeUser,
+									Namespace: "stacks-12",
+								},
 							},
 						},
 					},
