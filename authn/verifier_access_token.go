@@ -2,7 +2,8 @@ package authn
 
 import (
 	"context"
-	"fmt"
+
+	"github.com/grafana/authlib/types"
 )
 
 type ActorClaims struct {
@@ -29,23 +30,6 @@ type AccessTokenClaims struct {
 	ServiceIdentity string `json:"serviceIdentity,omitempty"`
 }
 
-func (c ActorClaims) getTypedUID() string {
-	return fmt.Sprintf("%s:%s", c.Type, c.Identifier)
-}
-
-func (c ActorClaims) getK8sName() string {
-	if c.DisplayName != "" {
-		return c.DisplayName
-	}
-	if c.Username != "" {
-		return c.Username
-	}
-	if c.Email != "" {
-		return c.Email
-	}
-	return c.Identifier
-}
-
 func (c AccessTokenClaims) getInnermostActor() *ActorClaims {
 	currentActor := c.Actor
 	if currentActor != nil {
@@ -55,6 +39,14 @@ func (c AccessTokenClaims) getInnermostActor() *ActorClaims {
 	}
 
 	return currentActor
+}
+
+func (c AccessTokenClaims) getIdentity() *IDTokenClaims {
+	actor := c.getInnermostActor()
+	if actor != nil && types.IsIdentityType(actor.IDTokenClaims.Type, types.TypeUser) {
+		return &actor.IDTokenClaims
+	}
+	return nil
 }
 
 func NewAccessTokenVerifier(cfg VerifierConfig, keys KeyRetriever) *AccessTokenVerifier {
