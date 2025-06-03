@@ -15,18 +15,7 @@ type AuthInfo struct {
 }
 
 func NewAccessTokenAuthInfo(at Claims[AccessTokenClaims]) *AuthInfo {
-	var id *Claims[IDTokenClaims]
-	identityActor := at.Rest.getIdentityActor()
-	if identityActor != nil {
-		id = &Claims[IDTokenClaims]{
-			Rest:  identityActor.IDTokenClaims,
-			token: at.token,
-			Claims: jwt.Claims{
-				Subject: identityActor.Subject,
-			},
-		}
-	}
-
+	id := getIdInfo(at)
 	return &AuthInfo{
 		at: at,
 		id: id,
@@ -35,21 +24,29 @@ func NewAccessTokenAuthInfo(at Claims[AccessTokenClaims]) *AuthInfo {
 
 func NewIDTokenAuthInfo(at Claims[AccessTokenClaims], id *Claims[IDTokenClaims]) *AuthInfo {
 	if id == nil {
-		identityActor := at.Rest.getIdentityActor()
-		if identityActor != nil {
-			id = &Claims[IDTokenClaims]{
-				Rest:  identityActor.IDTokenClaims,
-				token: at.token,
-				Claims: jwt.Claims{
-					Subject: identityActor.Subject,
-				},
-			}
-		}
+		id = getIdInfo(at)
 	}
 
 	return &AuthInfo{
 		at: at,
 		id: id,
+	}
+}
+
+// getIdInfo checks if user info from ID token claims are in the innermost actor of an access token.
+// This can be the case if an ID token is sent in the request to sign an access token.
+func getIdInfo(at Claims[AccessTokenClaims]) *Claims[IDTokenClaims] {
+	identityActor := at.Rest.getIdentityActor()
+	if identityActor == nil {
+		return nil
+	}
+
+	return &Claims[IDTokenClaims]{
+		Rest:  identityActor.IDTokenClaims,
+		token: at.token,
+		Claims: jwt.Claims{
+			Subject: identityActor.Subject,
+		},
 	}
 }
 
