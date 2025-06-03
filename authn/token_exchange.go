@@ -34,6 +34,12 @@ func WithHTTPClient(client *http.Client) ExchangeClientOpts {
 	}
 }
 
+func WithTokenExchangeClientCache(cache cache.Cache) ExchangeClientOpts {
+	return func(c *TokenExchangeClient) {
+		c.cache = cache
+	}
+}
+
 func NewTokenExchangeClient(cfg TokenExchangeConfig, opts ...ExchangeClientOpts) (*TokenExchangeClient, error) {
 	if cfg.Token == "" {
 		return nil, fmt.Errorf("%w: missing required token", ErrMissingConfig)
@@ -44,9 +50,7 @@ func NewTokenExchangeClient(cfg TokenExchangeConfig, opts ...ExchangeClientOpts)
 	}
 
 	c := &TokenExchangeClient{
-		cache: cache.NewLocalCache(cache.Config{
-			CleanupInterval: 5 * time.Minute,
-		}),
+		cache:   nil, // See below.
 		cfg:     cfg,
 		singlef: singleflight.Group{},
 	}
@@ -57,6 +61,19 @@ func NewTokenExchangeClient(cfg TokenExchangeConfig, opts ...ExchangeClientOpts)
 
 	if c.client == nil {
 		c.client = httpclient.New()
+	}
+
+	// If the options did not set the cache, create a new local cache.
+	//
+	// This has to be done this way because the cache that is created by
+	// the cache.NewLocalCache function spawns a goroutine that cannot be
+	// trivially stopped. It is set up to stop when the object is garbage
+	// collected, but in the general case, the calling code will not have
+	// control over that.
+	if c.cache == nil {
+		c.cache = cache.NewLocalCache(cache.Config{
+			CleanupInterval: 5 * time.Minute,
+		})
 	}
 
 	return c, nil
