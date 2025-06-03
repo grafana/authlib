@@ -217,6 +217,28 @@ func Test_TokenExchangeClient_Exchange(t *testing.T) {
 	})
 }
 
+func Test_WithMinimumCacheTTL(t *testing.T) {
+	cfg := TokenExchangeConfig{
+		Token:            "some-token",
+		TokenExchangeURL: "http://localhost",
+	}
+
+	t.Run("not using WithMinimumCacheTTL should use the default", func(t *testing.T) {
+		client, err := NewTokenExchangeClient(cfg)
+		require.NoError(t, err)
+		require.NotNil(t, client)
+		assert.Equal(t, defaultCacheTTL, client.minimumTTL)
+	})
+
+	t.Run("using WithMinimumCacheTTL should modify the value", func(t *testing.T) {
+		customTTL := 42 * time.Second
+		client, err := NewTokenExchangeClient(cfg, WithMinimumCacheTTL(customTTL))
+		require.NoError(t, err)
+		require.NotNil(t, client)
+		assert.Equal(t, customTTL, client.minimumTTL)
+	})
+}
+
 func signAccessToken(t *testing.T, expiresIn time.Duration) string {
 	signer, err := jose.NewSigner(jose.SigningKey{
 		Algorithm: jose.HS256,
