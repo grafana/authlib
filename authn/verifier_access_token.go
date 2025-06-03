@@ -43,10 +43,16 @@ func (c AccessTokenClaims) getInnermostActor() *ActorClaims {
 
 func (c AccessTokenClaims) getIdentityActor() *ActorClaims {
 	actor := c.getInnermostActor()
-	if actor != nil && types.IsIdentityType(actor.IDTokenClaims.Type, types.TypeUser) {
-		return actor
+	if actor == nil {
+		return nil
 	}
-	return nil
+
+	actorType := actor.IDTokenClaims.Type
+	if !types.IsIdentityType(actorType, types.TypeUser) && !types.IsIdentityType(actorType, types.TypeServiceAccount) {
+		return nil
+	}
+
+	return actor
 }
 
 func NewAccessTokenVerifier(cfg VerifierConfig, keys KeyRetriever) *AccessTokenVerifier {
