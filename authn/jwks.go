@@ -27,6 +27,12 @@ func WithHTTPClientKeyRetrieverOpt(client *http.Client) DefaultKeyRetrieverOptio
 	}
 }
 
+func WithKeyRetrieverCache(cache cache.Cache) DefaultKeyRetrieverOption {
+	return func(c *DefaultKeyRetriever) {
+		c.c = cache
+	}
+}
+
 const (
 	cacheTTL             = 10 * time.Minute
 	cacheCleanupInterval = 10 * time.Minute
@@ -34,11 +40,8 @@ const (
 
 func NewKeyRetriever(cfg KeyRetrieverConfig, opt ...DefaultKeyRetrieverOption) *DefaultKeyRetriever {
 	s := &DefaultKeyRetriever{
-		cfg: cfg,
-		c: cache.NewLocalCache(cache.Config{
-			Expiry:          cacheTTL,
-			CleanupInterval: cacheCleanupInterval,
-		}),
+		cfg:    cfg,
+		c:      nil, // See below.
 		client: http.DefaultClient,
 		s:      &singleflight.Group{},
 	}
@@ -46,6 +49,21 @@ func NewKeyRetriever(cfg KeyRetrieverConfig, opt ...DefaultKeyRetrieverOption) *
 	for _, o := range opt {
 		o(s)
 	}
+
+	// If the options did not set the cache, create a new local cache.
+	//
+	// This has to be done this way because the cache that is created by
+	// the cache.NewLocalCache function spawns a goroutine that cannot be
+	// trivially stopped. It is set up to stop when the object is garbage
+	// collected, but in the general case, the calling code will not have
+	// control over that.
+	if s.c == nil {
+		s.c = cache.NewLocalCache(cache.Config{
+			Expiry:          cacheTTL,
+			CleanupInterval: cacheCleanupInterval,
+		})
+	}
+
 	return s
 }
 
