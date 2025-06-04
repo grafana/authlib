@@ -168,5 +168,5 @@ func (a *AuthInfo) GetIDToken() string {
 	if a.id != nil {
 		return a.id.token
 	}
-	return a.at.token
+	return ""
 }
