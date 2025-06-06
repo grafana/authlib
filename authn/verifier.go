@@ -83,9 +83,9 @@ type VerifierBase[T any] struct {
 
 // Verify will parse and verify provided token, if `AllowedAudiences` was configured those will be validated as well.
 func (v *VerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T], error) {
-	parsed, err := jwt.ParseSigned(token)
+	parsed, err := Parse(token)
 	if err != nil {
-		return nil, ErrParseToken
+		return nil, err
 	}
 
 	if !validType(parsed, v.tokenType) {
@@ -119,17 +119,40 @@ func (v *VerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T],
 	return &claims, nil
 }
 
+// Parse is also used in the Auth API to parse the raw token
+// and determine if a token is an ID token or an access token.
+func Parse(token string) (*jwt.JSONWebToken, error) {
+	parsed, err := jwt.ParseSigned(token)
+	if err != nil {
+		return nil, ErrParseToken
+	}
+
+	return parsed, nil
+}
+
+// GetType is also used in the Auth API to determine
+// if a token is an ID token or an access token.
+func GetType(token *jwt.JSONWebToken) (TokenType, error) {
+	for _, h := range token.Headers {
+		if t, ok := h.ExtraHeaders["typ"].(string); ok {
+			return t, nil
+		}
+	}
+
+	return "", ErrInvalidTokenType
+}
+
 func validType(token *jwt.JSONWebToken, typ string) bool {
 	if typ == "" {
 		return true
 	}
 
-	for _, h := range token.Headers {
-		if t, ok := h.ExtraHeaders["typ"].(string); ok && t == typ {
-			return true
-		}
+	tokenType, err := GetType(token)
+	if err != nil {
+		return false
 	}
-	return false
+
+	return tokenType == typ
 }
 
 func mapErr(err error) error {
