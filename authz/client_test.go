@@ -411,7 +411,7 @@ func TestClient_Check(t *testing.T) {
 			want:     false,
 		},
 		{
-			name: "On behalf of, access token, propogated to a second service",
+			name: "On behalf of, access token, propagated to a second service",
 			caller: authn.NewAccessTokenAuthInfo(
 				authn.Claims[authn.AccessTokenClaims]{
 					Claims: jwt.Claims{Subject: "service"},
