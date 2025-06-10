@@ -95,7 +95,7 @@ type TokenExchangeRequest struct {
 	Audiences []string `json:"audiences"`
 	// [Optional] SubjectToken is the token to exchange in case of a token exchange request.
 	SubjectToken string `json:"subjectToken,omitempty"`
-	// ExpiresIn is the duration, in seconds, before the token expires.
+	// [Optional] ExpiresIn is the duration, in seconds, before the token expires.
 	ExpiresIn *int `json:"expiresIn,omitempty"`
 }
 
