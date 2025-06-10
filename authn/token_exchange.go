@@ -93,7 +93,7 @@ type TokenExchangeRequest struct {
 	Namespace string `json:"namespace"`
 	// Audiences token should be signed with.
 	Audiences []string `json:"audiences"`
-	// SubjectToken is the token to exchange in case of a token exchange request.
+	// [Optional] SubjectToken is the token to exchange in case of a token exchange request.
 	SubjectToken string `json:"subjectToken,omitempty"`
 	// ExpiresIn is the duration, in seconds, before the token expires.
 	ExpiresIn *int `json:"expiresIn,omitempty"`
