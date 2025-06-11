@@ -3,6 +3,7 @@ package authn
 import (
 	"strings"
 
+	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/grafana/authlib/types"
 )
 
@@ -14,15 +15,38 @@ type AuthInfo struct {
 }
 
 func NewAccessTokenAuthInfo(at Claims[AccessTokenClaims]) *AuthInfo {
+	id := getIdInfo(at)
 	return &AuthInfo{
 		at: at,
+		id: id,
 	}
 }
 
 func NewIDTokenAuthInfo(at Claims[AccessTokenClaims], id *Claims[IDTokenClaims]) *AuthInfo {
+	if id == nil {
+		id = getIdInfo(at)
+	}
+
 	return &AuthInfo{
 		at: at,
 		id: id,
+	}
+}
+
+// getIdInfo checks if user info from ID token claims are in the innermost actor of an access token.
+// This can be the case if an ID token is sent in the request to sign an access token.
+func getIdInfo(at Claims[AccessTokenClaims]) *Claims[IDTokenClaims] {
+	identityActor := at.Rest.getIdentityActor()
+	if identityActor == nil {
+		return nil
+	}
+
+	return &Claims[IDTokenClaims]{
+		Rest:  identityActor.IDTokenClaims,
+		token: at.token,
+		Claims: jwt.Claims{
+			Subject: identityActor.Subject,
+		},
 	}
 }
 
@@ -30,21 +54,21 @@ func (a *AuthInfo) GetName() string {
 	if a.id != nil {
 		return a.id.Rest.getK8sName()
 	}
-	return a.at.Subject
+	return a.GetSubject()
 }
 
 func (a *AuthInfo) GetUID() string {
 	if a.id != nil {
 		return a.id.Rest.getTypedUID()
 	}
-	return a.at.Subject
+	return a.GetSubject()
 }
 
 func (a *AuthInfo) GetIdentifier() string {
 	if a.id != nil {
 		return a.id.Rest.Identifier
 	}
-	return strings.TrimPrefix(a.at.Subject, string(types.TypeAccessPolicy)+":")
+	return strings.TrimPrefix(a.GetSubject(), string(types.TypeAccessPolicy)+":")
 }
 
 func (a *AuthInfo) GetIdentityType() types.IdentityType {
@@ -90,13 +114,9 @@ func (a *AuthInfo) GetSubject() string {
 		return a.id.Subject
 	}
 
-	// Find the subject of the most nested actor
-	currentActor := a.at.Rest.Actor
-	if currentActor != nil {
-		for currentActor.Actor != nil {
-			currentActor = currentActor.Actor
-		}
-		return currentActor.Subject
+	actor := a.at.Rest.getInnermostActor()
+	if actor != nil {
+		return actor.Subject
 	}
 
 	return a.at.Subject

@@ -2,11 +2,16 @@ package authn
 
 import (
 	"context"
+
+	"github.com/grafana/authlib/types"
 )
 
 type ActorClaims struct {
 	Subject string       `json:"sub"`
 	Actor   *ActorClaims `json:"act,omitempty"`
+
+	// Embed IDTokenClaims for on behalf of flow.
+	IDTokenClaims
 }
 
 type AccessTokenClaims struct {
@@ -23,6 +28,31 @@ type AccessTokenClaims struct {
 	Actor *ActorClaims `json:"act,omitempty"`
 	// ServiceIdentity is the name/identity of the service that has been created/signed the access token.
 	ServiceIdentity string `json:"serviceIdentity,omitempty"`
+}
+
+func (c AccessTokenClaims) getInnermostActor() *ActorClaims {
+	currentActor := c.Actor
+	if currentActor != nil {
+		for currentActor.Actor != nil {
+			currentActor = currentActor.Actor
+		}
+	}
+
+	return currentActor
+}
+
+func (c AccessTokenClaims) getIdentityActor() *ActorClaims {
+	actor := c.getInnermostActor()
+	if actor == nil {
+		return nil
+	}
+
+	actorType := actor.IDTokenClaims.Type
+	if !types.IsIdentityType(actorType, types.TypeUser, types.TypeServiceAccount) {
+		return nil
+	}
+
+	return actor
 }
 
 func NewAccessTokenVerifier(cfg VerifierConfig, keys KeyRetriever) *AccessTokenVerifier {
