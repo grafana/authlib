@@ -110,7 +110,7 @@ func (a *DefaultAuthenticator) Authenticate(ctx context.Context, provider TokenP
 
 	idClaims, err := a.id.Verify(ctx, idToken)
 	if err != nil {
-		return nil, fmt.Errorf("failed to verify access token: %w", err)
+		return nil, fmt.Errorf("failed to verify id token: %w", err)
 	}
 
 	// verify that access token can operate in the same namespace as id token
