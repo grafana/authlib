@@ -42,8 +42,7 @@ func getIdInfo(at Claims[AccessTokenClaims]) *Claims[IDTokenClaims] {
 	}
 
 	return &Claims[IDTokenClaims]{
-		Rest:  identityActor.IDTokenClaims,
-		token: at.token,
+		Rest: identityActor.IDTokenClaims,
 		Claims: jwt.Claims{
 			Subject: identityActor.Subject,
 		},
@@ -92,7 +91,7 @@ func (a *AuthInfo) GetGroups() []string {
 func (a *AuthInfo) GetExtra() map[string][]string {
 	result := map[string][]string{}
 
-	if a.id != nil {
+	if a.id != nil && a.id.token != "" {
 		// Currently required for external k8s aggregation
 		// but this should be removed in the not-to-distant future
 		result["id-token"] = []string{a.id.token}
