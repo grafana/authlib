@@ -41,12 +41,15 @@ func getIdInfo(at Claims[AccessTokenClaims]) *Claims[IDTokenClaims] {
 		return nil
 	}
 
-	return &Claims[IDTokenClaims]{
+	claims := &Claims[IDTokenClaims]{
 		Rest: identityActor.IDTokenClaims,
 		Claims: jwt.Claims{
 			Subject: identityActor.Subject,
 		},
 	}
+
+	claims.Rest.Namespace = at.Rest.Namespace
+	return claims
 }
 
 func (a *AuthInfo) GetName() string {
