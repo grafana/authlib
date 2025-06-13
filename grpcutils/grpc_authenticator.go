@@ -65,7 +65,10 @@ func NewAuthenticatorInterceptor(auth authn.Authenticator, tracer trace.Tracer) 
 
 		// FIXME: Add attribute with service subject once https://github.com/grafana/authlib/issues/139 is closed.
 		span.SetAttributes(attribute.String("subject", info.GetUID()))
-		span.SetAttributes(attribute.Bool("service", types.IsIdentityType(info.GetIdentityType(), types.TypeAccessPolicy)))
+		if extra := info.GetExtra(); extra[authn.ServiceIdentityKey] != nil {
+			span.SetAttributes(attribute.String("service_identity", extra[authn.ServiceIdentityKey][0]))
+		}
+
 		return types.WithAuthInfo(ctx, info), nil
 	}
 }
