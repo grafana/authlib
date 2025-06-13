@@ -27,12 +27,12 @@ var (
 )
 
 var (
-	ErrMissingAuthInfo    = errors.New("missing auth info")
-	ErrNamespaceMissmatch = errors.New("namespace missmatch")
+	ErrMissingAuthInfo   = errors.New("missing auth info")
+	ErrNamespaceMismatch = errors.New("namespace mismatch")
 )
 
 func IsUnauthorizedErr(err error) bool {
-	return errors.Is(err, ErrNamespaceMissmatch)
+	return errors.Is(err, ErrNamespaceMismatch)
 }
 
 // ClientImpl will implement the types.AccessClient interface
@@ -184,7 +184,7 @@ func (c *ClientImpl) Check(ctx context.Context, authInfo types.AuthInfo, req typ
 	}
 
 	if !types.NamespaceMatches(authInfo.GetNamespace(), req.Namespace) {
-		return checkResponseDenied, namespaceMissmatchError(authInfo.GetNamespace(), req.Namespace)
+		return checkResponseDenied, namespaceMismatchError(authInfo.GetNamespace(), req.Namespace)
 	}
 
 	span.SetAttributes(attribute.String("subject", authInfo.GetSubject()))
@@ -281,7 +281,7 @@ func (c *ClientImpl) Compile(ctx context.Context, authInfo types.AuthInfo, list 
 	}
 
 	if !types.NamespaceMatches(authInfo.GetNamespace(), list.Namespace) {
-		return nil, namespaceMissmatchError(authInfo.GetNamespace(), list.Namespace)
+		return nil, namespaceMismatchError(authInfo.GetNamespace(), list.Namespace)
 	}
 
 	span.SetAttributes(attribute.String("namespace", list.Namespace))
@@ -469,6 +469,6 @@ func (c *itemChecker) fn(authInfo types.AuthInfo) types.ItemChecker {
 	}
 }
 
-func namespaceMissmatchError(a, b string) error {
-	return fmt.Errorf("%w: got %s but expected %s", ErrNamespaceMissmatch, a, b)
+func namespaceMismatchError(a, b string) error {
+	return fmt.Errorf("%w: got %s but expected %s", ErrNamespaceMismatch, a, b)
 }
