@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	ErrNamespaceMissmatch     = errors.New("namespace missmatch")
+	ErrNamespaceMismatch      = errors.New("namespace mismatch")
 	ErrMissingRequestGroup    = errors.New("missing request group")
 	ErrMissingRequestResource = errors.New("missing request resource")
 	ErrMissingRequestVerb     = errors.New("missing request verb")
@@ -140,6 +140,6 @@ func ValidateListRequest(req ListRequest) error {
 	return nil
 }
 
-func namespaceMissmatchError(a, b string) error {
-	return fmt.Errorf("%w: got %s but expected %s", ErrNamespaceMissmatch, a, b)
+func namespaceMismatchError(a, b string) error {
+	return fmt.Errorf("%w: got %s but expected %s", ErrNamespaceMismatch, a, b)
 }

@@ -115,7 +115,7 @@ func (a *DefaultAuthenticator) Authenticate(ctx context.Context, provider TokenP
 
 	// verify that access token can operate in the same namespace as id token
 	if !types.NamespaceMatches(atClaims.Rest.Namespace, idClaims.Rest.Namespace) {
-		return nil, errors.New("namespace missmatch")
+		return nil, errors.New("namespace mismatch")
 	}
 
 	return NewIDTokenAuthInfo(*atClaims, idClaims), nil
