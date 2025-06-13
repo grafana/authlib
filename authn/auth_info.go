@@ -48,6 +48,8 @@ func getIdInfo(at Claims[AccessTokenClaims]) *Claims[IDTokenClaims] {
 		},
 	}
 
+	// Namespace is deliberately not set on the identity actor.
+	// Instead use the namespace from the access token claims.
 	claims.Rest.Namespace = at.Rest.Namespace
 	return claims
 }
