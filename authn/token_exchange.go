@@ -138,7 +138,7 @@ type tokenExchangeData struct {
 func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeRequest) (*TokenExchangeResponse, error) {
 	ctx, span := c.tracer.Start(ctx, "authn.TokenExchangeClient.Exchange")
 	defer span.End()
-	span.SetAttributes(attribute.Bool("cache_used", false))
+	span.SetAttributes(attribute.Bool("cache_hit", false))
 
 	if r.Namespace == "" {
 		return nil, ErrMissingNamespace
@@ -151,7 +151,7 @@ func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeReque
 	key := r.hash()
 	token, ok := c.getCache(ctx, key)
 	if ok {
-		span.SetAttributes(attribute.Bool("cache_used", true))
+		span.SetAttributes(attribute.Bool("cache_hit", true))
 		return &TokenExchangeResponse{Token: token}, nil
 	}
 
