@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/go-jose/go-jose/v3/jwt"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
 	"golang.org/x/sync/singleflight"
@@ -212,6 +214,10 @@ func (c *TokenExchangeClient) withHeaders(r *http.Request) *http.Request {
 	// These will be ignored for non system tokens.
 	r.Header.Set("X-Org-ID", "0")
 	r.Header.Set("X-Realms", `[{"type": "system", "identifier": "system"}]`)
+
+	// Propagate OpenTelemetry context headers.
+	otel.GetTextMapPropagator().Inject(r.Context(), propagation.HeaderCarrier(r.Header))
+
 	return r
 }
 
