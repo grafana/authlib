@@ -11,6 +11,9 @@ import (
 	"time"
 
 	"github.com/go-jose/go-jose/v3/jwt"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/grafana/authlib/cache"
@@ -40,6 +43,12 @@ func WithTokenExchangeClientCache(cache cache.Cache) ExchangeClientOpts {
 	}
 }
 
+func WithTracer(tracer trace.Tracer) ExchangeClientOpts {
+	return func(c *TokenExchangeClient) {
+		c.tracer = tracer
+	}
+}
+
 func NewTokenExchangeClient(cfg TokenExchangeConfig, opts ...ExchangeClientOpts) (*TokenExchangeClient, error) {
 	if cfg.Token == "" {
 		return nil, fmt.Errorf("%w: missing required token", ErrMissingConfig)
@@ -53,6 +62,7 @@ func NewTokenExchangeClient(cfg TokenExchangeConfig, opts ...ExchangeClientOpts)
 		cache:   nil, // See below.
 		cfg:     cfg,
 		singlef: singleflight.Group{},
+		tracer:  noop.NewTracerProvider().Tracer("authn.TokenExchangeClient"),
 	}
 
 	for _, opt := range opts {
@@ -85,6 +95,7 @@ type TokenExchangeClient struct {
 	cfg     TokenExchangeConfig
 	client  *http.Client
 	singlef singleflight.Group
+	tracer  trace.Tracer
 }
 
 type TokenExchangeRequest struct {
@@ -125,6 +136,10 @@ type tokenExchangeData struct {
 }
 
 func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeRequest) (*TokenExchangeResponse, error) {
+	ctx, span := c.tracer.Start(ctx, "authn.TokenExchangeClient.Exchange")
+	defer span.End()
+	span.SetAttributes(attribute.Bool("cache_used", false))
+
 	if r.Namespace == "" {
 		return nil, ErrMissingNamespace
 	}
@@ -136,6 +151,7 @@ func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeReque
 	key := r.hash()
 	token, ok := c.getCache(ctx, key)
 	if ok {
+		span.SetAttributes(attribute.Bool("cache_used", true))
 		return &TokenExchangeResponse{Token: token}, nil
 	}
 
