@@ -20,6 +20,7 @@ import (
 
 	"github.com/grafana/authlib/cache"
 	"github.com/grafana/authlib/internal/httpclient"
+	"github.com/grafana/dskit/backoff"
 )
 
 // Provided for mockability of client
@@ -168,8 +169,28 @@ func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeReque
 			return nil, fmt.Errorf("failed to build http request: %w", err)
 		}
 
-		res, err := c.client.Do(c.withHeaders(req))
+		b := backoff.New(ctx, backoff.Config{
+			MaxBackoff: 4 * time.Second,
+			MinBackoff: time.Second,
+			MaxRetries: 3,
+		})
+
+		var res *http.Response
+		for b.Ongoing() {
+			res, err = c.client.Do(c.withHeaders(req))
+			// Retry the request if there was a fundamental error, like resolving the host or network error.
+			if err != nil {
+				b.Wait()
+				continue
+			}
+
+			// No error, exit the retry loop
+			break
+		}
+
 		if err != nil {
+			// If we get here, it means we had hit the MaxRetries limit.
+			// Only returns the last error.
 			return nil, fmt.Errorf("%w: %w", ErrInvalidExchangeResponse, err)
 		}
 		defer res.Body.Close()
