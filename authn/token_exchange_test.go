@@ -322,7 +322,6 @@ func Test_TokenExchangeClient_Exchange(t *testing.T) {
 			countRequests++
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = w.Write([]byte("{}"))
-			return
 		}))
 
 		c, err := NewTokenExchangeClient(TokenExchangeConfig{
