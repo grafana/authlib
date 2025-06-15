@@ -170,18 +170,20 @@ func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeReque
 			return nil, fmt.Errorf("%w: %w", ErrInvalidExchangeResponse, err)
 		}
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.TokenExchangeURL, bytes.NewReader(data))
-		if err != nil {
-			return nil, fmt.Errorf("failed to build http request: %w", err)
-		}
-
 		b := backoff.New(ctx, c.backoffCfg)
 
+		var req *http.Request
 		var res *http.Response
 		for b.Ongoing() {
-			res, err = c.client.Do(c.withHeaders(req))
-			// Retry the request if there was a fundamental error, like resolving the host or network error.
+			req, err = http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.TokenExchangeURL, bytes.NewReader(data))
 			if err != nil {
+				return nil, fmt.Errorf("failed to build http request: %w", err)
+			}
+
+			res, err = c.client.Do(c.withHeaders(req))
+			// Retry the request if there was a fundamental error, like resolving the host or network error,
+			// or if we get a 429 or a 500s HTTP status code
+			if err != nil || (res != nil && (res.StatusCode == http.StatusTooManyRequests || res.StatusCode >= http.StatusInternalServerError)) {
 				b.Wait()
 				continue
 			}

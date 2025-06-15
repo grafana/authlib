@@ -285,6 +285,57 @@ func Test_TokenExchangeClient_Exchange(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, res)
 	})
+
+	t.Run("should retry failed requests with transient errors, like status code 500x, and return token on successful sign request", func(t *testing.T) {
+		var countRequests = 0
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			countRequests++
+			if countRequests < 3 {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte("{}"))
+				return
+			}
+
+			require.Equal(t, r.Header.Get("Authorization"), "Bearer some-token")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data": {"token": "` + signAccessToken(t, expiresIn) + `"}}`))
+			bytes.NewBuffer([]byte(`{}`))
+			json.NewEncoder(&bytes.Buffer{})
+		}))
+
+		c, err := NewTokenExchangeClient(TokenExchangeConfig{
+			Token:            "some-token",
+			TokenExchangeURL: srv.URL,
+		})
+		require.NoError(t, err)
+
+		res, err := c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service"}})
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+	})
+
+	t.Run("should not retry failed requests with permanent errors, like status code 400x", func(t *testing.T) {
+		var countRequests = 0
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			countRequests++
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte("{}"))
+			return
+		}))
+
+		c, err := NewTokenExchangeClient(TokenExchangeConfig{
+			Token:            "some-token",
+			TokenExchangeURL: srv.URL,
+		})
+		require.NoError(t, err)
+
+		res, err := c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service"}})
+		assert.ErrorIs(t, err, ErrInvalidExchangeResponse)
+		assert.Nil(t, res)
+		assert.Equal(t, countRequests, 1)
+	})
 }
 
 func signAccessToken(t *testing.T, expiresIn time.Duration) string {
