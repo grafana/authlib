@@ -66,6 +66,11 @@ func NewTokenExchangeClient(cfg TokenExchangeConfig, opts ...ExchangeClientOpts)
 		cfg:     cfg,
 		singlef: singleflight.Group{},
 		tracer:  noop.NewTracerProvider().Tracer("authn.TokenExchangeClient"),
+		backoffCfg: backoff.Config{
+			MaxBackoff: 4 * time.Second,
+			MinBackoff: time.Second,
+			MaxRetries: 3,
+		},
 	}
 
 	for _, opt := range opts {
@@ -94,11 +99,12 @@ func NewTokenExchangeClient(cfg TokenExchangeConfig, opts ...ExchangeClientOpts)
 }
 
 type TokenExchangeClient struct {
-	cache   cache.Cache
-	cfg     TokenExchangeConfig
-	client  *http.Client
-	singlef singleflight.Group
-	tracer  trace.Tracer
+	cache      cache.Cache
+	cfg        TokenExchangeConfig
+	client     *http.Client
+	singlef    singleflight.Group
+	tracer     trace.Tracer
+	backoffCfg backoff.Config
 }
 
 type TokenExchangeRequest struct {
@@ -169,11 +175,7 @@ func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeReque
 			return nil, fmt.Errorf("failed to build http request: %w", err)
 		}
 
-		b := backoff.New(ctx, backoff.Config{
-			MaxBackoff: 4 * time.Second,
-			MinBackoff: time.Second,
-			MaxRetries: 3,
-		})
+		b := backoff.New(ctx, c.backoffCfg)
 
 		var res *http.Response
 		for b.Ongoing() {
