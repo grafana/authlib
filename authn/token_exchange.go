@@ -192,10 +192,18 @@ func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeReque
 			break
 		}
 
-		if err != nil {
-			// If we get here, it means we had hit the MaxRetries limit.
-			// Only returns the last error.
-			return nil, fmt.Errorf("%w: %w", ErrInvalidExchangeResponse, err)
+		if err != nil || b.Err() != nil {
+			// If we get here, it means we had hit the MaxRetries limit or an error happened
+			// while retrying the request (for example, context canceled).
+
+			// Returns Only the last error.
+			errRetry := err
+			if err == nil {
+				// in the absence of error, check error returned by the backoff struct
+				errRetry = b.Err()
+			}
+
+			return nil, fmt.Errorf("%w: %w", ErrInvalidExchangeResponse, errRetry)
 		}
 		defer res.Body.Close()
 
