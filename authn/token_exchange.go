@@ -185,8 +185,15 @@ func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeReque
 			// or if we get a 429 or a 500s HTTP status code
 			if err != nil || (res != nil && (res.StatusCode == http.StatusTooManyRequests || res.StatusCode >= http.StatusInternalServerError)) {
 				b.Wait()
+
+				// Close response body after each attempt
+				if res != nil && res.Body != nil {
+					res.Body.Close()
+				}
 				continue
 			}
+
+			defer res.Body.Close()
 
 			// No error, exit the retry loop
 			break
@@ -205,7 +212,6 @@ func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeReque
 
 			return nil, fmt.Errorf("%w: %w", ErrInvalidExchangeResponse, errRetry)
 		}
-		defer res.Body.Close()
 
 		if res.StatusCode >= http.StatusInternalServerError {
 			return nil, fmt.Errorf("%w: %s", ErrInvalidExchangeResponse, res.Status)
