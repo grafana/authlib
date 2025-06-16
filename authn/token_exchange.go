@@ -67,8 +67,8 @@ func NewTokenExchangeClient(cfg TokenExchangeConfig, opts ...ExchangeClientOpts)
 		singlef: singleflight.Group{},
 		tracer:  noop.NewTracerProvider().Tracer("authn.TokenExchangeClient"),
 		backoffCfg: backoff.Config{
-			MaxBackoff: 4 * time.Second,
-			MinBackoff: time.Second,
+			MaxBackoff: time.Second,
+			MinBackoff: 250 * time.Millisecond,
 			MaxRetries: 3,
 		},
 	}
