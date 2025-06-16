@@ -44,7 +44,7 @@ func TestNamespaceMatches(t *testing.T) {
 			expected:          true,
 		},
 		{
-			desc:              "namespace missmatch",
+			desc:              "namespace mismatch",
 			namespace:         "stacks-1",
 			expectedNamespace: "stacks-2",
 			expected:          false,

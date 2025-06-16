@@ -74,6 +74,24 @@ func TestAuthInfo_getIdInfo(t *testing.T) {
 		idInfo := getIdInfo(at)
 		assert.Equal(t, "user-subject", idInfo.Claims.Subject)
 	})
+
+	t.Run("should not use nested namespace", func(t *testing.T) {
+		at := Claims[AccessTokenClaims]{
+			Rest: AccessTokenClaims{
+				Namespace: "at-namespace",
+				Actor: &ActorClaims{
+					Subject: "user-subject",
+					IDTokenClaims: IDTokenClaims{
+						Namespace: "id-namespace",
+						Type:      types.TypeUser,
+					},
+				},
+			},
+		}
+
+		idInfo := getIdInfo(at)
+		assert.Equal(t, "at-namespace", idInfo.Rest.Namespace)
+	})
 }
 
 func TestAuthInfo_GetTokenPermissions(t *testing.T) {
