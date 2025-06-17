@@ -184,7 +184,7 @@ func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeReque
 			res, err = c.client.Do(c.withHeaders(req))
 			// Retry the request if there was a fundamental error, like resolving the host or network error,
 			// or if we get a 429 or a 500s HTTP status code
-			if err != nil || (res != nil && (res.StatusCode == http.StatusTooManyRequests || res.StatusCode >= http.StatusInternalServerError)) {
+			if shouldRetry(res, err) {
 				// Consume and close response body after each attempt, so connections can be reused
 				if res != nil {
 					_, _ = io.Copy(io.Discard, res.Body)
@@ -243,6 +243,19 @@ func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeReque
 
 	response := resp.(tokenExchangeResponse)
 	return &TokenExchangeResponse{Token: response.Data.Token}, nil
+}
+
+// shouldRetry determines whether a request should be retried based on the HTTP response status code
+// or the presence of an error. It returns true for HTTP 429 (Too Many Requests) or server errors
+// (HTTP status codes 500 and above).
+func shouldRetry(res *http.Response, err error) bool {
+	if err != nil {
+		return true
+	}
+	if res != nil {
+		return res.StatusCode == http.StatusTooManyRequests || res.StatusCode >= http.StatusInternalServerError
+	}
+	return false
 }
 
 func (c *TokenExchangeClient) withHeaders(r *http.Request) *http.Request {
