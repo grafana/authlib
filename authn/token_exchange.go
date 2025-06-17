@@ -187,7 +187,7 @@ func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeReque
 				b.Wait()
 
 				// Close response body after each attempt
-				if res != nil && res.Body != nil {
+				if res != nil {
 					res.Body.Close()
 				}
 				continue
