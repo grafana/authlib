@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -184,12 +185,13 @@ func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeReque
 			// Retry the request if there was a fundamental error, like resolving the host or network error,
 			// or if we get a 429 or a 500s HTTP status code
 			if err != nil || (res != nil && (res.StatusCode == http.StatusTooManyRequests || res.StatusCode >= http.StatusInternalServerError)) {
-				b.Wait()
-
-				// Close response body after each attempt
+				// Consume and close response body after each attempt, so connections can be reused
 				if res != nil {
+					_, _ = io.Copy(io.Discard, res.Body)
 					res.Body.Close()
 				}
+
+				b.Wait()
 				continue
 			}
 
