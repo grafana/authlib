@@ -185,6 +185,8 @@ func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeReque
 			// Retry the request if there was a fundamental error, like resolving the host or network error,
 			// or if we get a 429 or a 500s HTTP status code
 			if shouldRetry(res, err) {
+				addRetryInformationToSpan(span, res, err)
+
 				// Consume and close response body after each attempt, so connections can be reused
 				if res != nil {
 					_, _ = io.Copy(io.Discard, res.Body)
@@ -256,6 +258,19 @@ func shouldRetry(res *http.Response, err error) bool {
 		return res.StatusCode == http.StatusTooManyRequests || res.StatusCode >= http.StatusInternalServerError
 	}
 	return false
+}
+
+// addRetryInformationToSpan adds an event to the span indicating error and HTTP status code
+func addRetryInformationToSpan(span trace.Span, res *http.Response, err error) {
+	spanAttr := []attribute.KeyValue{}
+	if err != nil {
+		spanAttr = append(spanAttr, attribute.String("error", err.Error()))
+	}
+
+	if res != nil {
+		spanAttr = append(spanAttr, attribute.String("status", res.Status))
+	}
+	span.AddEvent("Failed HTTP request will be retried", trace.WithAttributes(spanAttr...))
 }
 
 func (c *TokenExchangeClient) withHeaders(r *http.Request) *http.Request {
