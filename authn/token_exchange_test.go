@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -214,6 +216,124 @@ func Test_TokenExchangeClient_Exchange(t *testing.T) {
 		require.Equal(t, res1, res2)
 
 		// This is only testing that the cache is used, so we do not repeat the other cases here.
+	})
+
+	t.Run("should retry requests and return token on successful sign request", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, r.Header.Get("Authorization"), "Bearer some-token")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data": {"token": "` + signAccessToken(t, expiresIn) + `"}}`))
+			bytes.NewBuffer([]byte(`{}`))
+			json.NewEncoder(&bytes.Buffer{})
+		}))
+
+		c, err := NewTokenExchangeClient(TokenExchangeConfig{
+			Token:            "some-token",
+			TokenExchangeURL: srv.URL,
+		})
+		require.NoError(t, err)
+
+		var countRequests = 0
+		// brokenTransport returns a network error on the first 2 requests.
+		brokenTransport := &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				if countRequests < 2 {
+					countRequests++
+					return nil, fmt.Errorf("network error")
+				}
+				countRequests = 0
+				return net.Dial(network, addr)
+			},
+		}
+		c.client.Transport = brokenTransport
+
+		res, err := c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service"}})
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+	})
+
+	t.Run("should retry requests and return error after 3 failed requests", func(t *testing.T) {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			require.Equal(t, r.Header.Get("Authorization"), "Bearer some-token")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data": {"token": "` + signAccessToken(t, expiresIn) + `"}}`))
+			bytes.NewBuffer([]byte(`{}`))
+			json.NewEncoder(&bytes.Buffer{})
+		}))
+
+		c, err := NewTokenExchangeClient(TokenExchangeConfig{
+			Token:            "some-token",
+			TokenExchangeURL: srv.URL,
+		})
+		require.NoError(t, err)
+
+		var countRequests = 0
+		// brokenTransport returns a network error on the first 3 requests.
+		brokenTransport := &http.Transport{
+			DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+				if countRequests < 3 {
+					countRequests++
+					return nil, fmt.Errorf("network error")
+				}
+				countRequests = 0
+				return net.Dial(network, addr)
+			},
+		}
+		c.client.Transport = brokenTransport
+
+		res, err := c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service"}})
+		assert.Error(t, err)
+		assert.Nil(t, res)
+	})
+
+	t.Run("should retry failed requests with transient errors, like status code 500x, and return token on successful sign request", func(t *testing.T) {
+		var countRequests = 0
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			countRequests++
+			if countRequests < 3 {
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte("{}"))
+				return
+			}
+
+			require.Equal(t, r.Header.Get("Authorization"), "Bearer some-token")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data": {"token": "` + signAccessToken(t, expiresIn) + `"}}`))
+			bytes.NewBuffer([]byte(`{}`))
+			json.NewEncoder(&bytes.Buffer{})
+		}))
+
+		c, err := NewTokenExchangeClient(TokenExchangeConfig{
+			Token:            "some-token",
+			TokenExchangeURL: srv.URL,
+		})
+		require.NoError(t, err)
+
+		res, err := c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service"}})
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+	})
+
+	t.Run("should not retry failed requests with permanent errors, like status code 400x", func(t *testing.T) {
+		var countRequests = 0
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			countRequests++
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte("{}"))
+		}))
+
+		c, err := NewTokenExchangeClient(TokenExchangeConfig{
+			Token:            "some-token",
+			TokenExchangeURL: srv.URL,
+		})
+		require.NoError(t, err)
+
+		res, err := c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "*", Audiences: []string{"some-service"}})
+		assert.ErrorIs(t, err, ErrInvalidExchangeResponse)
+		assert.Nil(t, res)
+		assert.Equal(t, countRequests, 1)
 	})
 }
 

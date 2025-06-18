@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"sort"
 	"strings"
@@ -20,6 +22,7 @@ import (
 
 	"github.com/grafana/authlib/cache"
 	"github.com/grafana/authlib/internal/httpclient"
+	"github.com/grafana/dskit/backoff"
 )
 
 // Provided for mockability of client
@@ -65,6 +68,11 @@ func NewTokenExchangeClient(cfg TokenExchangeConfig, opts ...ExchangeClientOpts)
 		cfg:     cfg,
 		singlef: singleflight.Group{},
 		tracer:  noop.NewTracerProvider().Tracer("authn.TokenExchangeClient"),
+		backoffCfg: backoff.Config{
+			MaxBackoff: time.Second,
+			MinBackoff: 250 * time.Millisecond,
+			MaxRetries: 3,
+		},
 	}
 
 	for _, opt := range opts {
@@ -93,11 +101,12 @@ func NewTokenExchangeClient(cfg TokenExchangeConfig, opts ...ExchangeClientOpts)
 }
 
 type TokenExchangeClient struct {
-	cache   cache.Cache
-	cfg     TokenExchangeConfig
-	client  *http.Client
-	singlef singleflight.Group
-	tracer  trace.Tracer
+	cache      cache.Cache
+	cfg        TokenExchangeConfig
+	client     *http.Client
+	singlef    singleflight.Group
+	tracer     trace.Tracer
+	backoffCfg backoff.Config
 }
 
 type TokenExchangeRequest struct {
@@ -163,16 +172,43 @@ func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeReque
 			return nil, fmt.Errorf("%w: %w", ErrInvalidExchangeResponse, err)
 		}
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.TokenExchangeURL, bytes.NewReader(data))
-		if err != nil {
-			return nil, fmt.Errorf("failed to build http request: %w", err)
+		b := backoff.New(ctx, c.backoffCfg)
+
+		var req *http.Request
+		var res *http.Response
+		for b.Ongoing() {
+			req, err = http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.TokenExchangeURL, bytes.NewReader(data))
+			if err != nil {
+				return nil, fmt.Errorf("failed to build http request: %w", err)
+			}
+
+			res, err = c.client.Do(c.withHeaders(req))
+			// Retry the request if there was a fundamental error, like resolving the host or network error,
+			// or if we get a 429 or a 500s HTTP status code
+			if shouldRetry(res, err) {
+				addRetryInformationToSpan(span, res, err)
+
+				// Consume and close response body after each attempt, so connections can be reused
+				if res != nil {
+					_, _ = io.Copy(io.Discard, res.Body)
+					res.Body.Close()
+				}
+
+				b.Wait()
+				continue
+			}
+
+			defer res.Body.Close()
+
+			// No error, exit the retry loop
+			break
 		}
 
-		res, err := c.client.Do(c.withHeaders(req))
-		if err != nil {
-			return nil, fmt.Errorf("%w: %w", ErrInvalidExchangeResponse, err)
+		if err != nil || b.Err() != nil {
+			// If we get here, it means we had hit the MaxRetries limit or an error happened
+			// while retrying the request (for example, context canceled).
+			return nil, fmt.Errorf("%w: %w", ErrInvalidExchangeResponse, errors.Join(b.Err(), err))
 		}
-		defer res.Body.Close()
 
 		if res.StatusCode >= http.StatusInternalServerError {
 			return nil, fmt.Errorf("%w: %s", ErrInvalidExchangeResponse, res.Status)
@@ -202,6 +238,32 @@ func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeReque
 
 	response := resp.(tokenExchangeResponse)
 	return &TokenExchangeResponse{Token: response.Data.Token}, nil
+}
+
+// shouldRetry determines whether a request should be retried based on the HTTP response status code
+// or the presence of an error. It returns true for HTTP 429 (Too Many Requests) or server errors
+// (HTTP status codes 500 and above).
+func shouldRetry(res *http.Response, err error) bool {
+	if err != nil {
+		return true
+	}
+	if res != nil {
+		return res.StatusCode == http.StatusTooManyRequests || res.StatusCode >= http.StatusInternalServerError
+	}
+	return false
+}
+
+// addRetryInformationToSpan adds an event to the span indicating error and HTTP status code
+func addRetryInformationToSpan(span trace.Span, res *http.Response, err error) {
+	spanAttr := []attribute.KeyValue{}
+	if err != nil {
+		span.RecordError(err)
+	}
+
+	if res != nil {
+		spanAttr = append(spanAttr, attribute.String("status", res.Status))
+	}
+	span.AddEvent("Failed HTTP request will be retried", trace.WithAttributes(spanAttr...))
 }
 
 func (c *TokenExchangeClient) withHeaders(r *http.Request) *http.Request {
