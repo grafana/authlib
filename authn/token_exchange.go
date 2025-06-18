@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -206,15 +207,7 @@ func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeReque
 		if err != nil || b.Err() != nil {
 			// If we get here, it means we had hit the MaxRetries limit or an error happened
 			// while retrying the request (for example, context canceled).
-
-			// Returns Only the last error.
-			errRetry := err
-			if err == nil {
-				// in the absence of error, check error returned by the backoff struct
-				errRetry = b.Err()
-			}
-
-			return nil, fmt.Errorf("%w: %w", ErrInvalidExchangeResponse, errRetry)
+			return nil, fmt.Errorf("%w: %w", ErrInvalidExchangeResponse, errors.Join(b.Err(), err))
 		}
 
 		if res.StatusCode >= http.StatusInternalServerError {
@@ -264,7 +257,7 @@ func shouldRetry(res *http.Response, err error) bool {
 func addRetryInformationToSpan(span trace.Span, res *http.Response, err error) {
 	spanAttr := []attribute.KeyValue{}
 	if err != nil {
-		spanAttr = append(spanAttr, attribute.String("error", err.Error()))
+		span.RecordError(err)
 	}
 
 	if res != nil {
