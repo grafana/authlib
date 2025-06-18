@@ -257,7 +257,7 @@ func addRequestInformationToSpan(span trace.Span, res *http.Response, err error)
 	if err != nil {
 		span.RecordError(err)
 	} else {
-		span.AddEvent("request", trace.WithAttributes(attribute.Int("status", res.StatusCode)))
+		span.AddEvent("response", trace.WithAttributes(attribute.Int("status", res.StatusCode)))
 	}
 }
 
