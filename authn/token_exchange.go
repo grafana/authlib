@@ -183,7 +183,7 @@ func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeReque
 			}
 
 			res, err = c.client.Do(c.withHeaders(req))
-			addRequestInformationToSpan(span, res, err)
+			addResponseInformationToSpan(span, res, err)
 			// Retry the request if there was a fundamental error, like resolving the host or network error,
 			// or if we get a 429 or a 500s HTTP status code
 			if shouldRetry(res, err) {
@@ -252,8 +252,8 @@ func shouldRetry(res *http.Response, err error) bool {
 	return false
 }
 
-// addRequestInformationToSpan adds an event to the span indicating error and HTTP status code
-func addRequestInformationToSpan(span trace.Span, res *http.Response, err error) {
+// addResponseInformationToSpan adds an event to the span indicating error and HTTP status code
+func addResponseInformationToSpan(span trace.Span, res *http.Response, err error) {
 	if err != nil {
 		span.RecordError(err)
 	} else {
