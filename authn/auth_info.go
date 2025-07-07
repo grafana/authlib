@@ -36,7 +36,7 @@ func NewIDTokenAuthInfo(at Claims[AccessTokenClaims], id *Claims[IDTokenClaims])
 // getIdInfo checks if user info from ID token claims are in the innermost actor of an access token.
 // This can be the case if an ID token is sent in the request to sign an access token.
 func getIdInfo(at Claims[AccessTokenClaims]) *Claims[IDTokenClaims] {
-	identityActor := at.Rest.getIdentityActor()
+	identityActor := at.Rest.GetIdentityActor()
 	if identityActor == nil {
 		return nil
 	}

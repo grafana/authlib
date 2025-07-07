@@ -44,10 +44,10 @@ func TestAccessToken_getInnermostActor(t *testing.T) {
 	})
 }
 
-func TestAccessToken_getIdentityActor(t *testing.T) {
+func TestAccessToken_GetIdentityActor(t *testing.T) {
 	t.Run("no actor", func(t *testing.T) {
 		claims := AccessTokenClaims{}
-		actor := claims.getIdentityActor()
+		actor := claims.GetIdentityActor()
 		var nilActor *ActorClaims
 		assert.Equal(t, nilActor, actor)
 	})
@@ -61,7 +61,7 @@ func TestAccessToken_getIdentityActor(t *testing.T) {
 			},
 		}
 
-		actor := claims.getIdentityActor()
+		actor := claims.GetIdentityActor()
 		var nilActor *ActorClaims
 		assert.Equal(t, nilActor, actor)
 	})
@@ -78,7 +78,7 @@ func TestAccessToken_getIdentityActor(t *testing.T) {
 			},
 		}
 
-		actor := claims.getIdentityActor()
+		actor := claims.GetIdentityActor()
 		assert.Equal(t, "nested-user-actor", actor.Subject)
 	})
 
@@ -94,7 +94,7 @@ func TestAccessToken_getIdentityActor(t *testing.T) {
 			},
 		}
 
-		actor := claims.getIdentityActor()
+		actor := claims.GetIdentityActor()
 		assert.Equal(t, "nested-user-actor", actor.Subject)
 	})
 }

@@ -41,7 +41,7 @@ func (c AccessTokenClaims) getInnermostActor() *ActorClaims {
 	return currentActor
 }
 
-func (c AccessTokenClaims) getIdentityActor() *ActorClaims {
+func (c AccessTokenClaims) GetIdentityActor() *ActorClaims {
 	actor := c.getInnermostActor()
 	if actor == nil {
 		return nil
