@@ -15,15 +15,16 @@ var (
 type IdentityType string
 
 const (
-	TypeUser           IdentityType = "user"
-	TypeAPIKey         IdentityType = "api-key"
-	TypeServiceAccount IdentityType = "service-account"
-	TypeAnonymous      IdentityType = "anonymous"
-	TypeRenderService  IdentityType = "render"
-	TypeAccessPolicy   IdentityType = "access-policy"
-	TypeProvisioning   IdentityType = "provisioning"
-	TypePublic         IdentityType = "public"
-	TypeEmpty          IdentityType = ""
+	TypeUser            IdentityType = "user"
+	TypeAPIKey          IdentityType = "api-key"
+	TypeServiceAccount  IdentityType = "service-account"
+	TypeAnonymous       IdentityType = "anonymous"
+	TypeRenderService   IdentityType = "render"
+	TypeUnauthenticated IdentityType = "unauthenticated"
+	TypeAccessPolicy    IdentityType = "access-policy"
+	TypeProvisioning    IdentityType = "provisioning"
+	TypePublic          IdentityType = "public"
+	TypeEmpty           IdentityType = ""
 )
 
 func (n IdentityType) String() string {
@@ -60,6 +61,8 @@ func ParseType(str string) (IdentityType, error) {
 		return TypeAnonymous, nil
 	case string(TypeRenderService):
 		return TypeRenderService, nil
+	case string(TypeUnauthenticated):
+		return TypeUnauthenticated, nil
 	case string(TypeAccessPolicy):
 		return TypeAccessPolicy, nil
 	case string(TypePublic):
