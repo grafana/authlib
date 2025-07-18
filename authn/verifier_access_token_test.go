@@ -98,3 +98,46 @@ func TestAccessToken_getIdentityActor(t *testing.T) {
 		assert.Equal(t, "nested-user-actor", actor.Subject)
 	})
 }
+
+func TestAccessToken_IsOnBehalfOfUser(t *testing.T) {
+	t.Run("no actor", func(t *testing.T) {
+		claims := AccessTokenClaims{}
+		assert.False(t, claims.IsOnBehalfOfUser())
+	})
+
+	t.Run("user actor", func(t *testing.T) {
+		claims := AccessTokenClaims{
+			Actor: &ActorClaims{
+				IDTokenClaims: IDTokenClaims{
+					Type: types.TypeUser,
+				},
+			},
+		}
+
+		assert.True(t, claims.IsOnBehalfOfUser())
+	})
+
+	t.Run("service account actor", func(t *testing.T) {
+		claims := AccessTokenClaims{
+			Actor: &ActorClaims{
+				IDTokenClaims: IDTokenClaims{
+					Type: types.TypeServiceAccount,
+				},
+			},
+		}
+
+		assert.True(t, claims.IsOnBehalfOfUser())
+	})
+
+	t.Run("non-user actor", func(t *testing.T) {
+		claims := AccessTokenClaims{
+			Actor: &ActorClaims{
+				IDTokenClaims: IDTokenClaims{
+					Type: types.TypeAccessPolicy,
+				},
+			},
+		}
+
+		assert.False(t, claims.IsOnBehalfOfUser())
+	})
+}
