@@ -55,6 +55,10 @@ func (c AccessTokenClaims) getIdentityActor() *ActorClaims {
 	return actor
 }
 
+func (c AccessTokenClaims) IsOnBehalfOfUser() bool {
+	return c.getIdentityActor() != nil
+}
+
 func NewAccessTokenVerifier(cfg VerifierConfig, keys KeyRetriever) *AccessTokenVerifier {
 	return &AccessTokenVerifier{
 		v: NewVerifier[AccessTokenClaims](cfg, TokenTypeAccess, keys),
