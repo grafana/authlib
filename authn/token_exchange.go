@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -289,7 +288,7 @@ func (c *TokenExchangeClient) getCache(ctx context.Context, key string) (string,
 func (c *TokenExchangeClient) setCache(ctx context.Context, token string, key string) error {
 	const cacheLeeway = 15 * time.Second
 
-	parsed, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.ES256})
+	parsed, err := jwt.ParseSigned(token, tokenSignAlgs)
 	if err != nil {
 		return fmt.Errorf("failed to parse token: %v", err)
 	}

@@ -17,6 +17,9 @@ const (
 	TokenTypeAccess TokenType = "at+jwt"
 )
 
+// tokenSignAlgs - Signature algorithms used to sign the tokens.
+var tokenSignAlgs = []jose.SignatureAlgorithm{jose.ES256}
+
 type Claims[T any] struct {
 	jwt.Claims
 	Rest T
@@ -122,7 +125,7 @@ func (v *VerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T],
 // Parse is also used in the Auth API to parse the raw token
 // and determine if a token is an ID token or an access token.
 func Parse(token string) (*jwt.JSONWebToken, error) {
-	parsed, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.ES256})
+	parsed, err := jwt.ParseSigned(token, tokenSignAlgs)
 	if err != nil {
 		return nil, ErrParseToken
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
 )
 
@@ -23,7 +22,7 @@ type UnsafeVerifierBase[T any] struct {
 
 // Verify will parse and verify provided token, if `AllowedAudiences` was configured those will be validated as well.
 func (v *UnsafeVerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T], error) {
-	parsed, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.ES256})
+	parsed, err := jwt.ParseSigned(token, tokenSignAlgs)
 	if err != nil {
 		return nil, ErrParseToken
 	}
