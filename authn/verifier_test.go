@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-jose/go-jose/v3"
-	"github.com/go-jose/go-jose/v3/jwt"
+	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -211,7 +211,7 @@ func signToken(t *testing.T, keyID string, key *ecdsa.PrivateKey, exp time.Time)
 	})
 	require.NoError(t, err)
 
-	token, err := jwt.Signed(signer).Claims(jwt.Claims{Audience: jwt.Audience{"stack:1"}, Expiry: jwt.NewNumericDate(exp)}).CompactSerialize()
+	token, err := jwt.Signed(signer).Claims(jwt.Claims{Audience: jwt.Audience{"stack:1"}, Expiry: jwt.NewNumericDate(exp)}).Serialize()
 	require.NoError(t, err)
 
 	return token

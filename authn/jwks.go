@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-jose/go-jose/v3"
+	"github.com/go-jose/go-jose/v4"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/grafana/authlib/cache"
