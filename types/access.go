@@ -3,7 +3,6 @@ package types
 import (
 	"context"
 	"errors"
-	"fmt"
 )
 
 var (
@@ -138,8 +137,4 @@ func ValidateListRequest(req ListRequest) error {
 	}
 
 	return nil
-}
-
-func namespaceMismatchError(a, b string) error {
-	return fmt.Errorf("%w: got %s but expected %s", ErrNamespaceMismatch, a, b)
 }
