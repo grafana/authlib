@@ -4,7 +4,7 @@ import (
 	"flag"
 	"strings"
 
-	"github.com/go-jose/go-jose/v3/jwt"
+	"github.com/go-jose/go-jose/v4/jwt"
 )
 
 type VerifierConfig struct {

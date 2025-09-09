@@ -2,14 +2,41 @@ package authn
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/x509"
+	"encoding/pem"
 	"testing"
 
-	"github.com/go-jose/go-jose/v3"
-	"github.com/go-jose/go-jose/v3/jwt"
+	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/stretchr/testify/require"
 
 	"github.com/grafana/authlib/types"
 )
+
+var testPrivateKey = decodeTestPrivateKey([]byte(`
+-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEID6lXWsmcv/UWn9SptjOThsy88cifgGIBj2Lu0M9I8tQoAoGCCqGSM49
+AwEHoUQDQgAEsf6eNnNMNhl+q7jXsbdUf3ADPh248uoFUSSV9oBzgptyokHCjJz6
+n6PKDm2W7i3S2+dAs5M5f3s7d8KiLjGZdQ==
+-----END EC PRIVATE KEY-----
+`))
+
+func decodeTestPrivateKey(data []byte) *ecdsa.PrivateKey {
+	block, _ := pem.Decode(data)
+	if block == nil {
+		panic("should include PEM block")
+	}
+
+	privateKey, err := x509.ParseECPrivateKey(block.Bytes)
+	if err != nil {
+		panic("should be able to parse ec private key")
+	}
+	if privateKey.Curve.Params().Name != "P-256" {
+		panic("should be P-256 curve")
+	}
+	return privateKey
+}
 
 func TestDefaultAuthenticator_Authenticate(t *testing.T) {
 	authenticator := NewDefaultAuthenticator(
@@ -134,8 +161,8 @@ func (f fakeTokenProvider) IDToken(ctx context.Context) (string, bool) {
 
 func signAtToken(t *testing.T, subject string, claims AccessTokenClaims) string {
 	signer, err := jose.NewSigner(jose.SigningKey{
-		Algorithm: jose.HS256,
-		Key:       []byte("key"),
+		Algorithm: jose.ES256,
+		Key:       testPrivateKey,
 	}, &jose.SignerOptions{
 		ExtraHeaders: map[jose.HeaderKey]any{
 			"typ": TokenTypeAccess,
@@ -146,7 +173,7 @@ func signAtToken(t *testing.T, subject string, claims AccessTokenClaims) string 
 	token, err := jwt.Signed(signer).
 		Claims(&claims).
 		Claims(&jwt.Claims{Subject: subject}).
-		CompactSerialize()
+		Serialize()
 	require.NoError(t, err)
 
 	return token
@@ -154,8 +181,8 @@ func signAtToken(t *testing.T, subject string, claims AccessTokenClaims) string 
 
 func signIDToken(t *testing.T, subject string, claims IDTokenClaims) string {
 	signer, err := jose.NewSigner(jose.SigningKey{
-		Algorithm: jose.HS256,
-		Key:       []byte("key"),
+		Algorithm: jose.ES256,
+		Key:       testPrivateKey,
 	}, &jose.SignerOptions{
 		ExtraHeaders: map[jose.HeaderKey]any{
 			"typ": TokenTypeID,
@@ -166,7 +193,7 @@ func signIDToken(t *testing.T, subject string, claims IDTokenClaims) string {
 	token, err := jwt.Signed(signer).
 		Claims(&claims).
 		Claims(&jwt.Claims{Subject: subject}).
-		CompactSerialize()
+		Serialize()
 	require.NoError(t, err)
 
 	return token

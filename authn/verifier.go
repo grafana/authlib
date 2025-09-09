@@ -6,8 +6,8 @@ import (
 	"errors"
 	"time"
 
-	"github.com/go-jose/go-jose/v3"
-	"github.com/go-jose/go-jose/v3/jwt"
+	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 )
 
 type TokenType = string
@@ -16,6 +16,9 @@ const (
 	TokenTypeID     TokenType = "jwt"
 	TokenTypeAccess TokenType = "at+jwt"
 )
+
+// tokenSignAlgs - Signature algorithms used to sign the tokens.
+var tokenSignAlgs = []jose.SignatureAlgorithm{jose.ES256}
 
 type Claims[T any] struct {
 	jwt.Claims
@@ -110,8 +113,8 @@ func (v *VerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T],
 	}
 
 	if err := claims.Validate(jwt.Expected{
-		Audience: v.cfg.AllowedAudiences,
-		Time:     time.Now(),
+		AnyAudience: jwt.Audience(v.cfg.AllowedAudiences),
+		Time:        time.Now(),
 	}); err != nil {
 		return nil, mapErr(err)
 	}
@@ -122,7 +125,7 @@ func (v *VerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T],
 // Parse is also used in the Auth API to parse the raw token
 // and determine if a token is an ID token or an access token.
 func Parse(token string) (*jwt.JSONWebToken, error) {
-	parsed, err := jwt.ParseSigned(token)
+	parsed, err := jwt.ParseSigned(token, tokenSignAlgs)
 	if err != nil {
 		return nil, ErrParseToken
 	}

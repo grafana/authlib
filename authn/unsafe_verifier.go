@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/go-jose/go-jose/v3/jwt"
+	"github.com/go-jose/go-jose/v4/jwt"
 )
 
 func NewUnsafeVerifier[T any](cfg VerifierConfig, typ TokenType) *UnsafeVerifierBase[T] {
@@ -22,7 +22,7 @@ type UnsafeVerifierBase[T any] struct {
 
 // Verify will parse and verify provided token, if `AllowedAudiences` was configured those will be validated as well.
 func (v *UnsafeVerifierBase[T]) Verify(ctx context.Context, token string) (*Claims[T], error) {
-	parsed, err := jwt.ParseSigned(token)
+	parsed, err := jwt.ParseSigned(token, tokenSignAlgs)
 	if err != nil {
 		return nil, ErrParseToken
 	}
@@ -40,8 +40,8 @@ func (v *UnsafeVerifierBase[T]) Verify(ctx context.Context, token string) (*Clai
 	}
 
 	if err := claims.Validate(jwt.Expected{
-		Audience: v.cfg.AllowedAudiences,
-		Time:     time.Now(),
+		AnyAudience: jwt.Audience(v.cfg.AllowedAudiences),
+		Time:        time.Now(),
 	}); err != nil {
 		return nil, mapErr(err)
 	}
