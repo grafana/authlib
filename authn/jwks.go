@@ -120,7 +120,7 @@ func (s *DefaultKeyRetriever) fetchJWKS(ctx context.Context) (*jose.JSONWebKeySe
 	if err != nil {
 		return nil, fmt.Errorf("%w: request error", ErrFetchingSigningKey)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, ErrFetchingSigningKey

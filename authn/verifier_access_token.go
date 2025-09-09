@@ -47,7 +47,7 @@ func (c AccessTokenClaims) getIdentityActor() *ActorClaims {
 		return nil
 	}
 
-	actorType := actor.IDTokenClaims.Type
+	actorType := actor.Type
 	if !types.IsIdentityType(actorType, types.TypeUser, types.TypeServiceAccount) {
 		return nil
 	}

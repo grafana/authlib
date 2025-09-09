@@ -191,14 +191,14 @@ func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeReque
 				// Consume and close response body after each attempt, so connections can be reused
 				if res != nil {
 					_, _ = io.Copy(io.Discard, res.Body)
-					res.Body.Close()
+					_ = res.Body.Close()
 				}
 
 				b.Wait()
 				continue
 			}
 
-			defer res.Body.Close()
+			defer func() { _ = res.Body.Close() }()
 
 			// No error, exit the retry loop
 			break
