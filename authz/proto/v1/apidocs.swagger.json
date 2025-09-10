@@ -129,6 +129,9 @@
                 },
                 "subresource": {
                   "type": "string"
+                },
+                "options": {
+                  "$ref": "#/definitions/v1ListRequestOptions"
                 }
               }
             }
@@ -176,6 +179,14 @@
         }
       }
     },
+    "v1ListRequestOptions": {
+      "type": "object",
+      "properties": {
+        "skipcache": {
+          "type": "boolean"
+        }
+      }
+    },
     "v1ListResponse": {
       "type": "object",
       "properties": {
@@ -193,6 +204,18 @@
           "items": {
             "type": "string"
           }
+        },
+        "zookie": {
+          "$ref": "#/definitions/v1Zookie"
+        }
+      }
+    },
+    "v1Zookie": {
+      "type": "object",
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "int64"
         }
       }
     }
