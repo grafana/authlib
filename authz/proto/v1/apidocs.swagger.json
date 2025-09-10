@@ -184,6 +184,9 @@
       "properties": {
         "skipcache": {
           "type": "boolean"
+        },
+        "zookie": {
+          "$ref": "#/definitions/v1Zookie"
         }
       }
     },
@@ -204,6 +207,15 @@
           "items": {
             "type": "string"
           }
+        }
+      }
+    },
+    "v1Zookie": {
+      "type": "object",
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "int64"
         }
       }
     }

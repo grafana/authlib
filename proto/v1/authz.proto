@@ -63,6 +63,11 @@ message ListRequest {
 
 message ListRequestOptions {
   bool skipcache = 1;
+  Zookie zookie = 2;
+}
+
+message Zookie {
+  int64 timestamp = 1;
 }
 
 message ListResponse {
