@@ -184,9 +184,6 @@
       "properties": {
         "skipcache": {
           "type": "boolean"
-        },
-        "zookie": {
-          "$ref": "#/definitions/v1Zookie"
         }
       }
     },
@@ -207,6 +204,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "zookie": {
+          "$ref": "#/definitions/v1Zookie"
         }
       }
     },

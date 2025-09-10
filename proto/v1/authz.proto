@@ -63,7 +63,6 @@ message ListRequest {
 
 message ListRequestOptions {
   bool skipcache = 1;
-  Zookie zookie = 2;
 }
 
 message Zookie {
@@ -74,4 +73,5 @@ message ListResponse {
   bool all = 1;
   repeated string folders = 2;
   repeated string items = 3;
+  Zookie zookie = 4;
 }
