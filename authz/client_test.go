@@ -556,7 +556,7 @@ func TestClient_Compile_Cache(t *testing.T) {
 	}
 
 	// First call should populate the cache
-	check, err := client.Compile(context.Background(), caller, req)
+	check, _, err := client.Compile(context.Background(), caller, req)
 	require.NoError(t, err)
 	require.NotNil(t, check)
 
@@ -571,7 +571,7 @@ func TestClient_Compile_Cache(t *testing.T) {
 	authz.listRes = &authzv1.ListResponse{}
 
 	// Second call should still be true as we hit the cache
-	check, err = client.Compile(context.Background(), caller, req)
+	check, _, err = client.Compile(context.Background(), caller, req)
 	require.NoError(t, err)
 	require.NotNil(t, check)
 	require.True(t, check("dash1", "fold1"))
@@ -850,7 +850,7 @@ func TestClient_Compile(t *testing.T) {
 			client, authz := setupAccessClient()
 			authz.listRes = tt.listRes
 
-			gotFunc, err := client.Compile(context.Background(), tt.caller, tt.listReq)
+			gotFunc, _, err := client.Compile(context.Background(), tt.caller, tt.listReq)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
