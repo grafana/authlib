@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-jose/go-jose/v3"
-	"github.com/go-jose/go-jose/v3/jwt"
+	"github.com/go-jose/go-jose/v4"
+	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -177,7 +177,7 @@ func Test_TokenExchangeClient_Exchange(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 
-		resultToken, err := jwt.ParseSigned(res.Token)
+		resultToken, err := jwt.ParseSigned(res.Token, []jose.SignatureAlgorithm{jose.ES256})
 		require.NoError(t, err)
 		var claims jwt.Claims
 		err = resultToken.UnsafeClaimsWithoutVerification(&claims)
@@ -339,14 +339,14 @@ func Test_TokenExchangeClient_Exchange(t *testing.T) {
 
 func signAccessToken(t *testing.T, expiresIn time.Duration) string {
 	signer, err := jose.NewSigner(jose.SigningKey{
-		Algorithm: jose.HS256,
-		Key:       []byte("key"),
+		Algorithm: jose.ES256,
+		Key:       testPrivateKey,
 	}, nil)
 	require.NoError(t, err)
 
 	token, err := jwt.Signed(signer).
 		Claims(&jwt.Claims{Expiry: jwt.NewNumericDate(time.Now().Add(expiresIn))}).
-		CompactSerialize()
+		Serialize()
 
 	require.NoError(t, err)
 	return token

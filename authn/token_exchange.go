@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-jose/go-jose/v3/jwt"
+	"github.com/go-jose/go-jose/v4/jwt"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
@@ -190,14 +190,14 @@ func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeReque
 				// Consume and close response body after each attempt, so connections can be reused
 				if res != nil {
 					_, _ = io.Copy(io.Discard, res.Body)
-					res.Body.Close()
+					_ = res.Body.Close()
 				}
 
 				b.Wait()
 				continue
 			}
 
-			defer res.Body.Close()
+			defer func() { _ = res.Body.Close() }()
 
 			// No error, exit the retry loop
 			break
@@ -288,7 +288,7 @@ func (c *TokenExchangeClient) getCache(ctx context.Context, key string) (string,
 func (c *TokenExchangeClient) setCache(ctx context.Context, token string, key string) error {
 	const cacheLeeway = 15 * time.Second
 
-	parsed, err := jwt.ParseSigned(token)
+	parsed, err := jwt.ParseSigned(token, tokenSignAlgs)
 	if err != nil {
 		return fmt.Errorf("failed to parse token: %v", err)
 	}

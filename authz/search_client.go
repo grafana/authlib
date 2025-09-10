@@ -122,7 +122,7 @@ func (query *searchQuery) processIDToken(c *searchClientImpl) error {
 			return fmt.Errorf("%v: %w", ErrInvalidIDToken, errors.New("missing subject (namespacedID) in id token"))
 		}
 		query.NamespacedID = claims.Subject
-		if !(strings.HasPrefix(query.NamespacedID, NamespaceServiceAccount) || strings.HasPrefix(query.NamespacedID, NamespaceUser)) {
+		if !strings.HasPrefix(query.NamespacedID, NamespaceServiceAccount) && !strings.HasPrefix(query.NamespacedID, NamespaceUser) {
 			// return an error if we attempt to query an `api-key` - currently not supported by the /search endpoint
 			return ErrInvalidTokenNamespace
 		}
@@ -193,7 +193,7 @@ func (c *searchClientImpl) Search(ctx context.Context, query searchQuery) (*sear
 			return nil, err
 		}
 
-		defer res.Body.Close()
+		defer func() { _ = res.Body.Close() }()
 
 		if res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusForbidden {
 			return nil, ErrInvalidToken

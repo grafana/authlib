@@ -3,7 +3,7 @@ package authn
 import (
 	"testing"
 
-	"github.com/go-jose/go-jose/v3/jwt"
+	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/grafana/authlib/types"
 	"github.com/stretchr/testify/assert"
 )
@@ -29,7 +29,7 @@ func TestAuthInfo_NewAccessTokenAuthInfo(t *testing.T) {
 		}
 
 		authInfo := NewAccessTokenAuthInfo(at)
-		assert.Equal(t, "user-subject", authInfo.id.Claims.Subject)
+		assert.Equal(t, "user-subject", authInfo.id.Subject)
 	})
 }
 
@@ -47,7 +47,7 @@ func TestAuthInfo_NewIDTokenAuthInfo(t *testing.T) {
 		}
 
 		authInfo := NewIDTokenAuthInfo(at, nil)
-		assert.Equal(t, "user-subject", authInfo.id.Claims.Subject)
+		assert.Equal(t, "user-subject", authInfo.id.Subject)
 	})
 }
 
@@ -72,7 +72,7 @@ func TestAuthInfo_getIdInfo(t *testing.T) {
 		}
 
 		idInfo := getIdInfo(at)
-		assert.Equal(t, "user-subject", idInfo.Claims.Subject)
+		assert.Equal(t, "user-subject", idInfo.Subject)
 	})
 
 	t.Run("should not use nested namespace", func(t *testing.T) {
