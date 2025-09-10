@@ -3,6 +3,7 @@ package types
 import (
 	"context"
 	"errors"
+	"time"
 )
 
 var (
@@ -49,6 +50,10 @@ type CheckResponse struct {
 	Allowed bool
 }
 
+type Zookie interface {
+	IsFresherThan(d time.Time) bool
+}
+
 type AccessChecker interface {
 	// Check checks whether the user can perform the given action for all requests
 	Check(ctx context.Context, info AuthInfo, req CheckRequest) (CheckResponse, error)
@@ -69,6 +74,9 @@ type ListRequest struct {
 
 	// Optional subresource
 	Subresource string
+
+	// SkipCache forces the access checker to skip any caching layer
+	SkipCache bool
 }
 
 // Checks access while iterating within a resource
@@ -78,7 +86,7 @@ type AccessLister interface {
 	// Compile generates a function to check whether the id has access to items matching a request
 	// This is particularly useful when you want to verify access to a list of resources.
 	// Returns nil if there is no access to any matching items
-	Compile(ctx context.Context, info AuthInfo, req ListRequest) (ItemChecker, error)
+	Compile(ctx context.Context, info AuthInfo, req ListRequest) (ItemChecker, Zookie, error)
 }
 
 type AccessClient interface {
@@ -102,13 +110,13 @@ func (n *fixedClient) Check(ctx context.Context, _ AuthInfo, req CheckRequest) (
 	return CheckResponse{Allowed: n.allowed}, nil
 }
 
-func (n *fixedClient) Compile(ctx context.Context, _ AuthInfo, req ListRequest) (ItemChecker, error) {
+func (n *fixedClient) Compile(ctx context.Context, _ AuthInfo, req ListRequest) (ItemChecker, Zookie, error) {
 	if err := ValidateListRequest(req); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	return func(name, folder string) bool {
 		return n.allowed
-	}, nil
+	}, &NoopZookie{}, nil
 }
 
 func ValidateCheckRequest(req CheckRequest) error {
@@ -137,4 +145,10 @@ func ValidateListRequest(req ListRequest) error {
 	}
 
 	return nil
+}
+
+type NoopZookie struct{}
+
+func (n NoopZookie) IsFresherThan(d time.Time) bool {
+	return true
 }

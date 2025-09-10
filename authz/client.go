@@ -266,22 +266,22 @@ func (c *ClientImpl) compile(ctx context.Context, authInfo types.AuthInfo, list 
 	return checker, err
 }
 
-func (c *ClientImpl) Compile(ctx context.Context, authInfo types.AuthInfo, list types.ListRequest) (types.ItemChecker, error) {
+func (c *ClientImpl) Compile(ctx context.Context, authInfo types.AuthInfo, list types.ListRequest) (types.ItemChecker, types.Zookie, error) {
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.List")
 	defer span.End()
 
 	if err := types.ValidateListRequest(list); err != nil {
 		span.RecordError(err)
-		return nil, err
+		return nil, nil, err
 	}
 
 	if authInfo.GetSubject() == "" {
 		span.RecordError(ErrMissingAuthInfo)
-		return nil, ErrMissingAuthInfo
+		return nil, nil, ErrMissingAuthInfo
 	}
 
 	if !types.NamespaceMatches(authInfo.GetNamespace(), list.Namespace) {
-		return nil, namespaceMismatchError(authInfo.GetNamespace(), list.Namespace)
+		return nil, nil, namespaceMismatchError(authInfo.GetNamespace(), list.Namespace)
 	}
 
 	span.SetAttributes(attribute.String("namespace", list.Namespace))
@@ -295,23 +295,23 @@ func (c *ClientImpl) Compile(ctx context.Context, authInfo types.AuthInfo, list 
 	// No user => check on the service permissions
 	if isService {
 		if hasPermissionInToken(authInfo.GetTokenPermissions(), list.Group, list.Resource, list.Verb) {
-			return allowAllChecker(true), nil
+			return allowAllChecker(true), types.NoopZookie{}, nil
 		}
-		return denyAllChecker, nil
+		return denyAllChecker, types.NoopZookie{}, nil
 	}
 
 	// Only check the service permissions if the access token check is enabled
 	if !hasPermissionInToken(authInfo.GetTokenDelegatedPermissions(), list.Group, list.Resource, list.Verb) {
-		return denyAllChecker, nil
+		return denyAllChecker, types.NoopZookie{}, nil
 	}
 
 	checker, err := c.compile(ctx, authInfo, &list)
 	if err != nil {
 		span.RecordError(err)
-		return denyAllChecker, err
+		return denyAllChecker, types.NoopZookie{}, err
 	}
 
-	return checker.fn(authInfo), nil
+	return checker.fn(authInfo), checker.Zookie(), nil
 }
 
 // newOutgoingContext creates a new context that will be canceled when the input context is canceled.
@@ -423,23 +423,27 @@ func allowAllChecker(isServiceAccount bool) types.ItemChecker {
 }
 
 type itemChecker struct {
-	All     bool
-	Items   map[string]bool
-	Folders map[string]bool
+	All       bool
+	Items     map[string]bool
+	Folders   map[string]bool
+	Timestamp int64
 }
 
 func newItemChecker(resp *authzv1.ListResponse) *itemChecker {
 	if resp == nil {
-		return &itemChecker{}
+		return &itemChecker{Timestamp: time.Now().UnixMilli()}
 	}
 
 	if resp.All {
-		return &itemChecker{All: true}
+		// TODO: Add timestamp from the response
+		return &itemChecker{All: true, Timestamp: time.Now().UnixMilli()}
 	}
 
 	res := &itemChecker{
 		Items:   make(map[string]bool, len(resp.Items)),
 		Folders: make(map[string]bool, len(resp.Folders)),
+		// TODO: Add timestamp from the response
+		Timestamp: time.Now().UnixMilli(),
 	}
 	for _, i := range resp.Items {
 		res.Items[i] = true
@@ -467,6 +471,24 @@ func (c *itemChecker) fn(authInfo types.AuthInfo) types.ItemChecker {
 		}
 		return c.Items[name] || c.Folders[folder]
 	}
+}
+
+func (c *itemChecker) Zookie() types.Zookie {
+	return NewTimestampZookie(c.Timestamp)
+}
+
+// Zookie
+type TimestampZookie struct {
+	timestamp int64 // UnixMilli
+}
+
+// NewTimestampZookie creates a new TimestampZookie with the given timestamp in milliseconds.
+func NewTimestampZookie(ts int64) *TimestampZookie {
+	return &TimestampZookie{timestamp: ts}
+}
+
+func (t *TimestampZookie) IsFresherThan(d time.Time) bool {
+	return t.timestamp > d.UnixMilli()
 }
 
 func namespaceMismatchError(a, b string) error {
