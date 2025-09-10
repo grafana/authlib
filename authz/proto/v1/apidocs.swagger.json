@@ -129,6 +129,9 @@
                 },
                 "subresource": {
                   "type": "string"
+                },
+                "options": {
+                  "$ref": "#/definitions/v1ListRequestOptions"
                 }
               }
             }
@@ -172,6 +175,14 @@
       "type": "object",
       "properties": {
         "allowed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "v1ListRequestOptions": {
+      "type": "object",
+      "properties": {
+        "skipcache": {
           "type": "boolean"
         }
       }
