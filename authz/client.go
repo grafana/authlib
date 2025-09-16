@@ -435,15 +435,13 @@ func newItemChecker(resp *authzv1.ListResponse) *itemChecker {
 	}
 
 	if resp.All {
-		// TODO: Add timestamp from the response
-		return &itemChecker{All: true, Timestamp: time.Now().UnixMilli()}
+		return &itemChecker{All: true, Timestamp: resp.Zookie.Timestamp}
 	}
 
 	res := &itemChecker{
-		Items:   make(map[string]bool, len(resp.Items)),
-		Folders: make(map[string]bool, len(resp.Folders)),
-		// TODO: Add timestamp from the response
-		Timestamp: time.Now().UnixMilli(),
+		Items:     make(map[string]bool, len(resp.Items)),
+		Folders:   make(map[string]bool, len(resp.Folders)),
+		Timestamp: resp.GetZookie().Timestamp,
 	}
 	for _, i := range resp.Items {
 		res.Items[i] = true
