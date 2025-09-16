@@ -589,7 +589,6 @@ func TestClient_Compile_Cache(t *testing.T) {
 }
 
 func TestClient_Compile(t *testing.T) {
-	nowZookie := &authzv1.Zookie{Timestamp: time.Now().UnixMilli()}
 	type check struct {
 		namespace string
 		item      string
@@ -688,7 +687,7 @@ func TestClient_Compile(t *testing.T) {
 				Resource:  "dashboards",
 				Verb:      "get",
 			},
-			listRes: &authzv1.ListResponse{All: true, Zookie: nowZookie},
+			listRes: &authzv1.ListResponse{All: true},
 			wantRes: map[check]bool{
 				{"stacks-12", "dash1", "fold1"}: true,
 				{"stacks-12", "dash2", "fold2"}: true,
@@ -707,7 +706,7 @@ func TestClient_Compile(t *testing.T) {
 				},
 			),
 			listReq: types.ListRequest{Namespace: "stacks-12", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get"},
-			listRes: &authzv1.ListResponse{All: true, Zookie: nowZookie},
+			listRes: &authzv1.ListResponse{All: true},
 			wantRes: map[check]bool{
 				{"stacks-12", "dash1", "fold1"}: false,
 				{"stacks-12", "dash2", "fold2"}: false,
@@ -732,7 +731,7 @@ func TestClient_Compile(t *testing.T) {
 				Resource:  "dashboards",
 				Verb:      "get",
 			},
-			listRes: &authzv1.ListResponse{Zookie: nowZookie},
+			listRes: &authzv1.ListResponse{},
 			wantRes: map[check]bool{
 				{"stacks-12", "dash1", "fold1"}: false,
 			},
@@ -755,7 +754,7 @@ func TestClient_Compile(t *testing.T) {
 				Resource:  "dashboards",
 				Verb:      "get",
 			},
-			listRes: &authzv1.ListResponse{Items: []string{"dash1"}, Folders: []string{"fold2"}, Zookie: nowZookie},
+			listRes: &authzv1.ListResponse{Items: []string{"dash1"}, Folders: []string{"fold2"}},
 			wantRes: map[check]bool{
 				{"stacks-12", "dash1", "fold1"}: true,
 				{"stacks-12", "dash2", "fold2"}: true,
@@ -780,7 +779,7 @@ func TestClient_Compile(t *testing.T) {
 				Resource:  "folders",
 				Verb:      "get",
 			},
-			listRes: &authzv1.ListResponse{Items: []string{"app-k6", "app-k6-child", "another-folder"}, Zookie: nowZookie},
+			listRes: &authzv1.ListResponse{Items: []string{"app-k6", "app-k6-child", "another-folder"}},
 			wantRes: map[check]bool{
 				{"stacks-12", k6FolderUID, ""}:             false,
 				{"stacks-12", "k6-app-child", k6FolderUID}: false,
@@ -805,7 +804,7 @@ func TestClient_Compile(t *testing.T) {
 				Resource:  "folders",
 				Verb:      "get",
 			},
-			listRes: &authzv1.ListResponse{Items: []string{"app-k6", "app-k6-child", "another-folder"}, Zookie: nowZookie},
+			listRes: &authzv1.ListResponse{Items: []string{"app-k6", "app-k6-child", "another-folder"}},
 			wantRes: map[check]bool{
 				{"stacks-12", k6FolderUID, ""}:                               false,
 				{"stacks-12", "k6-appauthn/auth_info.go-child", k6FolderUID}: false,
@@ -826,7 +825,7 @@ func TestClient_Compile(t *testing.T) {
 				Resource: "folders",
 				Verb:     "get",
 			},
-			listRes: &authzv1.ListResponse{Items: []string{"app-k6", "app-k6-child", "another-folder"}, Zookie: nowZookie},
+			listRes: &authzv1.ListResponse{Items: []string{"app-k6", "app-k6-child", "another-folder"}},
 			wantRes: map[check]bool{
 				{"stacks-1", "stack-1", "folder-1"}: true,
 				{"stacks-2", "stack2", "folder-2"}:  true,
