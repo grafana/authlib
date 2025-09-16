@@ -569,7 +569,7 @@ func TestClient_Compile_Cache(t *testing.T) {
 
 	// Check the zookie is correct
 	require.NotNil(t, zookie)
-	require.False(t, zookie.IsFresherThan(now))
+	require.True(t, zookie.IsFresherThan(now.Add(-time.Minute)))
 
 	// Check that the cache was populated correctly
 	ctrl, err := client.getCachedItemChecker(context.Background(), itemCheckerCacheKey("user:1", &req))
