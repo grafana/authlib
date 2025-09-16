@@ -147,6 +147,7 @@ func ValidateListRequest(req ListRequest) error {
 	return nil
 }
 
+// A Zookie that is always fresh
 type NoopZookie struct{}
 
 func (n NoopZookie) IsFresherThan(d time.Time) bool {

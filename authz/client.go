@@ -237,9 +237,13 @@ func (c *ClientImpl) Check(ctx context.Context, authInfo types.AuthInfo, req typ
 
 func (c *ClientImpl) compile(ctx context.Context, authInfo types.AuthInfo, list *types.ListRequest) (*itemChecker, error) {
 	key := itemCheckerCacheKey(authInfo.GetSubject(), list)
-	checker, err := c.getCachedItemChecker(ctx, key)
-	if err == nil {
-		return checker, nil
+
+	// Skip the cache if requested
+	if !list.SkipCache {
+		checker, err := c.getCachedItemChecker(ctx, key)
+		if err == nil {
+			return checker, nil
+		}
 	}
 
 	// Instantiate a new context for the request
@@ -263,7 +267,7 @@ func (c *ClientImpl) compile(ctx context.Context, authInfo types.AuthInfo, list 
 		return nil, err
 	}
 
-	checker = newItemChecker(resp)
+	checker := newItemChecker(resp)
 	err = c.cacheItemChecker(ctx, key, checker)
 
 	return checker, err
@@ -437,6 +441,12 @@ func newItemChecker(resp *authzv1.ListResponse) *itemChecker {
 		return &itemChecker{Timestamp: time.Now().UnixMilli()}
 	}
 
+	// Ensure backward compatibility with older authz servers
+	// that don't return a zookie
+	if resp.Zookie == nil {
+		resp.Zookie = &authzv1.Zookie{Timestamp: time.Now().UnixMilli()}
+	}
+
 	if resp.All {
 		return &itemChecker{All: true, Timestamp: resp.Zookie.Timestamp}
 	}
@@ -444,7 +454,7 @@ func newItemChecker(resp *authzv1.ListResponse) *itemChecker {
 	res := &itemChecker{
 		Items:     make(map[string]bool, len(resp.Items)),
 		Folders:   make(map[string]bool, len(resp.Folders)),
-		Timestamp: resp.GetZookie().Timestamp,
+		Timestamp: resp.Zookie.Timestamp,
 	}
 	for _, i := range resp.Items {
 		res.Items[i] = true
@@ -478,7 +488,7 @@ func (c *itemChecker) Zookie() types.Zookie {
 	return NewTimestampZookie(c.Timestamp)
 }
 
-// Zookie
+// Zookie implementation based on a timestamp
 type TimestampZookie struct {
 	timestamp int64 // UnixMilli
 }
