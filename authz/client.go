@@ -253,6 +253,10 @@ func (c *ClientImpl) compile(ctx context.Context, authInfo types.AuthInfo, list 
 		Verb:        list.Verb,
 		Namespace:   list.Namespace,
 		Subresource: list.Subresource,
+		Options:     &authzv1.ListRequestOptions{},
+	}
+	if list.SkipCache {
+		listReq.Options.Skipcache = true
 	}
 
 	resp, err := c.clientV1.List(outCtx, listReq)
