@@ -876,6 +876,74 @@ func TestClient_Compile(t *testing.T) {
 	}
 }
 
+func TestClient_Compile_Zookie(t *testing.T) {
+	client, authz := setupAccessClient()
+
+	t.Run("Recover when list response has no timestamp", func(t *testing.T) {
+		authz.listRes = &authzv1.ListResponse{
+			Items:   []string{"dash1"},
+			Folders: []string{"folder1"},
+			Zookie:  nil, // No timestamp provided
+		}
+
+		caller := authn.NewIDTokenAuthInfo(
+			authn.Claims[authn.AccessTokenClaims]{
+				Claims: jwt.Claims{Subject: "service"},
+				Rest:   authn.AccessTokenClaims{Namespace: "*", DelegatedPermissions: []string{"dashboard.grafana.app/dashboards:get"}}},
+			&authn.Claims[authn.IDTokenClaims]{
+				Claims: jwt.Claims{Subject: "user:1"},
+				Rest:   authn.IDTokenClaims{Type: types.TypeUser, Namespace: "stacks-1"},
+			},
+		)
+
+		req := types.ListRequest{
+			Namespace: "stacks-1",
+			Group:     "dashboard.grafana.app",
+			Resource:  "dashboards",
+			Verb:      "get",
+			SkipCache: true,
+		}
+
+		_, zookie, err := client.Compile(context.Background(), caller, req)
+		require.NoError(t, err)
+		require.NotNil(t, zookie)
+		require.True(t, zookie.IsFresherThan(time.Now().Add(-time.Minute)))
+	})
+
+	t.Run("Should account for the list response timestamp", func(t *testing.T) {
+		timestamp := time.Now().Add(-time.Hour).UnixMilli()
+		authz.listRes = &authzv1.ListResponse{
+			Items:   []string{"dash1"},
+			Folders: []string{"folder1"},
+			Zookie:  &authzv1.Zookie{Timestamp: timestamp},
+		}
+
+		caller := authn.NewIDTokenAuthInfo(
+			authn.Claims[authn.AccessTokenClaims]{
+				Claims: jwt.Claims{Subject: "service"},
+				Rest:   authn.AccessTokenClaims{Namespace: "*", DelegatedPermissions: []string{"dashboard.grafana.app/dashboards:get"}}},
+			&authn.Claims[authn.IDTokenClaims]{
+				Claims: jwt.Claims{Subject: "user:1"},
+				Rest:   authn.IDTokenClaims{Type: types.TypeUser, Namespace: "stacks-1"},
+			},
+		)
+
+		req := types.ListRequest{
+			Namespace: "stacks-1",
+			Group:     "dashboard.grafana.app",
+			Resource:  "dashboards",
+			Verb:      "get",
+			SkipCache: true,
+		}
+
+		_, zookie, err := client.Compile(context.Background(), caller, req)
+		require.NoError(t, err)
+		require.NotNil(t, zookie)
+		require.False(t, zookie.IsFresherThan(time.Now().Add(-30*time.Minute)))
+		require.True(t, zookie.IsFresherThan(time.Now().Add(-2*time.Hour)))
+	})
+}
+
 func setupAccessClient() (*ClientImpl, *FakeAuthzServiceClient) {
 	fakeClient := &FakeAuthzServiceClient{}
 	return &ClientImpl{
