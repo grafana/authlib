@@ -879,29 +879,29 @@ func TestClient_Compile(t *testing.T) {
 func TestClient_Compile_Zookie(t *testing.T) {
 	client, authz := setupAccessClient()
 
+	caller := authn.NewIDTokenAuthInfo(
+		authn.Claims[authn.AccessTokenClaims]{
+			Claims: jwt.Claims{Subject: "service"},
+			Rest:   authn.AccessTokenClaims{Namespace: "*", DelegatedPermissions: []string{"dashboard.grafana.app/dashboards:get"}}},
+		&authn.Claims[authn.IDTokenClaims]{
+			Claims: jwt.Claims{Subject: "user:1"},
+			Rest:   authn.IDTokenClaims{Type: types.TypeUser, Namespace: "stacks-1"},
+		},
+	)
+
+	req := types.ListRequest{
+		Namespace: "stacks-1",
+		Group:     "dashboard.grafana.app",
+		Resource:  "dashboards",
+		Verb:      "get",
+		SkipCache: true,
+	}
+
 	t.Run("Recover when list response has no timestamp", func(t *testing.T) {
 		authz.listRes = &authzv1.ListResponse{
 			Items:   []string{"dash1"},
 			Folders: []string{"folder1"},
 			Zookie:  nil, // No timestamp provided
-		}
-
-		caller := authn.NewIDTokenAuthInfo(
-			authn.Claims[authn.AccessTokenClaims]{
-				Claims: jwt.Claims{Subject: "service"},
-				Rest:   authn.AccessTokenClaims{Namespace: "*", DelegatedPermissions: []string{"dashboard.grafana.app/dashboards:get"}}},
-			&authn.Claims[authn.IDTokenClaims]{
-				Claims: jwt.Claims{Subject: "user:1"},
-				Rest:   authn.IDTokenClaims{Type: types.TypeUser, Namespace: "stacks-1"},
-			},
-		)
-
-		req := types.ListRequest{
-			Namespace: "stacks-1",
-			Group:     "dashboard.grafana.app",
-			Resource:  "dashboards",
-			Verb:      "get",
-			SkipCache: true,
 		}
 
 		_, zookie, err := client.Compile(context.Background(), caller, req)
@@ -911,29 +911,12 @@ func TestClient_Compile_Zookie(t *testing.T) {
 	})
 
 	t.Run("Should account for the list response timestamp", func(t *testing.T) {
-		timestamp := time.Now().Add(-time.Hour).UnixMilli()
 		authz.listRes = &authzv1.ListResponse{
 			Items:   []string{"dash1"},
 			Folders: []string{"folder1"},
-			Zookie:  &authzv1.Zookie{Timestamp: timestamp},
-		}
-
-		caller := authn.NewIDTokenAuthInfo(
-			authn.Claims[authn.AccessTokenClaims]{
-				Claims: jwt.Claims{Subject: "service"},
-				Rest:   authn.AccessTokenClaims{Namespace: "*", DelegatedPermissions: []string{"dashboard.grafana.app/dashboards:get"}}},
-			&authn.Claims[authn.IDTokenClaims]{
-				Claims: jwt.Claims{Subject: "user:1"},
-				Rest:   authn.IDTokenClaims{Type: types.TypeUser, Namespace: "stacks-1"},
+			Zookie: &authzv1.Zookie{
+				Timestamp: time.Now().Add(-time.Hour).UnixMilli(), // Permissions are 1 hour old
 			},
-		)
-
-		req := types.ListRequest{
-			Namespace: "stacks-1",
-			Group:     "dashboard.grafana.app",
-			Resource:  "dashboards",
-			Verb:      "get",
-			SkipCache: true,
 		}
 
 		_, zookie, err := client.Compile(context.Background(), caller, req)
