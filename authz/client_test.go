@@ -3,6 +3,7 @@ package authz
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/go-jose/go-jose/v4/jwt"
 	"github.com/stretchr/testify/require"
@@ -530,11 +531,17 @@ func TestClient_Check_Cache(t *testing.T) {
 
 func TestClient_Compile_Cache(t *testing.T) {
 	client, authz := setupAccessClient()
+
+	now := time.Now()
+
 	// User has the action on dash1 and fold1
 	authz.listRes = &authzv1.ListResponse{
 		All:     false,
 		Items:   []string{"dash1"},
 		Folders: []string{"fold1"},
+		Zookie: &authzv1.Zookie{
+			Timestamp: now.Unix(),
+		},
 	}
 
 	caller := authn.NewIDTokenAuthInfo(
@@ -556,9 +563,13 @@ func TestClient_Compile_Cache(t *testing.T) {
 	}
 
 	// First call should populate the cache
-	check, _, err := client.Compile(context.Background(), caller, req)
+	check, zookie, err := client.Compile(context.Background(), caller, req)
 	require.NoError(t, err)
 	require.NotNil(t, check)
+
+	// Check the zookie is correct
+	require.NotNil(t, zookie)
+	require.False(t, zookie.IsFresherThan(now))
 
 	// Check that the cache was populated correctly
 	ctrl, err := client.getCachedItemChecker(context.Background(), itemCheckerCacheKey("user:1", &req))
