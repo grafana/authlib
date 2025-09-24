@@ -5,7 +5,7 @@ go 1.24.0
 require (
 	github.com/go-jose/go-jose/v4 v4.1.2
 	github.com/google/go-querystring v1.1.0
-	github.com/grafana/authlib/types v0.0.0-20250721184729-1593a38e4933
+	github.com/grafana/authlib/types v0.0.0
 	github.com/grafana/dskit v0.0.0-20250908063411-6b6da59b5cc4
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.2
 	github.com/patrickmn/go-cache v2.1.0+incompatible
@@ -17,6 +17,9 @@ require (
 	google.golang.org/grpc v1.75.0
 	google.golang.org/protobuf v1.36.8
 )
+
+// Always reference the current version
+replace github.com/grafana/authlib/types => ./types
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
