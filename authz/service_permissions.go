@@ -18,9 +18,10 @@ type ServiceEvaluationResult struct {
 func CheckServicePermissions(authInfo types.AuthInfo, group, resource, verb string) ServiceEvaluationResult {
 	res := ServiceEvaluationResult{
 		ServiceCall: types.IsIdentityType(authInfo.GetIdentityType(), types.TypeAccessPolicy),
-		Permissions: authInfo.GetTokenPermissions(),
 	}
-	if !res.ServiceCall {
+	if res.ServiceCall {
+		res.Permissions = authInfo.GetTokenPermissions()
+	} else {
 		res.Permissions = authInfo.GetTokenDelegatedPermissions()
 	}
 	res.Allowed = hasPermissionInToken(res.Permissions, group, resource, verb)
