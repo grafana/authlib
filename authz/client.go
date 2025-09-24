@@ -6,8 +6,6 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
-	"slices"
-	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -135,40 +133,6 @@ func (c *ClientImpl) check(ctx context.Context, authInfo types.AuthInfo, req *ty
 	return resp.Allowed, err
 }
 
-func hasPermissionInToken(tokenPermissions []string, group, resource, verb string) bool {
-	verbs := []string{verb}
-
-	// we always map list to get for authz
-	// to be backward compatible with access tokens we accept both for now
-	if verb == "list" {
-		verbs = append(verbs, "get")
-	}
-
-	for _, p := range tokenPermissions {
-		parts := strings.SplitN(p, ":", 2)
-		if len(parts) != 2 {
-			continue
-		}
-		pVerb := parts[1]
-		if pVerb != "*" && !slices.Contains(verbs, pVerb) {
-			continue
-		}
-
-		parts = strings.SplitN(parts[0], "/", 2)
-		switch len(parts) {
-		case 1:
-			if parts[0] == group {
-				return true
-			}
-		case 2:
-			if parts[0] == group && parts[1] == resource {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 func (c *ClientImpl) Check(ctx context.Context, authInfo types.AuthInfo, req types.CheckRequest) (types.CheckResponse, error) {
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.Check")
 	defer span.End()
@@ -187,6 +151,8 @@ func (c *ClientImpl) Check(ctx context.Context, authInfo types.AuthInfo, req typ
 		return checkResponseDenied, namespaceMismatchError(authInfo.GetNamespace(), req.Namespace)
 	}
 
+	checkServiceRes := CheckServicePermissions(authInfo, req.Group, req.Resource, req.Verb)
+
 	span.SetAttributes(attribute.String("subject", authInfo.GetSubject()))
 	span.SetAttributes(attribute.String("namespace", req.Namespace))
 	span.SetAttributes(attribute.String("verb", req.Verb))
@@ -198,29 +164,17 @@ func (c *ClientImpl) Check(ctx context.Context, authInfo types.AuthInfo, req typ
 	if req.Path != "" {
 		span.SetAttributes(attribute.String("path", req.Path))
 	}
+	span.SetAttributes(attribute.Bool("with_user", !checkServiceRes.ServiceCall))
+	span.SetAttributes(attribute.Int("permissions", len(checkServiceRes.Permissions)))
+	span.SetAttributes(attribute.Bool("service_allowed", checkServiceRes.Allowed))
 
-	isService := types.IsIdentityType(authInfo.GetIdentityType(), types.TypeAccessPolicy)
-	span.SetAttributes(attribute.Bool("with_user", !isService))
-
-	// No user => check on the service permissions
-	if isService {
-		permissions := authInfo.GetTokenPermissions()
-		serviceIsAllowedAction := hasPermissionInToken(permissions, req.Group, req.Resource, req.Verb)
-
-		span.SetAttributes(attribute.Int("permissions", len(permissions)))
-		span.SetAttributes(attribute.Bool("service_allowed", serviceIsAllowedAction))
-
-		return types.CheckResponse{Allowed: serviceIsAllowedAction}, nil
+	if checkServiceRes.ServiceCall {
+		// No user => check on the service permissions only
+		return types.CheckResponse{Allowed: checkServiceRes.Allowed}, nil
 	}
 
-	// Only check the service permissions if the access token check is enabled
-	permissions := authInfo.GetTokenDelegatedPermissions()
-	serviceIsAllowedAction := hasPermissionInToken(permissions, req.Group, req.Resource, req.Verb)
-
-	span.SetAttributes(attribute.Int("delegated_permissions", len(permissions)))
-	span.SetAttributes(attribute.Bool("service_allowed", serviceIsAllowedAction))
-
-	if !serviceIsAllowedAction {
+	if !checkServiceRes.Allowed {
+		// Service is not allowed => no need to check the user permissions
 		return checkResponseDenied, nil
 	}
 
@@ -291,24 +245,26 @@ func (c *ClientImpl) Compile(ctx context.Context, authInfo types.AuthInfo, list 
 		return nil, nil, namespaceMismatchError(authInfo.GetNamespace(), list.Namespace)
 	}
 
+	checkServiceRes := CheckServicePermissions(authInfo, list.Group, list.Resource, list.Verb)
+
 	span.SetAttributes(attribute.String("namespace", list.Namespace))
 	span.SetAttributes(attribute.String("group", list.Group))
 	span.SetAttributes(attribute.String("resource", list.Resource))
 	span.SetAttributes(attribute.String("verb", list.Verb))
+	span.SetAttributes(attribute.Bool("with_user", !checkServiceRes.ServiceCall))
+	span.SetAttributes(attribute.Int("permissions", len(checkServiceRes.Permissions)))
+	span.SetAttributes(attribute.Bool("service_allowed", checkServiceRes.Allowed))
 
-	isService := types.IsIdentityType(authInfo.GetIdentityType(), types.TypeAccessPolicy)
-	span.SetAttributes(attribute.Bool("with_user", !isService))
-
-	// No user => check on the service permissions
-	if isService {
-		if hasPermissionInToken(authInfo.GetTokenPermissions(), list.Group, list.Resource, list.Verb) {
+	if checkServiceRes.ServiceCall {
+		// No user => check on the service permissions only
+		if checkServiceRes.Allowed {
 			return allowAllChecker(true), types.NoopZookie{}, nil
 		}
 		return denyAllChecker, types.NoopZookie{}, nil
 	}
 
-	// Only check the service permissions if the access token check is enabled
-	if !hasPermissionInToken(authInfo.GetTokenDelegatedPermissions(), list.Group, list.Resource, list.Verb) {
+	if !checkServiceRes.Allowed {
+		// Service is not allowed => no need to check the user permissions
 		return denyAllChecker, types.NoopZookie{}, nil
 	}
 
