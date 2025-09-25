@@ -24,6 +24,7 @@ type ServiceEvaluationResult struct {
 // TL;DR: CheckServicePermissions should only be used when user permissions are checked later in the flow.
 // If the service is allowed, the caller can proceed to check user permissions as needed.
 // If the service is not allowed, the caller should reject the request immediately.
+// Prefer using the authz.Client directly, it handles both service and user permissions in one call.
 //
 // AuthInfo always holds service info, and optionally user info (service vs. on-behalf-of calls).
 // While service permissions are directly checkable from AuthInfo, user permissions require an AuthZ service
