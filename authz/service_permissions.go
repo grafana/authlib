@@ -10,6 +10,7 @@ import (
 // ServiceEvaluationResult contains the result of a service permission check along with debug information
 type ServiceEvaluationResult struct {
 	// ServiceCall indicates if the call was made by a service (access policy) identity
+	// False indicates an on-behalf-of call (delegated permissions), user permissions should be checked.
 	ServiceCall bool
 	// Allowed indicates if the permission check passed. This does not imply that the user is allowed,
 	// only that the service has the required permissions (itself or acting on behalf of a user)
