@@ -40,9 +40,6 @@ type CheckRequest struct {
 
 	// For non-resource requests, this will be the requested URL path
 	Path string
-
-	// Folder is the parent folder of the requested resource
-	Folder string
 }
 
 type CheckResponse struct {
@@ -56,7 +53,9 @@ type Zookie interface {
 
 type AccessChecker interface {
 	// Check checks whether the user can perform the given action for all requests
-	Check(ctx context.Context, info AuthInfo, req CheckRequest) (CheckResponse, error)
+	// NOTE, the authz system does not know the folder where each resource is stored
+	// the folder must be passed into the system when folder authorization is required
+	Check(ctx context.Context, info AuthInfo, req CheckRequest, folder string) (CheckResponse, error)
 }
 
 type ListRequest struct {
@@ -103,7 +102,7 @@ type fixedClient struct {
 	allowed bool
 }
 
-func (n *fixedClient) Check(ctx context.Context, _ AuthInfo, req CheckRequest) (CheckResponse, error) {
+func (n *fixedClient) Check(ctx context.Context, _ AuthInfo, req CheckRequest, _ string) (CheckResponse, error) {
 	if err := ValidateCheckRequest(req); err != nil {
 		return CheckResponse{Allowed: false}, err
 	}

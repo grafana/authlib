@@ -91,16 +91,16 @@ func NewClient(cc grpc.ClientConnInterface, opts ...AuthzClientOption) *ClientIm
 // Implementation
 // -----
 
-func (c *ClientImpl) check(ctx context.Context, authInfo types.AuthInfo, req *types.CheckRequest) (bool, error) {
+func (c *ClientImpl) check(ctx context.Context, authInfo types.AuthInfo, req *types.CheckRequest, folder string) (bool, error) {
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.hasAccess")
 	defer span.End()
 
 	idIsServiceAccount := types.IsIdentityType(authInfo.GetIdentityType(), types.TypeServiceAccount)
-	if !idIsServiceAccount && (req.Name == k6FolderUID || req.Folder == k6FolderUID) {
+	if !idIsServiceAccount && (req.Name == k6FolderUID || folder == k6FolderUID) {
 		return false, nil
 	}
 
-	key := checkCacheKey(authInfo.GetSubject(), req)
+	key := checkCacheKey(authInfo.GetSubject(), req, folder)
 	res, err := c.getCachedCheck(ctx, key)
 	if err == nil {
 		return res, nil
@@ -115,7 +115,7 @@ func (c *ClientImpl) check(ctx context.Context, authInfo types.AuthInfo, req *ty
 		Name:        req.Name,
 		Subresource: req.Subresource,
 		Path:        req.Path,
-		Folder:      req.Folder,
+		Folder:      folder,
 	}
 
 	// Instantiate a new context for the request
@@ -133,7 +133,7 @@ func (c *ClientImpl) check(ctx context.Context, authInfo types.AuthInfo, req *ty
 	return resp.Allowed, err
 }
 
-func (c *ClientImpl) Check(ctx context.Context, authInfo types.AuthInfo, req types.CheckRequest) (types.CheckResponse, error) {
+func (c *ClientImpl) Check(ctx context.Context, authInfo types.AuthInfo, req types.CheckRequest, folder string) (types.CheckResponse, error) {
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.Check")
 	defer span.End()
 
@@ -178,7 +178,7 @@ func (c *ClientImpl) Check(ctx context.Context, authInfo types.AuthInfo, req typ
 		return checkResponseDenied, nil
 	}
 
-	res, err := c.check(ctx, authInfo, &req)
+	res, err := c.check(ctx, authInfo, &req, folder)
 	if err != nil {
 		span.RecordError(err)
 		return checkResponseDenied, err
@@ -303,8 +303,8 @@ func newOutgoingContext(ctx context.Context) context.Context {
 // CACHE
 // -----
 
-func checkCacheKey(subj string, req *types.CheckRequest) string {
-	return fmt.Sprintf("check-%s-%s-%s-%s-%s-%s-%s-%s-%s", req.Namespace, subj, req.Group, req.Resource, req.Verb, req.Name, req.Subresource, req.Path, req.Folder)
+func checkCacheKey(subj string, req *types.CheckRequest, folder string) string {
+	return fmt.Sprintf("check-%s-%s-%s-%s-%s-%s-%s-%s-%s", req.Namespace, subj, req.Group, req.Resource, req.Verb, req.Name, req.Subresource, req.Path, folder)
 }
 
 func (c *ClientImpl) cacheCheck(ctx context.Context, key string, allowed bool) error {

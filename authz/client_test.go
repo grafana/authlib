@@ -128,6 +128,7 @@ func TestClient_Check(t *testing.T) {
 		name     string
 		caller   *authn.AuthInfo
 		req      types.CheckRequest
+		folder   string
 		checkRes bool
 		want     bool
 		wantErr  bool
@@ -446,7 +447,7 @@ func TestClient_Check(t *testing.T) {
 			client, authz := setupAccessClient()
 			authz.checkRes = &authzv1.CheckResponse{Allowed: tt.checkRes}
 
-			got, err := client.Check(context.Background(), tt.caller, tt.req)
+			got, err := client.Check(context.Background(), tt.caller, tt.req, tt.folder)
 			if tt.wantErr {
 				require.Error(t, err)
 				return
@@ -482,7 +483,7 @@ func TestClient_Check_OnPremFmt(t *testing.T) {
 		Name:      "rrss",
 	}
 
-	got, err := client.Check(context.Background(), caller, req)
+	got, err := client.Check(context.Background(), caller, req, "")
 	require.NoError(t, err)
 	require.True(t, got.Allowed)
 }
@@ -509,14 +510,15 @@ func TestClient_Check_Cache(t *testing.T) {
 		Verb:      "list",
 		Name:      "rrss",
 	}
+	folder := ""
 
 	// First call should populate the cache
-	got, err := client.Check(context.Background(), caller, req)
+	got, err := client.Check(context.Background(), caller, req, folder)
 	require.NoError(t, err)
 	require.True(t, got.Allowed)
 
 	// Check that the cache was populated correctly
-	ctrl, err := client.getCachedCheck(context.Background(), checkCacheKey("user:1", &req))
+	ctrl, err := client.getCachedCheck(context.Background(), checkCacheKey("user:1", &req, folder))
 	require.NoError(t, err)
 	require.True(t, ctrl)
 
@@ -524,7 +526,7 @@ func TestClient_Check_Cache(t *testing.T) {
 	authz.checkRes = &authzv1.CheckResponse{Allowed: false}
 
 	// Second call should still be true as we hit the cache
-	got, err = client.Check(context.Background(), caller, req)
+	got, err = client.Check(context.Background(), caller, req, folder)
 	require.NoError(t, err)
 	require.True(t, got.Allowed)
 }
