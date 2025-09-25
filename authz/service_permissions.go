@@ -11,13 +11,24 @@ import (
 type ServiceEvaluationResult struct {
 	// ServiceCall indicates if the call was made by a service (access policy) identity
 	ServiceCall bool
-	// Allowed indicates if the permission check passed
+	// Allowed indicates if the permission check passed. This does not imply that the user is allowed,
+	// only that the service has the required permissions (itself or on behalf of a user)
 	Allowed bool
 	// Permissions lists the permissions present in the token used for the check
 	Permissions []string
 }
 
-// CheckServicePermissions focuses on checking the service-related permissions within the provided AuthInfo.
+// TL;DR: CheckServicePermissions should only be used when user permissions are checked later in the flow.
+// If the service is allowed, the caller can proceed to check user permissions as needed.
+// If the service is not allowed, the caller should reject the request immediately.
+//
+// AuthInfo always holds service info, and optionally user info (service-to-service vs. on-behalf-of calls).
+// While service permissions are directly checkable from AuthInfo, user permissions require an AuthZ service
+// call which is not done here.
+//
+// CheckServicePermissions verifies if the service has the required permissions for an action:
+// - For direct service calls (access policy), it checks the service's own permissions.
+// - For calls made on behalf of a user (on-behalf-of), it checks the service's delegated permissions.
 func CheckServicePermissions(authInfo types.AuthInfo, group, resource, verb string) ServiceEvaluationResult {
 	res := ServiceEvaluationResult{
 		ServiceCall: types.IsIdentityType(authInfo.GetIdentityType(), types.TypeAccessPolicy),
