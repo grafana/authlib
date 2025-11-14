@@ -23,11 +23,6 @@ func OrgNamespaceFormatter(id int64) string {
 	return fmt.Sprintf("org-%d", id)
 }
 
-// disambiguateNamespace is a helper to temporarily navigate the issue with cloud namespace claims being ambiguous (stack vs stacks).
-func disambiguateNamespace(namespace string) string {
-	return strings.Replace(namespace, "stack-", "stacks-", 1)
-}
-
 // NamespaceMatches check if provided namespace matches the expected one.
 // This function always cosider the namespace to match if namespace is `*`.
 func NamespaceMatches(namespace, expected string) bool {
@@ -41,7 +36,7 @@ func NamespaceMatches(namespace, expected string) bool {
 		return false
 	}
 
-	return disambiguateNamespace(namespace) == disambiguateNamespace(expected)
+	return namespace == expected
 }
 
 type NamespaceInfo struct {
