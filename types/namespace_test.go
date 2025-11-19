@@ -20,18 +20,6 @@ func TestNamespaceMatches(t *testing.T) {
 			expected:          true,
 		},
 		{
-			desc:              "deprecated namespace format and correct expected",
-			namespace:         "stack-1",
-			expectedNamespace: "stacks-1",
-			expected:          true,
-		},
-		{
-			desc:              "correct namespace format and deprecated expected format",
-			namespace:         "stacks-1",
-			expectedNamespace: "stack-1",
-			expected:          true,
-		},
-		{
 			desc:              "wildcard namespace",
 			namespace:         "*",
 			expectedNamespace: "stack-1",
