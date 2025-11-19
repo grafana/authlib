@@ -88,16 +88,5 @@ func ParseNamespace(ns string) (NamespaceInfo, error) {
 		return info, err
 	}
 
-	// handle deprecated stack-X value
-	if id, ok := strings.CutPrefix(ns, "stack-"); ok {
-		stackID, err := strconv.ParseInt(id, 10, 64)
-		if err != nil || stackID < 1 {
-			return info, fmt.Errorf("invalid stack id")
-		}
-		info.StackID = stackID
-		info.OrgID = 1
-		return info, err
-	}
-
 	return info, nil
 }
