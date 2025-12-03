@@ -5,7 +5,7 @@ go 1.24.0
 require (
 	github.com/go-jose/go-jose/v4 v4.1.3
 	github.com/google/go-querystring v1.1.0
-	github.com/grafana/authlib/types v0.0.0-20251202135821-87d2e93d28f7
+	github.com/grafana/authlib/types v0.0.0-20251203121255-ec954099d22e
 	github.com/grafana/dskit v0.0.0-20251201161351-852136d24dbe
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.3
 	github.com/patrickmn/go-cache v2.1.0+incompatible
