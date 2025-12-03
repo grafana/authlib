@@ -16,8 +16,8 @@ github.com/google/go-querystring v1.1.0 h1:AnCroh3fv4ZBgVIf1Iwtovgjaw/GiKJo8M8yD
 github.com/google/go-querystring v1.1.0/go.mod h1:Kcdr2DB4koayq7X8pmAG4sNG59So17icRSOU623lUBU=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/grafana/authlib/types v0.0.0-20251203121255-ec954099d22e h1:35c33IxgiQkuwtSJRGTTYjy3JqBbb4ReiU1j/AET6d0=
-github.com/grafana/authlib/types v0.0.0-20251203121255-ec954099d22e/go.mod h1:CZ5McGzO/q6lnRb8xvTODCC2bJniQoQ+gho0AVZC/zY=
+github.com/grafana/authlib/types v0.0.0-20251203163023-dd5a97c606e3 h1:T4AMrL8ZB1U25m/+FOmkqWPnz0X7u/Oqj1ISg4OrS2c=
+github.com/grafana/authlib/types v0.0.0-20251203163023-dd5a97c606e3/go.mod h1:CZ5McGzO/q6lnRb8xvTODCC2bJniQoQ+gho0AVZC/zY=
 github.com/grafana/dskit v0.0.0-20251201161351-852136d24dbe h1:zJLVCqb/hFflkiOTX1WilI+Cj5fnKh73UcLfixRiVgY=
 github.com/grafana/dskit v0.0.0-20251201161351-852136d24dbe/go.mod h1:/pHIcyeZJBZbtboXOjRtPaMl5KK+2VRdNJbCHDkpDYs=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.3 h1:NmZ1PKzSTQbuGHw9DGPFomqkkLWMC+vZCkfs+FHv1Vg=
