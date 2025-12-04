@@ -1,0 +1,21 @@
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: ['github>grafana/grafana-renovate-config//presets/base'],
+  packageRules: [
+    {
+      description: 'Ignore major version updates for certain Go packages',
+      matchManagers: ['gomod'],
+      matchUpdateTypes: ['major'],
+      matchPackageNames: [
+        'go.opentelemetry.io/otel',
+        'google.golang.org/grpc',
+      ],
+      enabled: false,
+    },
+    {
+      description: 'Update dependencies digests on Monday mornings to avoid PR spam from repos not using semver',
+      matchUpdateTypes: ['digest'],
+      schedule: ['* 0-4 * * 1'],
+    },
+  ],
+}
