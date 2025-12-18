@@ -101,9 +101,13 @@ func (c *ClientImpl) check(ctx context.Context, authInfo types.AuthInfo, req *ty
 	}
 
 	key := checkCacheKey(authInfo.GetSubject(), req, folder)
-	allowed, timestamp, err := c.getCachedCheck(ctx, key)
-	if err == nil {
-		return allowed, timestamp, nil
+
+	// Skip the cache if requested
+	if !req.SkipCache {
+		allowed, timestamp, err := c.getCachedCheck(ctx, key)
+		if err == nil {
+			return allowed, timestamp, nil
+		}
 	}
 
 	checkReq := &authzv1.CheckRequest{
@@ -116,6 +120,7 @@ func (c *ClientImpl) check(ctx context.Context, authInfo types.AuthInfo, req *ty
 		Subresource: req.Subresource,
 		Path:        req.Path,
 		Folder:      folder,
+		Skipcache:   req.SkipCache,
 	}
 
 	// Instantiate a new context for the request

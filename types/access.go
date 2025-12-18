@@ -40,6 +40,9 @@ type CheckRequest struct {
 
 	// For non-resource requests, this will be the requested URL path
 	Path string
+
+	// SkipCache forces the access checker to skip any caching layer
+	SkipCache bool
 }
 
 type CheckResponse struct {

@@ -531,6 +531,50 @@ func TestClient_Check_Cache(t *testing.T) {
 	require.True(t, got.Allowed)
 }
 
+func TestClient_Check_SkipCache(t *testing.T) {
+	client, authz := setupAccessClient()
+	authz.checkRes = &authzv1.CheckResponse{Allowed: true}
+
+	caller := authn.NewIDTokenAuthInfo(
+		authn.Claims[authn.AccessTokenClaims]{
+			Claims: jwt.Claims{Subject: "service"},
+			Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:list"}},
+		},
+		&authn.Claims[authn.IDTokenClaims]{
+			Claims: jwt.Claims{Subject: "user:1"},
+			Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+		},
+	)
+
+	req := types.CheckRequest{
+		Namespace: "stacks-12",
+		Group:     "dashboards.grafana.app",
+		Resource:  "dashboards",
+		Verb:      "list",
+		Name:      "rrss",
+	}
+	folder := ""
+
+	// First call should populate the cache
+	got, err := client.Check(context.Background(), caller, req, folder)
+	require.NoError(t, err)
+	require.True(t, got.Allowed)
+
+	// Change the response to make sure cache would return different result
+	authz.checkRes = &authzv1.CheckResponse{Allowed: false}
+
+	// Second call without SkipCache should still be true (from cache)
+	got, err = client.Check(context.Background(), caller, req, folder)
+	require.NoError(t, err)
+	require.True(t, got.Allowed)
+
+	// Third call WITH SkipCache should be false (bypasses cache)
+	req.SkipCache = true
+	got, err = client.Check(context.Background(), caller, req, folder)
+	require.NoError(t, err)
+	require.False(t, got.Allowed)
+}
+
 func TestClient_Check_Zookie(t *testing.T) {
 	client, authz := setupAccessClient()
 
