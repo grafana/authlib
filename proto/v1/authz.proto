@@ -49,6 +49,7 @@ message CheckRequest {
 
 message CheckResponse {
   bool allowed = 1;
+  Zookie zookie = 2;
 }
 
 message ListRequest {

@@ -176,6 +176,9 @@
       "properties": {
         "allowed": {
           "type": "boolean"
+        },
+        "zookie": {
+          "$ref": "#/definitions/v1Zookie"
         }
       }
     },

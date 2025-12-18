@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	checkResponseDenied = types.CheckResponse{Allowed: false}
+	checkResponseDenied = types.CheckResponse{Allowed: false, Zookie: types.NoopZookie{}}
 
 	k6FolderUID = "k6-app"
 )
@@ -91,19 +91,19 @@ func NewClient(cc grpc.ClientConnInterface, opts ...AuthzClientOption) *ClientIm
 // Implementation
 // -----
 
-func (c *ClientImpl) check(ctx context.Context, authInfo types.AuthInfo, req *types.CheckRequest, folder string) (bool, error) {
+func (c *ClientImpl) check(ctx context.Context, authInfo types.AuthInfo, req *types.CheckRequest, folder string) (bool, int64, error) {
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.hasAccess")
 	defer span.End()
 
 	idIsServiceAccount := types.IsIdentityType(authInfo.GetIdentityType(), types.TypeServiceAccount)
 	if !idIsServiceAccount && (req.Name == k6FolderUID || folder == k6FolderUID) {
-		return false, nil
+		return false, time.Now().UnixMilli(), nil
 	}
 
 	key := checkCacheKey(authInfo.GetSubject(), req, folder)
-	res, err := c.getCachedCheck(ctx, key)
+	allowed, timestamp, err := c.getCachedCheck(ctx, key)
 	if err == nil {
-		return res, nil
+		return allowed, timestamp, nil
 	}
 
 	checkReq := &authzv1.CheckRequest{
@@ -124,13 +124,20 @@ func (c *ClientImpl) check(ctx context.Context, authInfo types.AuthInfo, req *ty
 	// Query the authz service
 	resp, err := c.clientV1.Check(outCtx, checkReq)
 	if err != nil {
-		return false, err
+		return false, 0, err
+	}
+
+	// Ensure backward compatibility with older authz servers
+	// that don't return a zookie
+	ts := time.Now().UnixMilli()
+	if resp.Zookie != nil {
+		ts = resp.Zookie.Timestamp
 	}
 
 	// Cache the result
-	err = c.cacheCheck(ctx, key, resp.Allowed)
+	err = c.cacheCheck(ctx, key, resp.Allowed, ts)
 
-	return resp.Allowed, err
+	return resp.Allowed, ts, err
 }
 
 func (c *ClientImpl) Check(ctx context.Context, authInfo types.AuthInfo, req types.CheckRequest, folder string) (types.CheckResponse, error) {
@@ -170,7 +177,7 @@ func (c *ClientImpl) Check(ctx context.Context, authInfo types.AuthInfo, req typ
 
 	if checkServiceRes.ServiceCall {
 		// No user => check on the service permissions only
-		return types.CheckResponse{Allowed: checkServiceRes.Allowed}, nil
+		return types.CheckResponse{Allowed: checkServiceRes.Allowed, Zookie: types.NoopZookie{}}, nil
 	}
 
 	if !checkServiceRes.Allowed {
@@ -178,15 +185,16 @@ func (c *ClientImpl) Check(ctx context.Context, authInfo types.AuthInfo, req typ
 		return checkResponseDenied, nil
 	}
 
-	res, err := c.check(ctx, authInfo, &req, folder)
+	allowed, timestamp, err := c.check(ctx, authInfo, &req, folder)
 	if err != nil {
 		span.RecordError(err)
 		return checkResponseDenied, err
 	}
 
 	// Check if the user has access to any of the requested resources
-	span.SetAttributes(attribute.Bool("user_allowed", res))
-	return types.CheckResponse{Allowed: res}, nil
+	span.SetAttributes(attribute.Bool("user_allowed", allowed))
+	span.SetAttributes(attribute.Int64("zookie_timestamp", timestamp))
+	return types.CheckResponse{Allowed: allowed, Zookie: NewTimestampZookie(timestamp)}, nil
 }
 
 func (c *ClientImpl) compile(ctx context.Context, authInfo types.AuthInfo, list *types.ListRequest) (*itemChecker, error) {
@@ -307,12 +315,18 @@ func checkCacheKey(subj string, req *types.CheckRequest, folder string) string {
 	return fmt.Sprintf("check-%s-%s-%s-%s-%s-%s-%s-%s-%s", req.Namespace, subj, req.Group, req.Resource, req.Verb, req.Name, req.Subresource, req.Path, folder)
 }
 
-func (c *ClientImpl) cacheCheck(ctx context.Context, key string, allowed bool) error {
+type checkCacheEntry struct {
+	Allowed   bool
+	Timestamp int64
+}
+
+func (c *ClientImpl) cacheCheck(ctx context.Context, key string, allowed bool, timestamp int64) error {
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.cacheCheck")
 	defer span.End()
 
+	entry := checkCacheEntry{Allowed: allowed, Timestamp: timestamp}
 	buf := bytes.Buffer{}
-	err := gob.NewEncoder(&buf).Encode(allowed)
+	err := gob.NewEncoder(&buf).Encode(entry)
 	if err != nil {
 		return err
 	}
@@ -321,21 +335,21 @@ func (c *ClientImpl) cacheCheck(ctx context.Context, key string, allowed bool) e
 	return c.cache.Set(ctx, key, buf.Bytes(), cache.DefaultExpiration)
 }
 
-func (c *ClientImpl) getCachedCheck(ctx context.Context, key string) (bool, error) {
+func (c *ClientImpl) getCachedCheck(ctx context.Context, key string) (bool, int64, error) {
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.getCachedCheck")
 	defer span.End()
 
 	data, err := c.cache.Get(ctx, key)
 	if err != nil {
-		return false, err
+		return false, 0, err
 	}
 
-	var allowed bool
-	err = gob.NewDecoder(bytes.NewReader(data)).Decode(&allowed)
+	var entry checkCacheEntry
+	err = gob.NewDecoder(bytes.NewReader(data)).Decode(&entry)
 	if err != nil {
-		return false, err
+		return false, 0, err
 	}
-	return allowed, nil
+	return entry.Allowed, entry.Timestamp, nil
 }
 
 func itemCheckerCacheKey(subj string, req *types.ListRequest) string {

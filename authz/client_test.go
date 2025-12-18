@@ -518,7 +518,7 @@ func TestClient_Check_Cache(t *testing.T) {
 	require.True(t, got.Allowed)
 
 	// Check that the cache was populated correctly
-	ctrl, err := client.getCachedCheck(context.Background(), checkCacheKey("user:1", &req, folder))
+	ctrl, _, err := client.getCachedCheck(context.Background(), checkCacheKey("user:1", &req, folder))
 	require.NoError(t, err)
 	require.True(t, ctrl)
 

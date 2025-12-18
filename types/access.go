@@ -45,6 +45,8 @@ type CheckRequest struct {
 type CheckResponse struct {
 	// Allowed is true if the request is allowed, false otherwise.
 	Allowed bool
+	// Zookie tracks the freshness of the authorization decision.
+	Zookie Zookie
 }
 
 type Zookie interface {
@@ -104,9 +106,9 @@ type fixedClient struct {
 
 func (n *fixedClient) Check(ctx context.Context, _ AuthInfo, req CheckRequest, _ string) (CheckResponse, error) {
 	if err := ValidateCheckRequest(req); err != nil {
-		return CheckResponse{Allowed: false}, err
+		return CheckResponse{Allowed: false, Zookie: NoopZookie{}}, err
 	}
-	return CheckResponse{Allowed: n.allowed}, nil
+	return CheckResponse{Allowed: n.allowed, Zookie: NoopZookie{}}, nil
 }
 
 func (n *fixedClient) Compile(ctx context.Context, _ AuthInfo, req ListRequest) (ItemChecker, Zookie, error) {
