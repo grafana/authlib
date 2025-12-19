@@ -72,6 +72,9 @@
                 },
                 "folder": {
                   "type": "string"
+                },
+                "skipcache": {
+                  "type": "boolean"
                 }
               }
             }
@@ -176,6 +179,9 @@
       "properties": {
         "allowed": {
           "type": "boolean"
+        },
+        "zookie": {
+          "$ref": "#/definitions/v1Zookie"
         }
       }
     },

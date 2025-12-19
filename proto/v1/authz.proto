@@ -45,10 +45,12 @@ message CheckRequest {
   string subresource = 7;
   string path = 8;
   string folder = 9;
+  bool skipcache = 10;
 }
 
 message CheckResponse {
   bool allowed = 1;
+  Zookie zookie = 2;
 }
 
 message ListRequest {
