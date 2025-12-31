@@ -2,6 +2,7 @@ package authz
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -9,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/trace/noop"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/grafana/authlib/authn"
 	authzv1 "github.com/grafana/authlib/authz/proto/v1"
@@ -1012,6 +1015,576 @@ func TestClient_Compile_Zookie(t *testing.T) {
 	})
 }
 
+func TestBatchCheckRequest_Validate(t *testing.T) {
+	tests := []struct {
+		name    string
+		req     types.BatchCheckRequest
+		wantErr error
+	}{
+		{
+			name:    "Empty checks is valid",
+			req:     types.BatchCheckRequest{Checks: []types.BatchCheckItem{}},
+			wantErr: nil,
+		},
+		{
+			name: "Valid request with one check",
+			req: types.BatchCheckRequest{
+				Checks: []types.BatchCheckItem{
+					{CorrelationID: "1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get"},
+				},
+			},
+			wantErr: nil,
+		},
+		{
+			name: "Valid request with exactly 50 checks",
+			req: func() types.BatchCheckRequest {
+				checks := make([]types.BatchCheckItem, 50)
+				for i := 0; i < 50; i++ {
+					checks[i] = types.BatchCheckItem{
+						CorrelationID: fmt.Sprintf("id-%d", i),
+						Group:         "dashboards.grafana.app",
+						Resource:      "dashboards",
+						Verb:          "get",
+					}
+				}
+				return types.BatchCheckRequest{Checks: checks}
+			}(),
+			wantErr: nil,
+		},
+		{
+			name: "Too many checks (51)",
+			req: func() types.BatchCheckRequest {
+				checks := make([]types.BatchCheckItem, 51)
+				for i := 0; i < 51; i++ {
+					checks[i] = types.BatchCheckItem{
+						CorrelationID: fmt.Sprintf("id-%d", i),
+						Group:         "dashboards.grafana.app",
+						Resource:      "dashboards",
+						Verb:          "get",
+					}
+				}
+				return types.BatchCheckRequest{Checks: checks}
+			}(),
+			wantErr: types.ErrTooManyChecks,
+		},
+		{
+			name: "Empty correlation ID",
+			req: types.BatchCheckRequest{
+				Checks: []types.BatchCheckItem{
+					{CorrelationID: "", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get"},
+				},
+			},
+			wantErr: types.ErrEmptyCorrelationID,
+		},
+		{
+			name: "Duplicate correlation IDs",
+			req: types.BatchCheckRequest{
+				Checks: []types.BatchCheckItem{
+					{CorrelationID: "same-id", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get"},
+					{CorrelationID: "same-id", Group: "folders.grafana.app", Resource: "folders", Verb: "list"},
+				},
+			},
+			wantErr: types.ErrDuplicateCorrelationID,
+		},
+		{
+			name: "Missing group",
+			req: types.BatchCheckRequest{
+				Checks: []types.BatchCheckItem{
+					{CorrelationID: "1", Group: "", Resource: "dashboards", Verb: "get"},
+				},
+			},
+			wantErr: types.ErrMissingRequestGroup,
+		},
+		{
+			name: "Missing resource",
+			req: types.BatchCheckRequest{
+				Checks: []types.BatchCheckItem{
+					{CorrelationID: "1", Group: "dashboards.grafana.app", Resource: "", Verb: "get"},
+				},
+			},
+			wantErr: types.ErrMissingRequestResource,
+		},
+		{
+			name: "Missing verb",
+			req: types.BatchCheckRequest{
+				Checks: []types.BatchCheckItem{
+					{CorrelationID: "1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: ""},
+				},
+			},
+			wantErr: types.ErrMissingRequestVerb,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.req.Validate()
+			if tt.wantErr != nil {
+				require.ErrorIs(t, err, tt.wantErr)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestClient_BatchCheck(t *testing.T) {
+	tests := []struct {
+		name          string
+		caller        *authn.AuthInfo
+		req           types.BatchCheckRequest
+		batchCheckRes *authzv1.BatchCheckResponse
+		wantErr       bool
+		wantRes       map[string]bool // correlation ID -> allowed
+	}{
+		{
+			name: "Empty request returns empty results",
+			caller: authn.NewIDTokenAuthInfo(
+				authn.Claims[authn.AccessTokenClaims]{
+					Claims: jwt.Claims{Subject: "service"},
+					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get"}},
+				},
+				&authn.Claims[authn.IDTokenClaims]{
+					Claims: jwt.Claims{Subject: "user:1"},
+					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+				},
+			),
+			req:     types.BatchCheckRequest{Checks: []types.BatchCheckItem{}},
+			wantErr: false,
+			wantRes: map[string]bool{},
+		},
+		{
+			name:   "No caller returns error",
+			caller: &authn.AuthInfo{},
+			req: types.BatchCheckRequest{
+				Checks: []types.BatchCheckItem{
+					{CorrelationID: "1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12"},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Validation error - missing verb",
+			caller: authn.NewIDTokenAuthInfo(
+				authn.Claims[authn.AccessTokenClaims]{
+					Claims: jwt.Claims{Subject: "service"},
+					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get"}},
+				},
+				&authn.Claims[authn.IDTokenClaims]{
+					Claims: jwt.Claims{Subject: "user:1"},
+					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+				},
+			),
+			req: types.BatchCheckRequest{
+				Checks: []types.BatchCheckItem{
+					{CorrelationID: "1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: ""},
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "Single check - allowed",
+			caller: authn.NewIDTokenAuthInfo(
+				authn.Claims[authn.AccessTokenClaims]{
+					Claims: jwt.Claims{Subject: "service"},
+					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get"}},
+				},
+				&authn.Claims[authn.IDTokenClaims]{
+					Claims: jwt.Claims{Subject: "user:1"},
+					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+				},
+			),
+			req: types.BatchCheckRequest{
+				Checks: []types.BatchCheckItem{
+					{CorrelationID: "check-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12", Name: "dash1"},
+				},
+			},
+			batchCheckRes: &authzv1.BatchCheckResponse{
+				Results: map[string]*authzv1.BatchCheckResult{"check-1": {Allowed: true}},
+				Zookie:  &authzv1.Zookie{Timestamp: time.Now().UnixMilli()},
+			},
+			wantErr: false,
+			wantRes: map[string]bool{"check-1": true},
+		},
+		{
+			name: "Single check - denied",
+			caller: authn.NewIDTokenAuthInfo(
+				authn.Claims[authn.AccessTokenClaims]{
+					Claims: jwt.Claims{Subject: "service"},
+					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get"}},
+				},
+				&authn.Claims[authn.IDTokenClaims]{
+					Claims: jwt.Claims{Subject: "user:1"},
+					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+				},
+			),
+			req: types.BatchCheckRequest{
+				Checks: []types.BatchCheckItem{
+					{CorrelationID: "check-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12", Name: "dash1"},
+				},
+			},
+			batchCheckRes: &authzv1.BatchCheckResponse{
+				Results: map[string]*authzv1.BatchCheckResult{"check-1": {Allowed: false}},
+				Zookie:  &authzv1.Zookie{Timestamp: time.Now().UnixMilli()},
+			},
+			wantErr: false,
+			wantRes: map[string]bool{"check-1": false},
+		},
+		{
+			name: "Multiple checks across different resources",
+			caller: authn.NewIDTokenAuthInfo(
+				authn.Claims[authn.AccessTokenClaims]{
+					Claims: jwt.Claims{Subject: "service"},
+					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get", "folders.grafana.app/folders:get"}},
+				},
+				&authn.Claims[authn.IDTokenClaims]{
+					Claims: jwt.Claims{Subject: "user:1"},
+					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+				},
+			),
+			req: types.BatchCheckRequest{
+				Checks: []types.BatchCheckItem{
+					{CorrelationID: "dash-check", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12", Name: "dash1"},
+					{CorrelationID: "folder-check", Group: "folders.grafana.app", Resource: "folders", Verb: "get", Namespace: "stacks-12", Name: "folder1"},
+				},
+			},
+			batchCheckRes: &authzv1.BatchCheckResponse{
+				Results: map[string]*authzv1.BatchCheckResult{
+					"dash-check":   {Allowed: true},
+					"folder-check": {Allowed: true},
+				},
+				Zookie: &authzv1.Zookie{Timestamp: time.Now().UnixMilli()},
+			},
+			wantErr: false,
+			wantRes: map[string]bool{"dash-check": true, "folder-check": true},
+		},
+		{
+			name: "Mixed results - some allowed, some denied",
+			caller: authn.NewIDTokenAuthInfo(
+				authn.Claims[authn.AccessTokenClaims]{
+					Claims: jwt.Claims{Subject: "service"},
+					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get", "folders.grafana.app/folders:get"}},
+				},
+				&authn.Claims[authn.IDTokenClaims]{
+					Claims: jwt.Claims{Subject: "user:1"},
+					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+				},
+			),
+			req: types.BatchCheckRequest{
+				Checks: []types.BatchCheckItem{
+					{CorrelationID: "check-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12"},
+					{CorrelationID: "check-2", Group: "folders.grafana.app", Resource: "folders", Verb: "get", Namespace: "stacks-12"},
+				},
+			},
+			batchCheckRes: &authzv1.BatchCheckResponse{
+				Results: map[string]*authzv1.BatchCheckResult{
+					"check-1": {Allowed: true},
+					"check-2": {Allowed: false},
+				},
+				Zookie: &authzv1.Zookie{Timestamp: time.Now().UnixMilli()},
+			},
+			wantErr: false,
+			wantRes: map[string]bool{"check-1": true, "check-2": false},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, authz := setupAccessClient()
+			authz.batchCheckRes = tt.batchCheckRes
+
+			resp, err := client.BatchCheck(context.Background(), tt.caller, tt.req)
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			require.Len(t, resp.Results, len(tt.wantRes))
+
+			for corrID, wantAllowed := range tt.wantRes {
+				result, exists := resp.Results[corrID]
+				require.True(t, exists, "expected result for correlation ID %s", corrID)
+				require.Equal(t, wantAllowed, result.Allowed, "unexpected allowed value for %s", corrID)
+			}
+		})
+	}
+}
+
+func TestClient_BatchCheck_Concurrency(t *testing.T) {
+	client, authz := setupAccessClient()
+	authz.checkRes = &authzv1.CheckResponse{Allowed: true}
+	// Force fallback to test concurrent Check calls
+	authz.batchCheckErr = status.Error(codes.Unimplemented, "method BatchCheck not implemented")
+
+	caller := authn.NewIDTokenAuthInfo(
+		authn.Claims[authn.AccessTokenClaims]{
+			Claims: jwt.Claims{Subject: "service"},
+			Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get"}},
+		},
+		&authn.Claims[authn.IDTokenClaims]{
+			Claims: jwt.Claims{Subject: "user:1"},
+			Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+		},
+	)
+
+	// Create a batch with 20 checks to verify concurrent execution
+	checks := make([]types.BatchCheckItem, 20)
+	for i := 0; i < 20; i++ {
+		checks[i] = types.BatchCheckItem{
+			CorrelationID: fmt.Sprintf("check-%d", i),
+			Group:         "dashboards.grafana.app",
+			Resource:      "dashboards",
+			Verb:          "get",
+			Namespace:     "stacks-12",
+			Name:          fmt.Sprintf("dash-%d", i),
+		}
+	}
+
+	req := types.BatchCheckRequest{Checks: checks}
+
+	resp, err := client.BatchCheck(context.Background(), caller, req)
+	require.NoError(t, err)
+	require.Len(t, resp.Results, 20)
+
+	// Verify all results are present and allowed
+	for i := 0; i < 20; i++ {
+		corrID := fmt.Sprintf("check-%d", i)
+		result, exists := resp.Results[corrID]
+		require.True(t, exists, "missing result for %s", corrID)
+		require.True(t, result.Allowed, "expected allowed for %s", corrID)
+		require.NoError(t, result.Error)
+	}
+}
+
+func TestClient_BatchCheck_Cache(t *testing.T) {
+	client, authz := setupAccessClient()
+	authz.checkRes = &authzv1.CheckResponse{Allowed: true}
+	// Force fallback to test cache behavior through Check calls
+	authz.batchCheckErr = status.Error(codes.Unimplemented, "method BatchCheck not implemented")
+
+	caller := authn.NewIDTokenAuthInfo(
+		authn.Claims[authn.AccessTokenClaims]{
+			Claims: jwt.Claims{Subject: "service"},
+			Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get"}},
+		},
+		&authn.Claims[authn.IDTokenClaims]{
+			Claims: jwt.Claims{Subject: "user:1"},
+			Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+		},
+	)
+
+	req := types.BatchCheckRequest{
+		Checks: []types.BatchCheckItem{
+			{CorrelationID: "check-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12", Name: "dash1"},
+		},
+	}
+
+	// First call - should populate cache
+	resp, err := client.BatchCheck(context.Background(), caller, req)
+	require.NoError(t, err)
+	require.True(t, resp.Results["check-1"].Allowed)
+
+	// Change the response to make sure cache is used
+	authz.checkRes = &authzv1.CheckResponse{Allowed: false}
+
+	// Second call - should still be true (from cache)
+	resp, err = client.BatchCheck(context.Background(), caller, req)
+	require.NoError(t, err)
+	require.True(t, resp.Results["check-1"].Allowed)
+}
+
+func TestClient_BatchCheck_SkipCache(t *testing.T) {
+	client, authz := setupAccessClient()
+	authz.checkRes = &authzv1.CheckResponse{Allowed: true}
+	// Force fallback to test cache behavior through Check calls
+	authz.batchCheckErr = status.Error(codes.Unimplemented, "method BatchCheck not implemented")
+
+	caller := authn.NewIDTokenAuthInfo(
+		authn.Claims[authn.AccessTokenClaims]{
+			Claims: jwt.Claims{Subject: "service"},
+			Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get"}},
+		},
+		&authn.Claims[authn.IDTokenClaims]{
+			Claims: jwt.Claims{Subject: "user:1"},
+			Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+		},
+	)
+
+	req := types.BatchCheckRequest{
+		Checks: []types.BatchCheckItem{
+			{CorrelationID: "check-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12", Name: "dash1"},
+		},
+	}
+
+	// First call - should populate cache
+	resp, err := client.BatchCheck(context.Background(), caller, req)
+	require.NoError(t, err)
+	require.True(t, resp.Results["check-1"].Allowed)
+
+	// Change the response
+	authz.checkRes = &authzv1.CheckResponse{Allowed: false}
+
+	// Second call without SkipCache - should still be true (from cache)
+	resp, err = client.BatchCheck(context.Background(), caller, req)
+	require.NoError(t, err)
+	require.True(t, resp.Results["check-1"].Allowed)
+
+	// Third call WITH SkipCache - should be false (bypasses cache)
+	req.SkipCache = true
+	resp, err = client.BatchCheck(context.Background(), caller, req)
+	require.NoError(t, err)
+	require.False(t, resp.Results["check-1"].Allowed)
+}
+
+func TestClient_BatchCheck_Zookie(t *testing.T) {
+	client, authz := setupAccessClient()
+
+	expectedTimestamp := time.Now().Add(-5 * time.Minute).UnixMilli()
+	authz.checkRes = &authzv1.CheckResponse{
+		Allowed: true,
+		Zookie:  &authzv1.Zookie{Timestamp: expectedTimestamp},
+	}
+	// Force fallback to test zookie behavior through Check calls
+	authz.batchCheckErr = status.Error(codes.Unimplemented, "method BatchCheck not implemented")
+
+	caller := authn.NewIDTokenAuthInfo(
+		authn.Claims[authn.AccessTokenClaims]{
+			Claims: jwt.Claims{Subject: "service"},
+			Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get"}},
+		},
+		&authn.Claims[authn.IDTokenClaims]{
+			Claims: jwt.Claims{Subject: "user:1"},
+			Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+		},
+	)
+
+	req := types.BatchCheckRequest{
+		Checks: []types.BatchCheckItem{
+			{CorrelationID: "check-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12"},
+			{CorrelationID: "check-2", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12", Name: "dash2"},
+		},
+		SkipCache: true,
+	}
+
+	resp, err := client.BatchCheck(context.Background(), caller, req)
+	require.NoError(t, err)
+	require.NotNil(t, resp.Zookie)
+
+	// Verify the zookie has the correct timestamp
+	require.True(t, resp.Zookie.IsFresherThan(time.UnixMilli(expectedTimestamp-1000)))
+	require.False(t, resp.Zookie.IsFresherThan(time.UnixMilli(expectedTimestamp+1000)))
+}
+
+func TestClient_BatchCheck_FallbackToCheckCalls(t *testing.T) {
+	// This test verifies that BatchCheck falls back to Check calls
+	// when native BatchCheck is not supported
+	client, authz := setupAccessClient()
+	authz.checkRes = &authzv1.CheckResponse{Allowed: true}
+	// Simulate server not supporting BatchCheck
+	authz.batchCheckErr = status.Error(codes.Unimplemented, "method BatchCheck not implemented")
+
+	caller := authn.NewIDTokenAuthInfo(
+		authn.Claims[authn.AccessTokenClaims]{
+			Claims: jwt.Claims{Subject: "service"},
+			Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get", "folders.grafana.app/folders:get"}},
+		},
+		&authn.Claims[authn.IDTokenClaims]{
+			Claims: jwt.Claims{Subject: "user:1"},
+			Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+		},
+	)
+
+	// Create a batch check request across different resources
+	req := types.BatchCheckRequest{
+		Checks: []types.BatchCheckItem{
+			{CorrelationID: "dash-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12", Name: "dash1"},
+			{CorrelationID: "folder-1", Group: "folders.grafana.app", Resource: "folders", Verb: "get", Namespace: "stacks-12", Name: "folder1"},
+		},
+	}
+
+	resp, err := client.BatchCheck(context.Background(), caller, req)
+	require.NoError(t, err)
+	require.Len(t, resp.Results, 2)
+	require.True(t, resp.Results["dash-1"].Allowed)
+	require.True(t, resp.Results["folder-1"].Allowed)
+	require.NotNil(t, resp.Zookie)
+}
+
+func TestClient_BatchCheck_NativeRPC(t *testing.T) {
+	// This test verifies that BatchCheck uses the native RPC when server supports it
+	client, authz := setupAccessClient()
+
+	expectedTimestamp := time.Now().UnixMilli()
+	authz.batchCheckRes = &authzv1.BatchCheckResponse{
+		Results: map[string]*authzv1.BatchCheckResult{
+			"dash-1":   {Allowed: true},
+			"folder-1": {Allowed: false},
+		},
+		Zookie: &authzv1.Zookie{Timestamp: expectedTimestamp},
+	}
+
+	caller := authn.NewIDTokenAuthInfo(
+		authn.Claims[authn.AccessTokenClaims]{
+			Claims: jwt.Claims{Subject: "service"},
+			Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get", "folders.grafana.app/folders:get"}},
+		},
+		&authn.Claims[authn.IDTokenClaims]{
+			Claims: jwt.Claims{Subject: "user:1"},
+			Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+		},
+	)
+
+	req := types.BatchCheckRequest{
+		Checks: []types.BatchCheckItem{
+			{CorrelationID: "dash-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12", Name: "dash1"},
+			{CorrelationID: "folder-1", Group: "folders.grafana.app", Resource: "folders", Verb: "get", Namespace: "stacks-12", Name: "folder1"},
+		},
+	}
+
+	resp, err := client.BatchCheck(context.Background(), caller, req)
+	require.NoError(t, err)
+	require.Len(t, resp.Results, 2)
+	require.True(t, resp.Results["dash-1"].Allowed)
+	require.False(t, resp.Results["folder-1"].Allowed)
+	require.NotNil(t, resp.Zookie)
+	require.True(t, resp.Zookie.IsFresherThan(time.UnixMilli(expectedTimestamp-1000)))
+}
+
+func TestClient_BatchCheck_NativeRPC_WithError(t *testing.T) {
+	// This test verifies that BatchCheck properly handles error responses from native RPC
+	client, authz := setupAccessClient()
+
+	authz.batchCheckRes = &authzv1.BatchCheckResponse{
+		Results: map[string]*authzv1.BatchCheckResult{
+			"check-1": {Allowed: false, Error: "namespace mismatch"},
+		},
+		Zookie: &authzv1.Zookie{Timestamp: time.Now().UnixMilli()},
+	}
+
+	caller := authn.NewIDTokenAuthInfo(
+		authn.Claims[authn.AccessTokenClaims]{
+			Claims: jwt.Claims{Subject: "service"},
+			Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get"}},
+		},
+		&authn.Claims[authn.IDTokenClaims]{
+			Claims: jwt.Claims{Subject: "user:1"},
+			Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+		},
+	)
+
+	req := types.BatchCheckRequest{
+		Checks: []types.BatchCheckItem{
+			{CorrelationID: "check-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12"},
+		},
+	}
+
+	resp, err := client.BatchCheck(context.Background(), caller, req)
+	require.NoError(t, err)
+	require.Len(t, resp.Results, 1)
+	require.False(t, resp.Results["check-1"].Allowed)
+	require.Error(t, resp.Results["check-1"].Error)
+	require.Contains(t, resp.Results["check-1"].Error.Error(), "namespace mismatch")
+}
+
 func setupAccessClient() (*ClientImpl, *FakeAuthzServiceClient) {
 	fakeClient := &FakeAuthzServiceClient{}
 	return &ClientImpl{
@@ -1022,8 +1595,10 @@ func setupAccessClient() (*ClientImpl, *FakeAuthzServiceClient) {
 }
 
 type FakeAuthzServiceClient struct {
-	checkRes *authzv1.CheckResponse
-	listRes  *authzv1.ListResponse
+	checkRes      *authzv1.CheckResponse
+	listRes       *authzv1.ListResponse
+	batchCheckRes *authzv1.BatchCheckResponse
+	batchCheckErr error
 }
 
 func (f *FakeAuthzServiceClient) Check(ctx context.Context, in *authzv1.CheckRequest, opts ...grpc.CallOption) (*authzv1.CheckResponse, error) {
@@ -1032,4 +1607,26 @@ func (f *FakeAuthzServiceClient) Check(ctx context.Context, in *authzv1.CheckReq
 
 func (f *FakeAuthzServiceClient) List(ctx context.Context, in *authzv1.ListRequest, opts ...grpc.CallOption) (*authzv1.ListResponse, error) {
 	return f.listRes, nil
+}
+
+func (f *FakeAuthzServiceClient) BatchCheck(ctx context.Context, in *authzv1.BatchCheckRequest, opts ...grpc.CallOption) (*authzv1.BatchCheckResponse, error) {
+	if f.batchCheckErr != nil {
+		return nil, f.batchCheckErr
+	}
+	if f.batchCheckRes != nil {
+		return f.batchCheckRes, nil
+	}
+	// Default: build response from checkRes for each item in the request
+	results := make(map[string]*authzv1.BatchCheckResult, len(in.Checks))
+	for _, check := range in.Checks {
+		allowed := false
+		if f.checkRes != nil {
+			allowed = f.checkRes.Allowed
+		}
+		results[check.CorrelationId] = &authzv1.BatchCheckResult{Allowed: allowed}
+	}
+	return &authzv1.BatchCheckResponse{
+		Results: results,
+		Zookie:  &authzv1.Zookie{Timestamp: time.Now().UnixMilli()},
+	}, nil
 }
