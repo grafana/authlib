@@ -16,6 +16,62 @@
     "application/json"
   ],
   "paths": {
+    "/v1/namespace/{namespace}/batchcheck": {
+      "post": {
+        "summary": "Batch check access for subject on multiple resources",
+        "description": "This API checks if a subject is allowed to perform actions on multiple resources in a single request. Maximum 50 checks per request.",
+        "operationId": "BatchCheck",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1BatchCheckResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "namespace",
+            "description": "namespace is used for the HTTP route binding. Individual checks may specify\ntheir own namespace which takes precedence.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "subject": {
+                  "type": "string"
+                },
+                "checks": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/v1BatchCheckItem"
+                  }
+                },
+                "options": {
+                  "$ref": "#/definitions/v1BatchCheckOptions"
+                }
+              },
+              "description": "BatchCheckRequest contains multiple checks to be performed at once.\nMaximum of 50 checks per request."
+            }
+          }
+        ],
+        "tags": [
+          "BatchCheck"
+        ]
+      }
+    },
     "/v1/namespace/{namespace}/check": {
       "post": {
         "summary": "Check access for subject on resource given its parent folder",
@@ -173,6 +229,76 @@
           }
         }
       }
+    },
+    "v1BatchCheckItem": {
+      "type": "object",
+      "properties": {
+        "correlationId": {
+          "type": "string",
+          "description": "correlation_id is a unique identifier to correlate this check with its result.\nMust be a non-empty string unique within the batch request."
+        },
+        "verb": {
+          "type": "string"
+        },
+        "group": {
+          "type": "string"
+        },
+        "resource": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "subresource": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "folder": {
+          "type": "string"
+        }
+      },
+      "description": "BatchCheckItem represents a single check in a batch request."
+    },
+    "v1BatchCheckOptions": {
+      "type": "object",
+      "properties": {
+        "skipcache": {
+          "type": "boolean"
+        }
+      }
+    },
+    "v1BatchCheckResponse": {
+      "type": "object",
+      "properties": {
+        "results": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/v1BatchCheckResult"
+          },
+          "description": "results maps each correlation_id to its check result."
+        },
+        "zookie": {
+          "$ref": "#/definitions/v1Zookie"
+        }
+      },
+      "description": "BatchCheckResponse contains results for all checks in a batch request."
+    },
+    "v1BatchCheckResult": {
+      "type": "object",
+      "properties": {
+        "allowed": {
+          "type": "boolean"
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "description": "BatchCheckResult represents the result of a single check in a batch."
     },
     "v1CheckResponse": {
       "type": "object",

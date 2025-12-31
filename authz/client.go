@@ -6,12 +6,16 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	authzv1 "github.com/grafana/authlib/authz/proto/v1"
 	"github.com/grafana/authlib/cache"
@@ -43,6 +47,10 @@ type ClientImpl struct {
 	clientV1 authzv1.AuthzServiceClient
 	cache    cache.Cache
 	tracer   trace.Tracer
+
+	// batchCheckUnsupported is set to true if the server returned Unimplemented
+	// for BatchCheck RPC. Starts false (optimistically assume supported).
+	batchCheckUnsupported atomic.Bool
 }
 
 // -----
@@ -288,6 +296,190 @@ func (c *ClientImpl) Compile(ctx context.Context, authInfo types.AuthInfo, list 
 	}
 
 	return checker.fn(authInfo), checker.Zookie(), nil
+}
+
+// BatchCheck performs multiple access checks in a single request.
+// It attempts to use the native BatchCheck RPC if supported by the server,
+// otherwise falls back to concurrent Check calls.
+func (c *ClientImpl) BatchCheck(ctx context.Context, authInfo types.AuthInfo, req types.BatchCheckRequest) (types.BatchCheckResponse, error) {
+	ctx, span := c.tracer.Start(ctx, "ClientImpl.BatchCheck")
+	defer span.End()
+
+	// Validate the request
+	if err := req.Validate(); err != nil {
+		span.RecordError(err)
+		return types.BatchCheckResponse{}, err
+	}
+
+	// Handle empty request
+	if len(req.Checks) == 0 {
+		return types.BatchCheckResponse{
+			Results: make(map[string]types.BatchCheckResult),
+			Zookie:  types.NoopZookie{},
+		}, nil
+	}
+
+	if authInfo.GetSubject() == "" {
+		span.RecordError(ErrMissingAuthInfo)
+		return types.BatchCheckResponse{}, ErrMissingAuthInfo
+	}
+
+	span.SetAttributes(attribute.String("subject", authInfo.GetSubject()))
+	span.SetAttributes(attribute.Int("check_count", len(req.Checks)))
+	span.SetAttributes(attribute.Bool("skip_cache", req.SkipCache))
+
+	// If we know the server doesn't support BatchCheck, use fallback
+	if c.batchCheckUnsupported.Load() {
+		return c.batchCheckFallback(ctx, authInfo, req)
+	}
+
+	// Try BatchCheck RPC
+	resp, err := c.batchCheck(ctx, authInfo, req)
+	if err == nil {
+		span.SetAttributes(attribute.Bool("batch_check_rpc", true))
+		return resp, nil
+	}
+
+	// Check if server doesn't support BatchCheck
+	if status.Code(err) == codes.Unimplemented {
+		c.batchCheckUnsupported.Store(true)
+		span.SetAttributes(attribute.Bool("batch_check_rpc", false))
+		// Fallback to concurrent Check calls
+		return c.batchCheckFallback(ctx, authInfo, req)
+	}
+
+	// Other error - return it
+	span.RecordError(err)
+	return types.BatchCheckResponse{}, err
+}
+
+// batchCheck calls the BatchCheck RPC on the server.
+func (c *ClientImpl) batchCheck(ctx context.Context, authInfo types.AuthInfo, req types.BatchCheckRequest) (types.BatchCheckResponse, error) {
+	ctx, span := c.tracer.Start(ctx, "ClientImpl.batchCheck")
+	defer span.End()
+
+	// Build the proto request
+	protoChecks := make([]*authzv1.BatchCheckItem, 0, len(req.Checks))
+	for _, check := range req.Checks {
+		protoChecks = append(protoChecks, &authzv1.BatchCheckItem{
+			CorrelationId: check.CorrelationID,
+			Verb:          check.Verb,
+			Group:         check.Group,
+			Resource:      check.Resource,
+			Namespace:     check.Namespace,
+			Name:          check.Name,
+			Subresource:   check.Subresource,
+			Path:          check.Path,
+			Folder:        check.Folder,
+		})
+	}
+
+	protoReq := &authzv1.BatchCheckRequest{
+		Subject: authInfo.GetUID(),
+		Checks:  protoChecks,
+		Options: &authzv1.BatchCheckOptions{
+			Skipcache: req.SkipCache,
+		},
+	}
+
+	// Instantiate a new context for the request
+	outCtx := newOutgoingContext(ctx)
+
+	// Query the authz service
+	resp, err := c.clientV1.BatchCheck(outCtx, protoReq)
+	if err != nil {
+		return types.BatchCheckResponse{}, err
+	}
+
+	// Convert proto response to types response
+	results := make(map[string]types.BatchCheckResult, len(resp.Results))
+	for corrID, result := range resp.Results {
+		var resultErr error
+		if result.Error != "" {
+			resultErr = errors.New(result.Error)
+		}
+		results[corrID] = types.BatchCheckResult{
+			Allowed: result.Allowed,
+			Error:   resultErr,
+		}
+	}
+
+	// Ensure backward compatibility with older authz servers that don't return a zookie
+	ts := time.Now().UnixMilli()
+	if resp.Zookie != nil {
+		ts = resp.Zookie.Timestamp
+	}
+
+	return types.BatchCheckResponse{
+		Results: results,
+		Zookie:  NewTimestampZookie(ts),
+	}, nil
+}
+
+// batchCheckFallback performs batch checks by making concurrent Check calls.
+func (c *ClientImpl) batchCheckFallback(ctx context.Context, authInfo types.AuthInfo, req types.BatchCheckRequest) (types.BatchCheckResponse, error) {
+	ctx, span := c.tracer.Start(ctx, "ClientImpl.batchCheckFallback")
+	defer span.End()
+
+	var (
+		wg       sync.WaitGroup
+		results  sync.Map
+		latestTs atomic.Int64
+	)
+
+	for _, item := range req.Checks {
+		wg.Add(1)
+		go func(item types.BatchCheckItem) {
+			defer wg.Done()
+
+			checkReq := types.CheckRequest{
+				Verb:        item.Verb,
+				Group:       item.Group,
+				Resource:    item.Resource,
+				Namespace:   item.Namespace,
+				Name:        item.Name,
+				Subresource: item.Subresource,
+				Path:        item.Path,
+				SkipCache:   req.SkipCache,
+			}
+
+			resp, err := c.Check(ctx, authInfo, checkReq, item.Folder)
+			results.Store(item.CorrelationID, types.BatchCheckResult{
+				Allowed: resp.Allowed,
+				Error:   err,
+			})
+
+			// Track latest timestamp atomically using CAS loop
+			if ts, ok := resp.Zookie.(*TimestampZookie); ok {
+				for {
+					current := latestTs.Load()
+					if ts.timestamp <= current || latestTs.CompareAndSwap(current, ts.timestamp) {
+						break
+					}
+				}
+			}
+		}(item)
+	}
+
+	wg.Wait()
+
+	// Convert sync.Map to regular map
+	finalResults := make(map[string]types.BatchCheckResult, len(req.Checks))
+	results.Range(func(key, value any) bool {
+		finalResults[key.(string)] = value.(types.BatchCheckResult)
+		return true
+	})
+
+	// If no timestamps were collected, use current time
+	ts := latestTs.Load()
+	if ts == 0 {
+		ts = time.Now().UnixMilli()
+	}
+
+	return types.BatchCheckResponse{
+		Results: finalResults,
+		Zookie:  NewTimestampZookie(ts),
+	}, nil
 }
 
 // newOutgoingContext creates a new context that will be canceled when the input context is canceled.
