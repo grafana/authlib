@@ -16,7 +16,7 @@
     "application/json"
   ],
   "paths": {
-    "/v1/namespace/{namespace}/batchcheck": {
+    "/v1/batchcheck": {
       "post": {
         "summary": "Batch check access for subject on multiple resources",
         "description": "This API checks if a subject is allowed to perform actions on multiple resources in a single request. Maximum 50 checks per request.",
@@ -37,33 +37,12 @@
         },
         "parameters": [
           {
-            "name": "namespace",
-            "description": "namespace is used for the HTTP route binding. Individual checks may specify\ntheir own namespace which takes precedence.",
-            "in": "path",
-            "required": true,
-            "type": "string"
-          },
-          {
             "name": "body",
+            "description": "BatchCheckRequest contains multiple checks to be performed at once.\nMaximum of 50 checks per request.",
             "in": "body",
             "required": true,
             "schema": {
-              "type": "object",
-              "properties": {
-                "subject": {
-                  "type": "string"
-                },
-                "checks": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/definitions/v1BatchCheckItem"
-                  }
-                },
-                "options": {
-                  "$ref": "#/definitions/v1BatchCheckOptions"
-                }
-              },
-              "description": "BatchCheckRequest contains multiple checks to be performed at once.\nMaximum of 50 checks per request."
+              "$ref": "#/definitions/v1BatchCheckRequest"
             }
           }
         ],
@@ -271,6 +250,24 @@
           "type": "boolean"
         }
       }
+    },
+    "v1BatchCheckRequest": {
+      "type": "object",
+      "properties": {
+        "subject": {
+          "type": "string"
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1BatchCheckItem"
+          }
+        },
+        "options": {
+          "$ref": "#/definitions/v1BatchCheckOptions"
+        }
+      },
+      "description": "BatchCheckRequest contains multiple checks to be performed at once.\nMaximum of 50 checks per request."
     },
     "v1BatchCheckResponse": {
       "type": "object",

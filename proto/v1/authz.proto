@@ -36,7 +36,7 @@ service AuthzService {
 
   rpc BatchCheck(BatchCheckRequest) returns (BatchCheckResponse) {
     option (google.api.http) = {
-      post: "/v1/namespace/{namespace}/batchcheck"
+      post: "/v1/batchcheck"
       body: "*"
     };
 
@@ -96,11 +96,8 @@ message ListResponse {
 // Maximum of 50 checks per request.
 message BatchCheckRequest {
   string subject = 1;
-  // namespace is used for the HTTP route binding. Individual checks may specify
-  // their own namespace which takes precedence.
-  string namespace = 2;
-  repeated BatchCheckItem checks = 3;
-  BatchCheckOptions options = 4;
+  repeated BatchCheckItem checks = 2;
+  BatchCheckOptions options = 3;
 }
 
 // BatchCheckItem represents a single check in a batch request.
