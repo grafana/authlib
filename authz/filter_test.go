@@ -16,7 +16,6 @@ import (
 type testItem struct {
 	name   string
 	folder string
-	value  string
 }
 
 // ctxWithUser returns a context with auth info embedded
