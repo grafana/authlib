@@ -305,7 +305,6 @@ func (c *ClientImpl) BatchCheck(ctx context.Context, authInfo types.AuthInfo, re
 	if len(req.Checks) == 0 {
 		return types.BatchCheckResponse{
 			Results: make(map[string]types.BatchCheckResult),
-			Zookie:  types.NoopZookie{},
 		}, nil
 	}
 
@@ -355,6 +354,7 @@ func (c *ClientImpl) BatchCheck(ctx context.Context, authInfo types.AuthInfo, re
 			Subresource:   check.Subresource,
 			Path:          check.Path,
 			Folder:        check.Folder,
+			LastChanged:   check.LastChanged.UnixMilli(),
 		})
 	}
 
@@ -364,7 +364,6 @@ func (c *ClientImpl) BatchCheck(ctx context.Context, authInfo types.AuthInfo, re
 	if len(protoChecks) == 0 {
 		return types.BatchCheckResponse{
 			Results: results,
-			Zookie:  types.NoopZookie{},
 		}, nil
 	}
 
@@ -397,15 +396,8 @@ func (c *ClientImpl) BatchCheck(ctx context.Context, authInfo types.AuthInfo, re
 		}
 	}
 
-	// Ensure backward compatibility with older authz servers that don't return a zookie
-	ts := time.Now().UnixMilli()
-	if resp.Zookie != nil {
-		ts = resp.Zookie.Timestamp
-	}
-
 	return types.BatchCheckResponse{
 		Results: results,
-		Zookie:  NewTimestampZookie(ts),
 	}, nil
 }
 

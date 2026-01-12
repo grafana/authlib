@@ -121,6 +121,11 @@ type BatchCheckItem struct {
 
 	// Folder is the parent folder of the resource
 	Folder string
+
+	// LastChanged is the timestamp when the resource was last modified.
+	// If provided, the server should skip cache for this item if the cached result
+	// is older than this timestamp. This ensures freshness for recently modified resources.
+	LastChanged time.Time
 }
 
 // BatchCheckRequest contains multiple checks to be performed at once.
@@ -146,8 +151,6 @@ type BatchCheckResult struct {
 type BatchCheckResponse struct {
 	// Results maps each CorrelationID to its check result.
 	Results map[string]BatchCheckResult
-	// Zookie tracks the freshness of the authorization decisions.
-	Zookie Zookie
 }
 
 // Validate validates the BatchCheckRequest ensuring:
@@ -244,7 +247,6 @@ func (n *fixedClient) BatchCheck(ctx context.Context, _ AuthInfo, req BatchCheck
 
 	return BatchCheckResponse{
 		Results: results,
-		Zookie:  NoopZookie{},
 	}, nil
 }
 

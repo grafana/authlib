@@ -60,16 +60,13 @@ func TestFilterAuthorized_AllAllowed(t *testing.T) {
 		{name: "item-2", folder: "folder1"},
 	}
 
-	result := FilterAuthorized(ctxWithUser(), types.FixedAccessClient(true), toSeq(items), extractTestItem)
-
 	var authorizedItems []string
-	for item, err := range result.Items {
+	for item, err := range FilterAuthorized(ctxWithUser(), types.FixedAccessClient(true), toSeq(items), extractTestItem) {
 		require.NoError(t, err)
 		authorizedItems = append(authorizedItems, item.name)
 	}
 
 	assert.Equal(t, []string{"item-0", "item-1", "item-2"}, authorizedItems)
-	assert.NotNil(t, result.Zookie)
 }
 
 func TestFilterAuthorized_AllDenied(t *testing.T) {
@@ -79,16 +76,13 @@ func TestFilterAuthorized_AllDenied(t *testing.T) {
 		{name: "item-2", folder: "folder1"},
 	}
 
-	result := FilterAuthorized(ctxWithUser(), types.FixedAccessClient(false), toSeq(items), extractTestItem)
-
 	count := 0
-	for _, err := range result.Items {
+	for _, err := range FilterAuthorized(ctxWithUser(), types.FixedAccessClient(false), toSeq(items), extractTestItem) {
 		require.NoError(t, err)
 		count++
 	}
 
 	assert.Equal(t, 0, count)
-	assert.NotNil(t, result.Zookie)
 }
 
 func TestFilterAuthorized_MissingAuthInfo(t *testing.T) {
@@ -96,11 +90,9 @@ func TestFilterAuthorized_MissingAuthInfo(t *testing.T) {
 		{name: "item-0", folder: "folder1"},
 	}
 
-	result := FilterAuthorized(context.Background(), types.FixedAccessClient(true), toSeq(items), extractTestItem)
-
 	// Use context without auth info
 	var gotError error
-	for _, err := range result.Items {
+	for _, err := range FilterAuthorized(context.Background(), types.FixedAccessClient(true), toSeq(items), extractTestItem) {
 		if err != nil {
 			gotError = err
 			break
@@ -112,32 +104,12 @@ func TestFilterAuthorized_MissingAuthInfo(t *testing.T) {
 }
 
 func TestFilterAuthorized_EmptyInput(t *testing.T) {
-	result := FilterAuthorized(ctxWithUser(), types.FixedAccessClient(true), toSeq(nil), extractTestItem)
-
 	count := 0
-	for range result.Items {
+	for range FilterAuthorized(ctxWithUser(), types.FixedAccessClient(true), toSeq(nil), extractTestItem) {
 		count++
 	}
 
 	assert.Equal(t, 0, count)
-}
-
-func TestFilterAuthorized_ZookiePopulated(t *testing.T) {
-	items := []testItem{
-		{name: "item-0", folder: "folder1"},
-	}
-
-	result := FilterAuthorized(ctxWithUser(), types.FixedAccessClient(true), toSeq(items), extractTestItem)
-
-	// Zookie pointer should be set
-	assert.NotNil(t, result.Zookie)
-
-	// Consume the iterator
-	for range result.Items {
-	}
-
-	// Zookie should be populated after iteration (FixedAccessClient returns NoopZookie)
-	assert.NotNil(t, result.Zookie)
 }
 
 func TestFilterAuthorized_EarlyTermination(t *testing.T) {
@@ -147,11 +119,9 @@ func TestFilterAuthorized_EarlyTermination(t *testing.T) {
 		{name: "item-2", folder: "folder1"},
 	}
 
-	result := FilterAuthorized(ctxWithUser(), types.FixedAccessClient(true), toSeq(items), extractTestItem)
-
 	// Only take first item
 	count := 0
-	for range result.Items {
+	for range FilterAuthorized(ctxWithUser(), types.FixedAccessClient(true), toSeq(items), extractTestItem) {
 		count++
 		if count >= 1 {
 			break
@@ -168,10 +138,8 @@ func TestFilterAuthorized_LargeBatch(t *testing.T) {
 		items[i] = testItem{name: "item-" + string(rune('0'+i%10)), folder: "folder1"}
 	}
 
-	result := FilterAuthorized(ctxWithUser(), types.FixedAccessClient(true), toSeq(items), extractTestItem)
-
 	count := 0
-	for _, err := range result.Items {
+	for _, err := range FilterAuthorized(ctxWithUser(), types.FixedAccessClient(true), toSeq(items), extractTestItem) {
 		require.NoError(t, err)
 		count++
 	}
