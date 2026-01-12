@@ -318,9 +318,33 @@ func (c *ClientImpl) BatchCheck(ctx context.Context, authInfo types.AuthInfo, re
 	span.SetAttributes(attribute.Int("check_count", len(req.Checks)))
 	span.SetAttributes(attribute.Bool("skip_cache", req.SkipCache))
 
+	// Check service permissions for each item and determine which checks need to go to the AuthZ service
+	results := make(map[string]types.BatchCheckResult, len(req.Checks))
 	// Build the proto request
 	protoChecks := make([]*authzv1.BatchCheckItem, 0, len(req.Checks))
+
+	// Cache service permission results to avoid redundant checks for the same Group/Resource/Verb
+	servicePermCache := make(map[string]ServiceEvaluationResult)
+
 	for _, check := range req.Checks {
+		// Use cached result if available for this Group/Resource/Verb combination
+		permKey := check.Group + "/" + check.Resource + ":" + check.Verb
+		checkServiceRes, cached := servicePermCache[permKey]
+		if !cached {
+			checkServiceRes = CheckServicePermissions(authInfo, check.Group, check.Resource, check.Verb)
+			servicePermCache[permKey] = checkServiceRes
+		}
+
+		if checkServiceRes.ServiceCall {
+			results[check.CorrelationID] = types.BatchCheckResult{Allowed: checkServiceRes.Allowed}
+			continue
+		}
+
+		if !checkServiceRes.Allowed {
+			results[check.CorrelationID] = types.BatchCheckResult{Allowed: false}
+			continue
+		}
+
 		protoChecks = append(protoChecks, &authzv1.BatchCheckItem{
 			CorrelationId: check.CorrelationID,
 			Verb:          check.Verb,
@@ -332,6 +356,16 @@ func (c *ClientImpl) BatchCheck(ctx context.Context, authInfo types.AuthInfo, re
 			Path:          check.Path,
 			Folder:        check.Folder,
 		})
+	}
+
+	span.SetAttributes(attribute.Int("authz_check_count", len(protoChecks)))
+
+	// If all checks were resolved via service permissions, return early
+	if len(protoChecks) == 0 {
+		return types.BatchCheckResponse{
+			Results: results,
+			Zookie:  types.NoopZookie{},
+		}, nil
 	}
 
 	protoReq := &authzv1.BatchCheckRequest{
@@ -352,8 +386,6 @@ func (c *ClientImpl) BatchCheck(ctx context.Context, authInfo types.AuthInfo, re
 		return types.BatchCheckResponse{}, err
 	}
 
-	// Convert proto response to types response
-	results := make(map[string]types.BatchCheckResult, len(resp.Results))
 	for corrID, result := range resp.Results {
 		var resultErr error
 		if result.Error != "" {

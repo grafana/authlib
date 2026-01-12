@@ -1307,80 +1307,151 @@ func TestClient_BatchCheck(t *testing.T) {
 	}
 }
 
-func TestClient_BatchCheck_NativeRPC(t *testing.T) {
-	// This test verifies that BatchCheck uses the native RPC when server supports it
-	client, authz := setupAccessClient()
+func TestClient_BatchCheck_ServicePermissions(t *testing.T) {
+	t.Run("Service call with permission - should not call AuthZ service", func(t *testing.T) {
+		client, authz := setupAccessClient()
 
-	expectedTimestamp := time.Now().UnixMilli()
-	authz.batchCheckRes = &authzv1.BatchCheckResponse{
-		Results: map[string]*authzv1.BatchCheckResult{
-			"dash-1":   {Allowed: true},
-			"folder-1": {Allowed: false},
-		},
-		Zookie: &authzv1.Zookie{Timestamp: expectedTimestamp},
-	}
-
-	caller := authn.NewIDTokenAuthInfo(
-		authn.Claims[authn.AccessTokenClaims]{
+		// Service (access policy) has the permission
+		caller := authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{
 			Claims: jwt.Claims{Subject: "service"},
-			Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get", "folders.grafana.app/folders:get"}},
-		},
-		&authn.Claims[authn.IDTokenClaims]{
-			Claims: jwt.Claims{Subject: "user:1"},
-			Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
-		},
-	)
+			Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", Permissions: []string{"dashboards.grafana.app/dashboards:get"}},
+		})
 
-	req := types.BatchCheckRequest{
-		Checks: []types.BatchCheckItem{
-			{CorrelationID: "dash-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12", Name: "dash1"},
-			{CorrelationID: "folder-1", Group: "folders.grafana.app", Resource: "folders", Verb: "get", Namespace: "stacks-12", Name: "folder1"},
-		},
-	}
+		req := types.BatchCheckRequest{
+			Checks: []types.BatchCheckItem{
+				{CorrelationID: "check-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12", Name: "dash1"},
+			},
+		}
 
-	resp, err := client.BatchCheck(context.Background(), caller, req)
-	require.NoError(t, err)
-	require.Len(t, resp.Results, 2)
-	require.True(t, resp.Results["dash-1"].Allowed)
-	require.False(t, resp.Results["folder-1"].Allowed)
-	require.NotNil(t, resp.Zookie)
-	require.True(t, resp.Zookie.IsFresherThan(time.UnixMilli(expectedTimestamp-1000)))
-}
+		resp, err := client.BatchCheck(context.Background(), caller, req)
+		require.NoError(t, err)
+		require.Len(t, resp.Results, 1)
+		require.True(t, resp.Results["check-1"].Allowed)
+		// AuthZ service should NOT have been called
+		require.False(t, authz.batchCheckCalled, "AuthZ service should not be called for service calls")
+	})
 
-func TestClient_BatchCheck_NativeRPC_WithError(t *testing.T) {
-	// This test verifies that BatchCheck properly handles error responses from native RPC
-	client, authz := setupAccessClient()
+	t.Run("Service call without permission - should not call AuthZ service", func(t *testing.T) {
+		client, authz := setupAccessClient()
 
-	authz.batchCheckRes = &authzv1.BatchCheckResponse{
-		Results: map[string]*authzv1.BatchCheckResult{
-			"check-1": {Allowed: false, Error: "namespace mismatch"},
-		},
-		Zookie: &authzv1.Zookie{Timestamp: time.Now().UnixMilli()},
-	}
-
-	caller := authn.NewIDTokenAuthInfo(
-		authn.Claims[authn.AccessTokenClaims]{
+		// Service (access policy) does NOT have the permission
+		caller := authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{
 			Claims: jwt.Claims{Subject: "service"},
-			Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get"}},
-		},
-		&authn.Claims[authn.IDTokenClaims]{
-			Claims: jwt.Claims{Subject: "user:1"},
-			Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
-		},
-	)
+			Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", Permissions: []string{"other.grafana.app/other:get"}},
+		})
 
-	req := types.BatchCheckRequest{
-		Checks: []types.BatchCheckItem{
-			{CorrelationID: "check-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12"},
-		},
-	}
+		req := types.BatchCheckRequest{
+			Checks: []types.BatchCheckItem{
+				{CorrelationID: "check-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12", Name: "dash1"},
+			},
+		}
 
-	resp, err := client.BatchCheck(context.Background(), caller, req)
-	require.NoError(t, err)
-	require.Len(t, resp.Results, 1)
-	require.False(t, resp.Results["check-1"].Allowed)
-	require.Error(t, resp.Results["check-1"].Error)
-	require.Contains(t, resp.Results["check-1"].Error.Error(), "namespace mismatch")
+		resp, err := client.BatchCheck(context.Background(), caller, req)
+		require.NoError(t, err)
+		require.Len(t, resp.Results, 1)
+		require.False(t, resp.Results["check-1"].Allowed)
+		// AuthZ service should NOT have been called
+		require.False(t, authz.batchCheckCalled, "AuthZ service should not be called for service calls")
+	})
+
+	t.Run("OBO call - service without delegated permission should deny without calling AuthZ", func(t *testing.T) {
+		client, authz := setupAccessClient()
+
+		// Service does NOT have delegated permission for dashboards
+		caller := authn.NewIDTokenAuthInfo(
+			authn.Claims[authn.AccessTokenClaims]{
+				Claims: jwt.Claims{Subject: "service"},
+				Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"other.grafana.app/other:get"}},
+			},
+			&authn.Claims[authn.IDTokenClaims]{
+				Claims: jwt.Claims{Subject: "user:1"},
+				Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+			},
+		)
+
+		req := types.BatchCheckRequest{
+			Checks: []types.BatchCheckItem{
+				{CorrelationID: "check-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12", Name: "dash1"},
+			},
+		}
+
+		resp, err := client.BatchCheck(context.Background(), caller, req)
+		require.NoError(t, err)
+		require.Len(t, resp.Results, 1)
+		require.False(t, resp.Results["check-1"].Allowed)
+		// AuthZ service should NOT have been called since service lacks delegated permission
+		require.False(t, authz.batchCheckCalled, "AuthZ service should not be called when service lacks delegated permission")
+	})
+
+	t.Run("OBO call - mixed delegated permissions", func(t *testing.T) {
+		client, authz := setupAccessClient()
+
+		// Service has delegated permission for dashboards but NOT for folders
+		caller := authn.NewIDTokenAuthInfo(
+			authn.Claims[authn.AccessTokenClaims]{
+				Claims: jwt.Claims{Subject: "service"},
+				Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get"}},
+			},
+			&authn.Claims[authn.IDTokenClaims]{
+				Claims: jwt.Claims{Subject: "user:1"},
+				Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+			},
+		)
+
+		// Set up AuthZ response for the dashboard check only
+		authz.batchCheckRes = &authzv1.BatchCheckResponse{
+			Results: map[string]*authzv1.BatchCheckResult{
+				"dash-check": {Allowed: true},
+			},
+			Zookie: &authzv1.Zookie{Timestamp: time.Now().UnixMilli()},
+		}
+
+		req := types.BatchCheckRequest{
+			Checks: []types.BatchCheckItem{
+				{CorrelationID: "dash-check", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12", Name: "dash1"},
+				{CorrelationID: "folder-check", Group: "folders.grafana.app", Resource: "folders", Verb: "get", Namespace: "stacks-12", Name: "folder1"},
+			},
+		}
+
+		resp, err := client.BatchCheck(context.Background(), caller, req)
+		require.NoError(t, err)
+		require.Len(t, resp.Results, 2)
+		// Dashboard check should be allowed (service has delegated permission, AuthZ returned allowed)
+		require.True(t, resp.Results["dash-check"].Allowed)
+		// Folder check should be denied (service lacks delegated permission)
+		require.False(t, resp.Results["folder-check"].Allowed)
+		// AuthZ service should have been called with only the dashboard check
+		require.True(t, authz.batchCheckCalled)
+		require.Len(t, authz.batchCheckReq.Checks, 1)
+		require.Equal(t, "dash-check", authz.batchCheckReq.Checks[0].CorrelationId)
+	})
+
+	t.Run("Service call with multiple checks - all resolved without AuthZ", func(t *testing.T) {
+		client, authz := setupAccessClient()
+
+		// Service has permission for dashboards but NOT for folders
+		caller := authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{
+			Claims: jwt.Claims{Subject: "service"},
+			Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", Permissions: []string{"dashboards.grafana.app/dashboards:get"}},
+		})
+
+		req := types.BatchCheckRequest{
+			Checks: []types.BatchCheckItem{
+				{CorrelationID: "dash-check", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12", Name: "dash1"},
+				{CorrelationID: "folder-check", Group: "folders.grafana.app", Resource: "folders", Verb: "get", Namespace: "stacks-12", Name: "folder1"},
+			},
+		}
+
+		resp, err := client.BatchCheck(context.Background(), caller, req)
+		require.NoError(t, err)
+		require.Len(t, resp.Results, 2)
+		// Dashboard check should be allowed (service has permission)
+		require.True(t, resp.Results["dash-check"].Allowed)
+		// Folder check should be denied (service lacks permission)
+		require.False(t, resp.Results["folder-check"].Allowed)
+		// AuthZ service should NOT have been called
+		require.False(t, authz.batchCheckCalled, "AuthZ service should not be called for service calls")
+	})
 }
 
 func setupAccessClient() (*ClientImpl, *FakeAuthzServiceClient) {
@@ -1393,10 +1464,12 @@ func setupAccessClient() (*ClientImpl, *FakeAuthzServiceClient) {
 }
 
 type FakeAuthzServiceClient struct {
-	checkRes      *authzv1.CheckResponse
-	listRes       *authzv1.ListResponse
-	batchCheckRes *authzv1.BatchCheckResponse
-	batchCheckErr error
+	checkRes         *authzv1.CheckResponse
+	listRes          *authzv1.ListResponse
+	batchCheckRes    *authzv1.BatchCheckResponse
+	batchCheckErr    error
+	batchCheckCalled bool
+	batchCheckReq    *authzv1.BatchCheckRequest
 }
 
 func (f *FakeAuthzServiceClient) Check(ctx context.Context, in *authzv1.CheckRequest, opts ...grpc.CallOption) (*authzv1.CheckResponse, error) {
@@ -1408,6 +1481,8 @@ func (f *FakeAuthzServiceClient) List(ctx context.Context, in *authzv1.ListReque
 }
 
 func (f *FakeAuthzServiceClient) BatchCheck(ctx context.Context, in *authzv1.BatchCheckRequest, opts ...grpc.CallOption) (*authzv1.BatchCheckResponse, error) {
+	f.batchCheckCalled = true
+	f.batchCheckReq = in
 	if f.batchCheckErr != nil {
 		return nil, f.batchCheckErr
 	}
