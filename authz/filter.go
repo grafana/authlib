@@ -73,7 +73,7 @@ func FilterAuthorized[T any](
 		if !ok {
 			var zero T
 			span.SetAttributes(attribute.Bool("error.missing_auth", true))
-			yield(zero, fmt.Errorf("missing auth info in context"))
+			yield(zero, fmt.Errorf("%w: in context", ErrMissingAuthInfo))
 			return
 		}
 
