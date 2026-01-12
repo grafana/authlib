@@ -145,7 +145,7 @@ func processBatch[T any](
 	for i, item := range batch {
 		info := extractFn(item)
 		checks[i] = types.BatchCheckItem{
-			CorrelationID: fmt.Sprintf("%d", i),
+			CorrelationID: strconv.Itoa(i),
 			Verb:          info.Verb,
 			Group:         info.Group,
 			Resource:      info.Resource,
