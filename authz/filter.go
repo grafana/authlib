@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"iter"
 	"strconv"
+	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -21,14 +22,10 @@ type BatchCheckItem struct {
 	Resource  string
 	Verb      string
 	Namespace string
-}
-
-// FilterResult contains the result of an authorization filter operation.
-// Items is the iterator yielding authorized items.
-// Zookie is populated after the iterator is consumed with the latest zookie from batch checks.
-type FilterResult[T any] struct {
-	Items  iter.Seq2[T, error]
-	Zookie *types.Zookie
+	// LastChanged is when the resource was last modified.
+	// If provided, the server will skip cache for this item if the cached result
+	// is older than this timestamp.
+	LastChanged time.Time
 }
 
 // FilterOptions configures the behavior of FilterAuthorized.
@@ -46,8 +43,7 @@ func WithTracer(tracer trace.Tracer) FilterOption {
 	}
 }
 
-// FilterAuthorized returns a FilterResult containing an iterator that yields only authorized items
-// and a pointer to the Zookie that is populated after iteration completes.
+// FilterAuthorized returns an iterator that yields only authorized items.
 // User is extracted from context. Items are batched internally for efficient authorization checks.
 // Yields (item, nil) for authorized items, (zero, err) on error.
 func FilterAuthorized[T any](
@@ -56,7 +52,7 @@ func FilterAuthorized[T any](
 	items iter.Seq[T],
 	extractFn func(T) BatchCheckItem,
 	opts ...FilterOption,
-) FilterResult[T] {
+) iter.Seq2[T, error] {
 	options := &FilterOptions{
 		Tracer: noop.Tracer{},
 	}
@@ -64,9 +60,7 @@ func FilterAuthorized[T any](
 		opt(options)
 	}
 
-	var zookie types.Zookie
-
-	iterator := func(yield func(T, error) bool) {
+	return func(yield func(T, error) bool) {
 		ctx, span := options.Tracer.Start(ctx, "FilterAuthorized")
 		defer span.End()
 
@@ -87,7 +81,7 @@ func FilterAuthorized[T any](
 			}
 
 			batchCount++
-			authorized, cont := processBatch(ctx, access, user, batch, extractFn, yield, &zookie, options.Tracer)
+			authorized, cont := processBatch(ctx, access, user, batch, extractFn, yield, options.Tracer)
 			authorizedItems += authorized
 			return cont
 		}
@@ -111,11 +105,6 @@ func FilterAuthorized[T any](
 
 		recordFilterMetrics(span, totalItems, authorizedItems, batchCount)
 	}
-
-	return FilterResult[T]{
-		Items:  iterator,
-		Zookie: &zookie,
-	}
 }
 
 func recordFilterMetrics(span trace.Span, total, authorized, batches int) {
@@ -135,7 +124,6 @@ func processBatch[T any](
 	batch []T,
 	extractFn func(T) BatchCheckItem,
 	yield func(T, error) bool,
-	zookie *types.Zookie,
 	tracer trace.Tracer,
 ) (int, bool) {
 	ctx, span := tracer.Start(ctx, "processBatch")
@@ -153,6 +141,7 @@ func processBatch[T any](
 			Namespace:     info.Namespace,
 			Name:          info.Name,
 			Folder:        info.Folder,
+			LastChanged:   info.LastChanged,
 		}
 	}
 
@@ -166,9 +155,6 @@ func processBatch[T any](
 		yield(zero, err)
 		return 0, false
 	}
-
-	// Store the latest zookie
-	*zookie = batchResp.Zookie
 
 	// Yield authorized items
 	authorized := 0

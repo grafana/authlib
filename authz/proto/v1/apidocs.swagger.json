@@ -239,6 +239,11 @@
         },
         "folder": {
           "type": "string"
+        },
+        "lastChanged": {
+          "type": "string",
+          "format": "int64",
+          "description": "last_changed is the timestamp (in milliseconds) when the resource was last modified.\nIf provided, the server should skip cache for this item if the cached result\nis older than this timestamp."
         }
       },
       "description": "BatchCheckItem represents a single check in a batch request."
@@ -278,9 +283,6 @@
             "$ref": "#/definitions/v1BatchCheckResult"
           },
           "description": "results maps each correlation_id to its check result."
-        },
-        "zookie": {
-          "$ref": "#/definitions/v1Zookie"
         }
       },
       "description": "BatchCheckResponse contains results for all checks in a batch request."

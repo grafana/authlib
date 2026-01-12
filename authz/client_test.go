@@ -1198,7 +1198,6 @@ func TestClient_BatchCheck(t *testing.T) {
 			},
 			batchCheckRes: &authzv1.BatchCheckResponse{
 				Results: map[string]*authzv1.BatchCheckResult{"check-1": {Allowed: true}},
-				Zookie:  &authzv1.Zookie{Timestamp: time.Now().UnixMilli()},
 			},
 			wantErr: false,
 			wantRes: map[string]bool{"check-1": true},
@@ -1222,7 +1221,6 @@ func TestClient_BatchCheck(t *testing.T) {
 			},
 			batchCheckRes: &authzv1.BatchCheckResponse{
 				Results: map[string]*authzv1.BatchCheckResult{"check-1": {Allowed: false}},
-				Zookie:  &authzv1.Zookie{Timestamp: time.Now().UnixMilli()},
 			},
 			wantErr: false,
 			wantRes: map[string]bool{"check-1": false},
@@ -1250,7 +1248,6 @@ func TestClient_BatchCheck(t *testing.T) {
 					"dash-check":   {Allowed: true},
 					"folder-check": {Allowed: true},
 				},
-				Zookie: &authzv1.Zookie{Timestamp: time.Now().UnixMilli()},
 			},
 			wantErr: false,
 			wantRes: map[string]bool{"dash-check": true, "folder-check": true},
@@ -1278,7 +1275,6 @@ func TestClient_BatchCheck(t *testing.T) {
 					"check-1": {Allowed: true},
 					"check-2": {Allowed: false},
 				},
-				Zookie: &authzv1.Zookie{Timestamp: time.Now().UnixMilli()},
 			},
 			wantErr: false,
 			wantRes: map[string]bool{"check-1": true, "check-2": false},
@@ -1403,7 +1399,6 @@ func TestClient_BatchCheck_ServicePermissions(t *testing.T) {
 			Results: map[string]*authzv1.BatchCheckResult{
 				"dash-check": {Allowed: true},
 			},
-			Zookie: &authzv1.Zookie{Timestamp: time.Now().UnixMilli()},
 		}
 
 		req := types.BatchCheckRequest{
@@ -1500,6 +1495,5 @@ func (f *FakeAuthzServiceClient) BatchCheck(ctx context.Context, in *authzv1.Bat
 	}
 	return &authzv1.BatchCheckResponse{
 		Results: results,
-		Zookie:  &authzv1.Zookie{Timestamp: time.Now().UnixMilli()},
 	}, nil
 }
