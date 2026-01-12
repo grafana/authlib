@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"iter"
+	"strconv"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -172,7 +173,7 @@ func processBatch[T any](
 	// Yield authorized items
 	authorized := 0
 	for i, item := range batch {
-		correlationID := fmt.Sprintf("%d", i)
+		correlationID := strconv.Itoa(i)
 		if result, ok := batchResp.Results[correlationID]; ok && result.Allowed {
 			authorized++
 			if !yield(item, nil) {
