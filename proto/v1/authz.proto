@@ -113,10 +113,10 @@ message BatchCheckItem {
   string subresource = 7;
   string path = 8;
   string folder = 9;
-  // last_changed is the timestamp (in milliseconds) when the resource was last modified.
-  // If provided, the server should skip cache for this item if the cached result
-  // is older than this timestamp.
-  int64 last_changed = 10;
+  // zookie is a consistency token representing when the resource was last modified.
+  // If provided, the server will skip cached results older than this zookie
+  // to ensure the check reflects the resource's current state.
+  Zookie zookie = 10;
 }
 
 message BatchCheckOptions {

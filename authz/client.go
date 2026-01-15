@@ -199,7 +199,7 @@ func (c *ClientImpl) Check(ctx context.Context, authInfo types.AuthInfo, req typ
 	// Check if the user has access to any of the requested resources
 	span.SetAttributes(attribute.Bool("user_allowed", allowed))
 	span.SetAttributes(attribute.Int64("zookie_timestamp", timestamp))
-	return types.CheckResponse{Allowed: allowed, Zookie: NewTimestampZookie(timestamp)}, nil
+	return types.CheckResponse{Allowed: allowed, Zookie: types.NewTimestampZookie(timestamp)}, nil
 }
 
 func (c *ClientImpl) compile(ctx context.Context, authInfo types.AuthInfo, list *types.ListRequest) (*itemChecker, error) {
@@ -344,7 +344,7 @@ func (c *ClientImpl) BatchCheck(ctx context.Context, authInfo types.AuthInfo, re
 			continue
 		}
 
-		protoChecks = append(protoChecks, &authzv1.BatchCheckItem{
+		item := &authzv1.BatchCheckItem{
 			CorrelationId: check.CorrelationID,
 			Verb:          check.Verb,
 			Group:         check.Group,
@@ -354,8 +354,11 @@ func (c *ClientImpl) BatchCheck(ctx context.Context, authInfo types.AuthInfo, re
 			Subresource:   check.Subresource,
 			Path:          check.Path,
 			Folder:        check.Folder,
-			LastChanged:   check.LastChanged.UnixMilli(),
-		})
+		}
+		if check.Zookie != nil {
+			item.Zookie = &authzv1.Zookie{Timestamp: check.Zookie.Timestamp()}
+		}
+		protoChecks = append(protoChecks, item)
 	}
 
 	span.SetAttributes(attribute.Int("authz_check_count", len(protoChecks)))
@@ -571,21 +574,7 @@ func (c *itemChecker) fn(authInfo types.AuthInfo) types.ItemChecker {
 }
 
 func (c *itemChecker) Zookie() types.Zookie {
-	return NewTimestampZookie(c.Timestamp)
-}
-
-// Zookie implementation based on a timestamp
-type TimestampZookie struct {
-	timestamp int64 // UnixMilli
-}
-
-// NewTimestampZookie creates a new TimestampZookie with the given timestamp in milliseconds.
-func NewTimestampZookie(ts int64) *TimestampZookie {
-	return &TimestampZookie{timestamp: ts}
-}
-
-func (t *TimestampZookie) IsFresherThan(d time.Time) bool {
-	return t.timestamp > d.UnixMilli()
+	return types.NewTimestampZookie(c.Timestamp)
 }
 
 func namespaceMismatchError(a, b string) error {

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"iter"
 	"strconv"
-	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -22,10 +21,10 @@ type BatchCheckItem struct {
 	Resource  string
 	Verb      string
 	Namespace string
-	// LastChanged is when the resource was last modified.
-	// If provided, the server will skip cache for this item if the cached result
-	// is older than this timestamp.
-	LastChanged time.Time
+	// Zookie is a consistency token representing when the resource was last modified.
+	// If provided, the server will skip cached results older than this zookie
+	// to ensure the check reflects the resource's current state.
+	Zookie types.Zookie
 }
 
 // FilterOptions configures the behavior of FilterAuthorized.
@@ -141,7 +140,7 @@ func processBatch[T any](
 			Namespace:     info.Namespace,
 			Name:          info.Name,
 			Folder:        info.Folder,
-			LastChanged:   info.LastChanged,
+			Zookie:        info.Zookie,
 		}
 	}
 
