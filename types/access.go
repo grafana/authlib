@@ -62,6 +62,27 @@ type CheckResponse struct {
 
 type Zookie interface {
 	IsFresherThan(d time.Time) bool
+	// Timestamp returns the zookie's timestamp in milliseconds (UnixMilli).
+	Timestamp() int64
+}
+
+// TimestampZookie is a Zookie implementation based on a timestamp.
+type TimestampZookie struct {
+	timestamp int64 // UnixMilli
+}
+
+// NewTimestampZookie creates a new TimestampZookie with the given timestamp in milliseconds.
+func NewTimestampZookie(ts int64) *TimestampZookie {
+	return &TimestampZookie{timestamp: ts}
+}
+
+func (t *TimestampZookie) IsFresherThan(d time.Time) bool {
+	return t.timestamp > d.UnixMilli()
+}
+
+// Timestamp returns the zookie's timestamp in milliseconds (UnixMilli).
+func (t *TimestampZookie) Timestamp() int64 {
+	return t.timestamp
 }
 
 type AccessChecker interface {
@@ -122,10 +143,10 @@ type BatchCheckItem struct {
 	// Folder is the parent folder of the resource
 	Folder string
 
-	// LastChanged is the timestamp when the resource was last modified.
-	// If provided, the server should skip cache for this item if the cached result
-	// is older than this timestamp. This ensures freshness for recently modified resources.
-	LastChanged time.Time
+	// Zookie is a consistency token representing when the resource was last modified.
+	// If provided, the server will skip cached results older than this zookie
+	// to ensure the check reflects the resource's current state.
+	Zookie Zookie
 }
 
 // BatchCheckRequest contains multiple checks to be performed at once.
@@ -283,4 +304,8 @@ type NoopZookie struct{}
 
 func (n NoopZookie) IsFresherThan(d time.Time) bool {
 	return true
+}
+
+func (n NoopZookie) Timestamp() int64 {
+	return 0
 }

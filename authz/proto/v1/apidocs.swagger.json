@@ -240,10 +240,9 @@
         "folder": {
           "type": "string"
         },
-        "lastChanged": {
-          "type": "string",
-          "format": "int64",
-          "description": "last_changed is the timestamp (in milliseconds) when the resource was last modified.\nIf provided, the server should skip cache for this item if the cached result\nis older than this timestamp."
+        "zookie": {
+          "$ref": "#/definitions/v1Zookie",
+          "description": "zookie is a consistency token representing when the resource was last modified.\nIf provided, the server will skip cached results older than this zookie\nto ensure the check reflects the resource's current state."
         }
       },
       "description": "BatchCheckItem represents a single check in a batch request."
