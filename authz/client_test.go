@@ -1398,6 +1398,7 @@ func TestClient_BatchCheck_ServicePermissions(t *testing.T) {
 		authz.batchCheckRes = &authzv1.BatchCheckResponse{
 			Results: map[string]*authzv1.BatchCheckResult{
 				"dash-check": {Allowed: true},
+				"folder-check": {Allowed: true},
 			},
 		}
 
