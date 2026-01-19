@@ -33,6 +33,20 @@ service AuthzService {
       description: "This API lists the resources a subject can perform a given action on."
     };
   }
+
+  rpc BatchCheck(BatchCheckRequest) returns (BatchCheckResponse) {
+    option (google.api.http) = {
+      post: "/v1/batchcheck"
+      body: "*"
+    };
+
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Batch check access for subject on multiple resources"
+      tags: ["BatchCheck"]
+      operation_id: "BatchCheck"
+      description: "This API checks if a subject is allowed to perform actions on multiple resources in a single request. Maximum 50 checks per request."
+    };
+  }
 }
 
 message CheckRequest {
@@ -76,4 +90,47 @@ message ListResponse {
   repeated string folders = 2;
   repeated string items = 3;
   Zookie zookie = 4;
+}
+
+// BatchCheckRequest contains multiple checks to be performed at once.
+// Maximum of 50 checks per request.
+message BatchCheckRequest {
+  string subject = 1;
+  repeated BatchCheckItem checks = 2;
+  BatchCheckOptions options = 3;
+}
+
+// BatchCheckItem represents a single check in a batch request.
+message BatchCheckItem {
+  // correlation_id is a unique identifier to correlate this check with its result.
+  // Must be a non-empty string unique within the batch request.
+  string correlation_id = 1;
+  string verb = 2;
+  string group = 3;
+  string resource = 4;
+  string namespace = 5;
+  string name = 6;
+  string subresource = 7;
+  string path = 8;
+  string folder = 9;
+  // freshness_timestamp is the timestamp (in milliseconds) when the resource was last modified.
+  // If provided, the server should skip cache for this item if the cached result
+  // is older than this timestamp.
+  int64 freshness_timestamp = 10;
+}
+
+message BatchCheckOptions {
+  bool skipcache = 1;
+}
+
+// BatchCheckResponse contains results for all checks in a batch request.
+message BatchCheckResponse {
+  // results maps each correlation_id to its check result.
+  map<string, BatchCheckResult> results = 1;
+}
+
+// BatchCheckResult represents the result of a single check in a batch.
+message BatchCheckResult {
+  bool allowed = 1;
+  string error = 2;
 }

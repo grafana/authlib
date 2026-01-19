@@ -290,6 +290,127 @@ func (c *ClientImpl) Compile(ctx context.Context, authInfo types.AuthInfo, list 
 	return checker.fn(authInfo), checker.Zookie(), nil
 }
 
+// BatchCheck performs multiple access checks in a single request.
+func (c *ClientImpl) BatchCheck(ctx context.Context, authInfo types.AuthInfo, req types.BatchCheckRequest) (types.BatchCheckResponse, error) {
+	ctx, span := c.tracer.Start(ctx, "ClientImpl.BatchCheck")
+	defer span.End()
+
+	// Validate the request
+	if err := req.Validate(); err != nil {
+		span.RecordError(err)
+		return types.BatchCheckResponse{}, err
+	}
+
+	// Handle empty request
+	if len(req.Checks) == 0 {
+		return types.BatchCheckResponse{
+			Results: make(map[string]types.BatchCheckResult),
+		}, nil
+	}
+
+	if authInfo.GetSubject() == "" {
+		span.RecordError(ErrMissingAuthInfo)
+		return types.BatchCheckResponse{}, ErrMissingAuthInfo
+	}
+
+	span.SetAttributes(attribute.String("subject", authInfo.GetSubject()))
+	span.SetAttributes(attribute.Int("check_count", len(req.Checks)))
+	span.SetAttributes(attribute.Bool("skip_cache", req.SkipCache))
+
+	// Check service permissions for each item and determine which checks need to go to the AuthZ service
+	results := make(map[string]types.BatchCheckResult, len(req.Checks))
+	// Build the proto request
+	protoChecks := make([]*authzv1.BatchCheckItem, 0, len(req.Checks))
+
+	// Cache service permission results to avoid redundant checks for the same Group/Resource/Verb
+	servicePermCache := make(map[string]ServiceEvaluationResult)
+
+	for _, check := range req.Checks {
+		// Use cached result if available for this Group/Resource/Verb combination
+		permKey := check.Group + "/" + check.Resource + ":" + check.Verb
+		checkServiceRes, cached := servicePermCache[permKey]
+		if !cached {
+			checkServiceRes = CheckServicePermissions(authInfo, check.Group, check.Resource, check.Verb)
+			servicePermCache[permKey] = checkServiceRes
+		}
+
+		if checkServiceRes.ServiceCall {
+			results[check.CorrelationID] = types.BatchCheckResult{Allowed: checkServiceRes.Allowed}
+			continue
+		}
+
+		if !checkServiceRes.Allowed {
+			results[check.CorrelationID] = types.BatchCheckResult{Allowed: false}
+			continue
+		}
+
+		protoChecks = append(protoChecks, &authzv1.BatchCheckItem{
+			CorrelationId:      check.CorrelationID,
+			Verb:               check.Verb,
+			Group:              check.Group,
+			Resource:           check.Resource,
+			Namespace:          check.Namespace,
+			Name:               check.Name,
+			Subresource:        check.Subresource,
+			Path:               check.Path,
+			Folder:             check.Folder,
+			FreshnessTimestamp: check.FreshnessTimestamp.UnixMilli(),
+		})
+	}
+
+	span.SetAttributes(attribute.Int("authz_check_count", len(protoChecks)))
+
+	// If all checks were resolved via service permissions, return early
+	if len(protoChecks) == 0 {
+		return types.BatchCheckResponse{
+			Results: results,
+		}, nil
+	}
+
+	protoReq := &authzv1.BatchCheckRequest{
+		Subject: authInfo.GetUID(),
+		Checks:  protoChecks,
+		Options: &authzv1.BatchCheckOptions{
+			Skipcache: req.SkipCache,
+		},
+	}
+
+	// Instantiate a new context for the request
+	outCtx := newOutgoingContext(ctx)
+
+	// Query the authz service
+	resp, err := c.clientV1.BatchCheck(outCtx, protoReq)
+	if err != nil {
+		span.RecordError(err)
+		return types.BatchCheckResponse{}, err
+	}
+
+	// Track which correlation IDs we sent to only process expected results
+	sentIDs := make(map[string]struct{}, len(protoChecks))
+	for _, check := range protoChecks {
+		sentIDs[check.CorrelationId] = struct{}{}
+	}
+
+	for corrID, result := range resp.Results {
+		// Only process results for checks we actually sent
+		if _, sent := sentIDs[corrID]; !sent {
+			continue
+		}
+		var resultErr error
+		if result.Error != "" {
+			resultErr = errors.New(result.Error)
+		}
+		results[corrID] = types.BatchCheckResult{
+			Allowed: result.Allowed,
+			Error:   resultErr,
+		}
+	}
+
+	return types.BatchCheckResponse{
+		Results: results,
+	}, nil
+}
+
 // newOutgoingContext creates a new context that will be canceled when the input context is canceled.
 func newOutgoingContext(ctx context.Context) context.Context {
 	outCtx, cancel := context.WithCancel(context.Background())
