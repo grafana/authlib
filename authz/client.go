@@ -345,15 +345,15 @@ func (c *ClientImpl) BatchCheck(ctx context.Context, authInfo types.AuthInfo, re
 		}
 
 		protoChecks = append(protoChecks, &authzv1.BatchCheckItem{
-			CorrelationId: check.CorrelationID,
-			Verb:          check.Verb,
-			Group:         check.Group,
-			Resource:      check.Resource,
-			Namespace:     check.Namespace,
-			Name:          check.Name,
-			Subresource:   check.Subresource,
-			Path:          check.Path,
-			Folder:        check.Folder,
+			CorrelationId:      check.CorrelationID,
+			Verb:               check.Verb,
+			Group:              check.Group,
+			Resource:           check.Resource,
+			Namespace:          check.Namespace,
+			Name:               check.Name,
+			Subresource:        check.Subresource,
+			Path:               check.Path,
+			Folder:             check.Folder,
 			FreshnessTimestamp: check.FreshnessTimestamp.UnixMilli(),
 		})
 	}
@@ -385,7 +385,17 @@ func (c *ClientImpl) BatchCheck(ctx context.Context, authInfo types.AuthInfo, re
 		return types.BatchCheckResponse{}, err
 	}
 
+	// Track which correlation IDs we sent to only process expected results
+	sentIDs := make(map[string]struct{}, len(protoChecks))
+	for _, check := range protoChecks {
+		sentIDs[check.CorrelationId] = struct{}{}
+	}
+
 	for corrID, result := range resp.Results {
+		// Only process results for checks we actually sent
+		if _, sent := sentIDs[corrID]; !sent {
+			continue
+		}
 		var resultErr error
 		if result.Error != "" {
 			resultErr = errors.New(result.Error)

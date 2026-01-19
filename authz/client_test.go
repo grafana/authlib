@@ -1397,7 +1397,7 @@ func TestClient_BatchCheck_ServicePermissions(t *testing.T) {
 		// Set up AuthZ response for the dashboard check only
 		authz.batchCheckRes = &authzv1.BatchCheckResponse{
 			Results: map[string]*authzv1.BatchCheckResult{
-				"dash-check": {Allowed: true},
+				"dash-check":   {Allowed: true},
 				"folder-check": {Allowed: true},
 			},
 		}
@@ -1420,6 +1420,48 @@ func TestClient_BatchCheck_ServicePermissions(t *testing.T) {
 		require.True(t, authz.batchCheckCalled)
 		require.Len(t, authz.batchCheckReq.Checks, 1)
 		require.Equal(t, "dash-check", authz.batchCheckReq.Checks[0].CorrelationId)
+	})
+
+	t.Run("OBO call - service allowed for both, user allowed only for dashboards", func(t *testing.T) {
+		client, authz := setupAccessClient()
+
+		// Service has delegated permission for BOTH dashboards and folders
+		caller := authn.NewIDTokenAuthInfo(
+			authn.Claims[authn.AccessTokenClaims]{
+				Claims: jwt.Claims{Subject: "service"},
+				Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get", "folders.grafana.app/folders:get"}},
+			},
+			&authn.Claims[authn.IDTokenClaims]{
+				Claims: jwt.Claims{Subject: "user:1"},
+				Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+			},
+		)
+
+		// AuthZ returns: user allowed for dashboards, denied for folders
+		authz.batchCheckRes = &authzv1.BatchCheckResponse{
+			Results: map[string]*authzv1.BatchCheckResult{
+				"dash-check":   {Allowed: true},
+				"folder-check": {Allowed: false},
+			},
+		}
+
+		req := types.BatchCheckRequest{
+			Checks: []types.BatchCheckItem{
+				{CorrelationID: "dash-check", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12", Name: "dash1"},
+				{CorrelationID: "folder-check", Group: "folders.grafana.app", Resource: "folders", Verb: "get", Namespace: "stacks-12", Name: "folder1"},
+			},
+		}
+
+		resp, err := client.BatchCheck(context.Background(), caller, req)
+		require.NoError(t, err)
+		require.Len(t, resp.Results, 2)
+		// Dashboard check should be allowed (service has delegated permission, user has permission)
+		require.True(t, resp.Results["dash-check"].Allowed)
+		// Folder check should be denied (service has delegated permission, but user lacks permission)
+		require.False(t, resp.Results["folder-check"].Allowed)
+		// AuthZ service should have been called with both checks
+		require.True(t, authz.batchCheckCalled)
+		require.Len(t, authz.batchCheckReq.Checks, 2)
 	})
 
 	t.Run("Service call with multiple checks - all resolved without AuthZ", func(t *testing.T) {
