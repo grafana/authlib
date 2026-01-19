@@ -113,10 +113,10 @@ message BatchCheckItem {
   string subresource = 7;
   string path = 8;
   string folder = 9;
-  // last_changed is the timestamp (in milliseconds) when the resource was last modified.
+  // freshness_timestamp is the timestamp (in milliseconds) when the resource was last modified.
   // If provided, the server should skip cache for this item if the cached result
   // is older than this timestamp.
-  int64 last_changed = 10;
+  int64 freshness_timestamp = 10;
 }
 
 message BatchCheckOptions {

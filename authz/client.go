@@ -354,7 +354,7 @@ func (c *ClientImpl) BatchCheck(ctx context.Context, authInfo types.AuthInfo, re
 			Subresource:   check.Subresource,
 			Path:          check.Path,
 			Folder:        check.Folder,
-			LastChanged:   check.LastChanged.UnixMilli(),
+			FreshnessTimestamp: check.FreshnessTimestamp.UnixMilli(),
 		})
 	}
 

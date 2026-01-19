@@ -240,10 +240,10 @@
         "folder": {
           "type": "string"
         },
-        "lastChanged": {
+        "freshnessTimestamp": {
           "type": "string",
           "format": "int64",
-          "description": "last_changed is the timestamp (in milliseconds) when the resource was last modified.\nIf provided, the server should skip cache for this item if the cached result\nis older than this timestamp."
+          "description": "freshness_timestamp is the timestamp (in milliseconds) when the resource was last modified.\nIf provided, the server should skip cache for this item if the cached result\nis older than this timestamp."
         }
       },
       "description": "BatchCheckItem represents a single check in a batch request."

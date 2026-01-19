@@ -122,10 +122,10 @@ type BatchCheckItem struct {
 	// Folder is the parent folder of the resource
 	Folder string
 
-	// LastChanged is the timestamp when the resource was last modified.
+	// FreshnessTimestamp is the timestamp when the resource was last modified.
 	// If provided, the server should skip cache for this item if the cached result
 	// is older than this timestamp. This ensures freshness for recently modified resources.
-	LastChanged time.Time
+	FreshnessTimestamp time.Time
 }
 
 // BatchCheckRequest contains multiple checks to be performed at once.

@@ -22,10 +22,10 @@ type BatchCheckItem struct {
 	Resource  string
 	Verb      string
 	Namespace string
-	// LastChanged is when the resource was last modified.
+	// FreshnessTimestamp is when the resource was last modified.
 	// If provided, the server will skip cache for this item if the cached result
 	// is older than this timestamp.
-	LastChanged time.Time
+	FreshnessTimestamp time.Time
 }
 
 // FilterOptions configures the behavior of FilterAuthorized.
@@ -141,7 +141,7 @@ func processBatch[T any](
 			Namespace:     info.Namespace,
 			Name:          info.Name,
 			Folder:        info.Folder,
-			LastChanged:   info.LastChanged,
+			FreshnessTimestamp: info.FreshnessTimestamp,
 		}
 	}
 
