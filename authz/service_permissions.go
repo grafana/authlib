@@ -50,8 +50,8 @@ func CheckServicePermissions(authInfo types.AuthInfo, group, resource, verb stri
 func groupMatches(permissionGroup, requestGroup string) bool {
 	// if granted permission is a wildcard, see if the request matches
 	if strings.HasPrefix(permissionGroup, "*.") {
-		// *.grafana.app is too broad and must never match any request group
-		if permissionGroup == "*.grafana.app" {
+		// *.grafana.app and *.ext.grafana.app are too broad and must never match any request group
+		if permissionGroup == "*.grafana.app" || permissionGroup == "*.ext.grafana.app" {
 			return false
 		}
 		suffix := permissionGroup[2:]
