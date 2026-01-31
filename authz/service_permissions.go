@@ -46,12 +46,18 @@ func CheckServicePermissions(authInfo types.AuthInfo, group, resource, verb stri
 	return res
 }
 
+// disallowedWildcardGroups are permission groups that must never match any request group (for example, for being too broad)
+var disallowedWildcardGroups = []string{
+	"*.grafana.app",
+	"*.ext.grafana.app",
+	"*.ext.grafana.com",
+}
+
 // check wildcard group matching as well as exact match
 func groupMatches(permissionGroup, requestGroup string) bool {
 	// if granted permission is a wildcard, see if the request matches
 	if strings.HasPrefix(permissionGroup, "*.") {
-		// *.grafana.app and *.ext.grafana.app are too broad and must never match any request group
-		if permissionGroup == "*.grafana.app" || permissionGroup == "*.ext.grafana.app" {
+		if slices.Contains(disallowedWildcardGroups, permissionGroup) {
 			return false
 		}
 		suffix := permissionGroup[2:]
