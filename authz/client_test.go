@@ -148,6 +148,14 @@ func TestHasPermissionInToken(t *testing.T) {
 			want:             true,
 		},
 		{
+			name:             "Wildcard group does not allow nested prefix (foo.loki.datasource.grafana.app)",
+			tokenPermissions: []string{"*.datasource.grafana.app/datasources:*"},
+			group:            "foo.loki.datasource.grafana.app",
+			resource:         "datasources",
+			verb:             "get",
+			want:             false,
+		},
+		{
 			name:             "Wildcard group does not allow wrong suffix (dashboard.grafana.app)",
 			tokenPermissions: []string{"*.datasource.grafana.app/datasources:*"},
 			group:            "dashboard.grafana.app",

@@ -60,9 +60,13 @@ func groupMatches(permissionGroup, requestGroup string) bool {
 		if slices.Contains(disallowedWildcardGroups, permissionGroup) {
 			return false
 		}
-		suffix := permissionGroup[2:]
-		// request group ends with suffix and the prefix is not empty
-		return strings.HasSuffix(requestGroup, suffix) && len(requestGroup) > len(suffix)
+		suffix := permissionGroup[1:]                                // remove leading "*"
+		prefixSegment, ok := strings.CutSuffix(requestGroup, suffix) // e.g. "prometheus.datasource.grafana.app" -> "prometheus"
+		if !ok || len(prefixSegment) == 0 {
+			return false
+		}
+		// the prefix segment must not contain any dots (e.g. "prometheus" is allowed, "prometheus.bad" is not)
+		return !strings.Contains(prefixSegment, ".")
 	}
 	// otherwise, exact match is required
 	return permissionGroup == requestGroup
