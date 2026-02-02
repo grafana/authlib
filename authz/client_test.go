@@ -1434,8 +1434,8 @@ func TestClient_BatchCheck_ServicePermissions(t *testing.T) {
 		require.False(t, resp.Results["folder-check"].Allowed)
 		// AuthZ service should have been called with only the dashboard check
 		require.True(t, authz.batchCheckCalled)
-		require.Len(t, authz.batchCheckReq.Checks, 1)
-		require.Equal(t, "dash-check", authz.batchCheckReq.Checks[0].CorrelationId)
+		require.Len(t, authz.batchCheckReqs[0].Checks, 1)
+		require.Equal(t, "dash-check", authz.batchCheckReqs[0].Checks[0].CorrelationId)
 	})
 
 	t.Run("OBO call - service allowed for both, user allowed only for dashboards", func(t *testing.T) {
@@ -1478,7 +1478,7 @@ func TestClient_BatchCheck_ServicePermissions(t *testing.T) {
 		require.False(t, resp.Results["folder-check"].Allowed)
 		// AuthZ service should have been called with both checks
 		require.True(t, authz.batchCheckCalled)
-		require.Len(t, authz.batchCheckReq.Checks, 2)
+		require.Len(t, authz.batchCheckReqs[0].Checks, 2)
 	})
 
 	t.Run("Service call with multiple checks - all resolved without AuthZ", func(t *testing.T) {
@@ -1525,7 +1525,7 @@ type FakeAuthzServiceClient struct {
 	batchCheckRes    *authzv1.BatchCheckResponse
 	batchCheckErr    error
 	batchCheckCalled bool
-	batchCheckReq    *authzv1.BatchCheckRequest
+	batchCheckReqs   []*authzv1.BatchCheckRequest
 }
 
 func (f *FakeAuthzServiceClient) Check(ctx context.Context, in *authzv1.CheckRequest, opts ...grpc.CallOption) (*authzv1.CheckResponse, error) {
@@ -1538,7 +1538,7 @@ func (f *FakeAuthzServiceClient) List(ctx context.Context, in *authzv1.ListReque
 
 func (f *FakeAuthzServiceClient) BatchCheck(ctx context.Context, in *authzv1.BatchCheckRequest, opts ...grpc.CallOption) (*authzv1.BatchCheckResponse, error) {
 	f.batchCheckCalled = true
-	f.batchCheckReq = in
+	f.batchCheckReqs = append(f.batchCheckReqs, in)
 	if f.batchCheckErr != nil {
 		return nil, f.batchCheckErr
 	}
