@@ -194,13 +194,13 @@ func TestFilterAuthorized_NamespaceSwitch(t *testing.T) {
 
 	// First batch: ns1 with 2 items
 	assert.Len(t, fakeClient.batchCheckReqs[0].Checks, 2)
-	assert.Equal(t, "ns1", fakeClient.batchCheckReqs[0].Checks[0].Namespace)
+	assert.Equal(t, "ns1", fakeClient.batchCheckReqs[0].Namespace)
 
 	// Second batch: ns2 with 2 items
 	assert.Len(t, fakeClient.batchCheckReqs[1].Checks, 2)
-	assert.Equal(t, "ns2", fakeClient.batchCheckReqs[1].Checks[0].Namespace)
+	assert.Equal(t, "ns2", fakeClient.batchCheckReqs[1].Namespace)
 
 	// Third batch: ns3 with 1 item
 	assert.Len(t, fakeClient.batchCheckReqs[2].Checks, 1)
-	assert.Equal(t, "ns3", fakeClient.batchCheckReqs[2].Checks[0].Namespace)
+	assert.Equal(t, "ns3", fakeClient.batchCheckReqs[2].Namespace)
 }

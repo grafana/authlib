@@ -357,7 +357,6 @@ func (c *ClientImpl) BatchCheck(ctx context.Context, authInfo types.AuthInfo, re
 			Verb:               check.Verb,
 			Group:              check.Group,
 			Resource:           check.Resource,
-			Namespace:          req.Namespace,
 			Name:               check.Name,
 			Subresource:        check.Subresource,
 			Path:               check.Path,
