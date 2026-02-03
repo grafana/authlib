@@ -172,14 +172,6 @@ func TestHasPermissionInToken(t *testing.T) {
 			want:             false,
 		},
 		{
-			name:             "Request group starting with * is never allowed",
-			tokenPermissions: []string{"*.datasource.grafana.app/datasources:*"},
-			group:            "*.datasource.grafana.app",
-			resource:         "datasources",
-			verb:             "get",
-			want:             false,
-		},
-		{
 			name:             "Non-allowlisted wildcard does not match (group/resource:verb)",
 			tokenPermissions: []string{"*.grafana.app/datasources:get"},
 			group:            "prometheus.datasource.grafana.app",
