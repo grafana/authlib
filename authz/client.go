@@ -376,8 +376,9 @@ func (c *ClientImpl) BatchCheck(ctx context.Context, authInfo types.AuthInfo, re
 	}
 
 	protoReq := &authzv1.BatchCheckRequest{
-		Subject: authInfo.GetUID(),
-		Checks:  protoChecks,
+		Subject:   authInfo.GetUID(),
+		Namespace: req.Namespace,
+		Checks:    protoChecks,
 		Options: &authzv1.BatchCheckOptions{
 			Skipcache: req.SkipCache,
 		},

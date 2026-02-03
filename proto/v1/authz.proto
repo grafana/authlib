@@ -36,7 +36,7 @@ service AuthzService {
 
   rpc BatchCheck(BatchCheckRequest) returns (BatchCheckResponse) {
     option (google.api.http) = {
-      post: "/v1/batchcheck"
+      post: "/v1/namespace/{namespace}/batchcheck"
       body: "*"
     };
 
@@ -98,6 +98,7 @@ message BatchCheckRequest {
   string subject = 1;
   repeated BatchCheckItem checks = 2;
   BatchCheckOptions options = 3;
+  string namespace = 4;
 }
 
 // BatchCheckItem represents a single check in a batch request.
