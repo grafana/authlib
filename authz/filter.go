@@ -72,100 +72,68 @@ func FilterAuthorized[T any](
 			return
 		}
 
-		var totalItems, authorizedItems, batchCount int
-		batch := make([]T, 0, types.MaxBatchCheckItems)
+		batchItems := make([]T, 0, types.MaxBatchCheckItems)
+		batchChecks := make([]types.BatchCheckItem, 0, types.MaxBatchCheckItems)
+		var currentNamespace string
 
-		flushBatch := func() bool {
-			if len(batch) == 0 {
+		flush := func() bool {
+			if len(batchChecks) == 0 {
 				return true
 			}
 
-			batchCount++
-			authorized, cont := processBatch(ctx, access, user, batch, extractFn, yield, options.Tracer)
-			authorizedItems += authorized
-			return cont
+			batchResp, err := access.BatchCheck(ctx, user, types.BatchCheckRequest{
+				Namespace: currentNamespace,
+				Checks:    batchChecks,
+			})
+			if err != nil {
+				span.RecordError(err)
+				var zero T
+				yield(zero, err)
+				return false
+			}
+
+			for i, check := range batchChecks {
+				if result, ok := batchResp.Results[check.CorrelationID]; ok && result.Allowed {
+					if !yield(batchItems[i], nil) {
+						return false
+					}
+				}
+			}
+
+			batchItems = batchItems[:0]
+			batchChecks = batchChecks[:0]
+			return true
 		}
 
 		for item := range items {
-			totalItems++
-			batch = append(batch, item)
-			if len(batch) >= types.MaxBatchCheckItems {
-				if !flushBatch() {
-					recordFilterMetrics(span, totalItems, authorizedItems, batchCount)
+			info := extractFn(item)
+
+			// Flush batch if namespace changes to ensure each batch has a single namespace
+			if len(batchChecks) > 0 && info.Namespace != currentNamespace {
+				if !flush() {
 					return
 				}
-				batch = batch[:0]
+			}
+
+			currentNamespace = info.Namespace
+			batchItems = append(batchItems, item)
+			batchChecks = append(batchChecks, types.BatchCheckItem{
+				CorrelationID:      strconv.Itoa(len(batchChecks)),
+				Verb:               info.Verb,
+				Group:              info.Group,
+				Resource:           info.Resource,
+				Name:               info.Name,
+				Folder:             info.Folder,
+				FreshnessTimestamp: info.FreshnessTimestamp,
+			})
+
+			if len(batchChecks) >= types.MaxBatchCheckItems {
+				if !flush() {
+					return
+				}
 			}
 		}
 
-		// Flush remaining items
-		if len(batch) > 0 {
-			flushBatch()
-		}
-
-		recordFilterMetrics(span, totalItems, authorizedItems, batchCount)
+		flush()
 	}
-}
-
-func recordFilterMetrics(span trace.Span, total, authorized, batches int) {
-	span.SetAttributes(
-		attribute.Int("items.total", total),
-		attribute.Int("items.authorized", authorized),
-		attribute.Int("batches", batches),
-	)
-}
-
-// processBatch performs batch authorization and yields authorized items.
-// Returns the count of authorized items and false if iteration should stop.
-func processBatch[T any](
-	ctx context.Context,
-	access types.AccessClient,
-	user types.AuthInfo,
-	batch []T,
-	extractFn func(T) BatchCheckItem,
-	yield func(T, error) bool,
-	tracer trace.Tracer,
-) (int, bool) {
-	ctx, span := tracer.Start(ctx, "processBatch")
-	defer span.End()
-
-	// Build batch check request
-	checks := make([]types.BatchCheckItem, len(batch))
-	for i, item := range batch {
-		info := extractFn(item)
-		checks[i] = types.BatchCheckItem{
-			CorrelationID: strconv.Itoa(i),
-			Verb:          info.Verb,
-			Group:         info.Group,
-			Resource:      info.Resource,
-			Namespace:     info.Namespace,
-			Name:          info.Name,
-			Folder:        info.Folder,
-			FreshnessTimestamp: info.FreshnessTimestamp,
-		}
-	}
-
-	// Perform batch authorization check
-	batchResp, err := access.BatchCheck(ctx, user, types.BatchCheckRequest{
-		Checks: checks,
-	})
-	if err != nil {
-		span.RecordError(err)
-		var zero T
-		yield(zero, err)
-		return 0, false
-	}
-
-	// Yield authorized items
-	authorized := 0
-	for i, item := range batch {
-		correlationID := strconv.Itoa(i)
-		if result, ok := batchResp.Results[correlationID]; ok && result.Allowed {
-			authorized++
-			if !yield(item, nil) {
-				return authorized, false
-			}
-		}
-	}
-	return authorized, true
 }

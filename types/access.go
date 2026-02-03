@@ -107,9 +107,6 @@ type BatchCheckItem struct {
 	// ~Kind eg dashboards
 	Resource string
 
-	// tenant isolation
-	Namespace string
-
 	// The specific resource name
 	Name string
 
@@ -131,6 +128,9 @@ type BatchCheckItem struct {
 // BatchCheckRequest contains multiple checks to be performed at once.
 // Maximum of 50 checks per request.
 type BatchCheckRequest struct {
+	// tenant isolation
+	Namespace string
+
 	// Checks is the list of individual check items to perform.
 	// Maximum of 50 items allowed.
 	Checks []BatchCheckItem

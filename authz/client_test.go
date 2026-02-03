@@ -1021,12 +1021,13 @@ func TestBatchCheckRequest_Validate(t *testing.T) {
 	}{
 		{
 			name:    "Empty checks is valid",
-			req:     types.BatchCheckRequest{Checks: []types.BatchCheckItem{}},
+			req:     types.BatchCheckRequest{Namespace: "stacks-12", Checks: []types.BatchCheckItem{}},
 			wantErr: nil,
 		},
 		{
 			name: "Valid request with one check",
 			req: types.BatchCheckRequest{
+				Namespace: "stacks-12",
 				Checks: []types.BatchCheckItem{
 					{CorrelationID: "1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get"},
 				},
@@ -1045,7 +1046,7 @@ func TestBatchCheckRequest_Validate(t *testing.T) {
 						Verb:          "get",
 					}
 				}
-				return types.BatchCheckRequest{Checks: checks}
+				return types.BatchCheckRequest{Namespace: "stacks-12", Checks: checks}
 			}(),
 			wantErr: nil,
 		},
@@ -1061,13 +1062,14 @@ func TestBatchCheckRequest_Validate(t *testing.T) {
 						Verb:          "get",
 					}
 				}
-				return types.BatchCheckRequest{Checks: checks}
+				return types.BatchCheckRequest{Namespace: "stacks-12", Checks: checks}
 			}(),
 			wantErr: types.ErrTooManyChecks,
 		},
 		{
 			name: "Empty correlation ID",
 			req: types.BatchCheckRequest{
+				Namespace: "stacks-12",
 				Checks: []types.BatchCheckItem{
 					{CorrelationID: "", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get"},
 				},
@@ -1077,6 +1079,7 @@ func TestBatchCheckRequest_Validate(t *testing.T) {
 		{
 			name: "Duplicate correlation IDs",
 			req: types.BatchCheckRequest{
+				Namespace: "stacks-12",
 				Checks: []types.BatchCheckItem{
 					{CorrelationID: "same-id", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get"},
 					{CorrelationID: "same-id", Group: "folders.grafana.app", Resource: "folders", Verb: "list"},
@@ -1087,6 +1090,7 @@ func TestBatchCheckRequest_Validate(t *testing.T) {
 		{
 			name: "Missing group",
 			req: types.BatchCheckRequest{
+				Namespace: "stacks-12",
 				Checks: []types.BatchCheckItem{
 					{CorrelationID: "1", Group: "", Resource: "dashboards", Verb: "get"},
 				},
@@ -1096,6 +1100,7 @@ func TestBatchCheckRequest_Validate(t *testing.T) {
 		{
 			name: "Missing resource",
 			req: types.BatchCheckRequest{
+				Namespace: "stacks-12",
 				Checks: []types.BatchCheckItem{
 					{CorrelationID: "1", Group: "dashboards.grafana.app", Resource: "", Verb: "get"},
 				},
@@ -1105,6 +1110,7 @@ func TestBatchCheckRequest_Validate(t *testing.T) {
 		{
 			name: "Missing verb",
 			req: types.BatchCheckRequest{
+				Namespace: "stacks-12",
 				Checks: []types.BatchCheckItem{
 					{CorrelationID: "1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: ""},
 				},
@@ -1146,7 +1152,7 @@ func TestClient_BatchCheck(t *testing.T) {
 					Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
 				},
 			),
-			req:     types.BatchCheckRequest{Checks: []types.BatchCheckItem{}},
+			req:     types.BatchCheckRequest{Namespace: "stacks-12", Checks: []types.BatchCheckItem{}},
 			wantErr: false,
 			wantRes: map[string]bool{},
 		},
@@ -1154,8 +1160,9 @@ func TestClient_BatchCheck(t *testing.T) {
 			name:   "No caller returns error",
 			caller: &authn.AuthInfo{},
 			req: types.BatchCheckRequest{
+				Namespace: "stacks-12",
 				Checks: []types.BatchCheckItem{
-					{CorrelationID: "1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12"},
+					{CorrelationID: "1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get"},
 				},
 			},
 			wantErr: true,
@@ -1173,6 +1180,7 @@ func TestClient_BatchCheck(t *testing.T) {
 				},
 			),
 			req: types.BatchCheckRequest{
+				Namespace: "stacks-12",
 				Checks: []types.BatchCheckItem{
 					{CorrelationID: "1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: ""},
 				},
@@ -1192,8 +1200,9 @@ func TestClient_BatchCheck(t *testing.T) {
 				},
 			),
 			req: types.BatchCheckRequest{
+				Namespace: "stacks-12",
 				Checks: []types.BatchCheckItem{
-					{CorrelationID: "check-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12", Name: "dash1"},
+					{CorrelationID: "check-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Name: "dash1"},
 				},
 			},
 			batchCheckRes: &authzv1.BatchCheckResponse{
@@ -1215,8 +1224,9 @@ func TestClient_BatchCheck(t *testing.T) {
 				},
 			),
 			req: types.BatchCheckRequest{
+				Namespace: "stacks-12",
 				Checks: []types.BatchCheckItem{
-					{CorrelationID: "check-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12", Name: "dash1"},
+					{CorrelationID: "check-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Name: "dash1"},
 				},
 			},
 			batchCheckRes: &authzv1.BatchCheckResponse{
@@ -1238,9 +1248,10 @@ func TestClient_BatchCheck(t *testing.T) {
 				},
 			),
 			req: types.BatchCheckRequest{
+				Namespace: "stacks-12",
 				Checks: []types.BatchCheckItem{
-					{CorrelationID: "dash-check", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12", Name: "dash1"},
-					{CorrelationID: "folder-check", Group: "folders.grafana.app", Resource: "folders", Verb: "get", Namespace: "stacks-12", Name: "folder1"},
+					{CorrelationID: "dash-check", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Name: "dash1"},
+					{CorrelationID: "folder-check", Group: "folders.grafana.app", Resource: "folders", Verb: "get", Name: "folder1"},
 				},
 			},
 			batchCheckRes: &authzv1.BatchCheckResponse{
@@ -1265,9 +1276,10 @@ func TestClient_BatchCheck(t *testing.T) {
 				},
 			),
 			req: types.BatchCheckRequest{
+				Namespace: "stacks-12",
 				Checks: []types.BatchCheckItem{
-					{CorrelationID: "check-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12"},
-					{CorrelationID: "check-2", Group: "folders.grafana.app", Resource: "folders", Verb: "get", Namespace: "stacks-12"},
+					{CorrelationID: "check-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get"},
+					{CorrelationID: "check-2", Group: "folders.grafana.app", Resource: "folders", Verb: "get"},
 				},
 			},
 			batchCheckRes: &authzv1.BatchCheckResponse{
@@ -1314,8 +1326,9 @@ func TestClient_BatchCheck_ServicePermissions(t *testing.T) {
 		})
 
 		req := types.BatchCheckRequest{
+			Namespace: "stacks-12",
 			Checks: []types.BatchCheckItem{
-				{CorrelationID: "check-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12", Name: "dash1"},
+				{CorrelationID: "check-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Name: "dash1"},
 			},
 		}
 
@@ -1337,8 +1350,9 @@ func TestClient_BatchCheck_ServicePermissions(t *testing.T) {
 		})
 
 		req := types.BatchCheckRequest{
+			Namespace: "stacks-12",
 			Checks: []types.BatchCheckItem{
-				{CorrelationID: "check-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12", Name: "dash1"},
+				{CorrelationID: "check-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Name: "dash1"},
 			},
 		}
 
@@ -1366,8 +1380,9 @@ func TestClient_BatchCheck_ServicePermissions(t *testing.T) {
 		)
 
 		req := types.BatchCheckRequest{
+			Namespace: "stacks-12",
 			Checks: []types.BatchCheckItem{
-				{CorrelationID: "check-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12", Name: "dash1"},
+				{CorrelationID: "check-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Name: "dash1"},
 			},
 		}
 
@@ -1403,9 +1418,10 @@ func TestClient_BatchCheck_ServicePermissions(t *testing.T) {
 		}
 
 		req := types.BatchCheckRequest{
+			Namespace: "stacks-12",
 			Checks: []types.BatchCheckItem{
-				{CorrelationID: "dash-check", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12", Name: "dash1"},
-				{CorrelationID: "folder-check", Group: "folders.grafana.app", Resource: "folders", Verb: "get", Namespace: "stacks-12", Name: "folder1"},
+				{CorrelationID: "dash-check", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Name: "dash1"},
+				{CorrelationID: "folder-check", Group: "folders.grafana.app", Resource: "folders", Verb: "get", Name: "folder1"},
 			},
 		}
 
@@ -1418,8 +1434,8 @@ func TestClient_BatchCheck_ServicePermissions(t *testing.T) {
 		require.False(t, resp.Results["folder-check"].Allowed)
 		// AuthZ service should have been called with only the dashboard check
 		require.True(t, authz.batchCheckCalled)
-		require.Len(t, authz.batchCheckReq.Checks, 1)
-		require.Equal(t, "dash-check", authz.batchCheckReq.Checks[0].CorrelationId)
+		require.Len(t, authz.batchCheckReqs[0].Checks, 1)
+		require.Equal(t, "dash-check", authz.batchCheckReqs[0].Checks[0].CorrelationId)
 	})
 
 	t.Run("OBO call - service allowed for both, user allowed only for dashboards", func(t *testing.T) {
@@ -1446,9 +1462,10 @@ func TestClient_BatchCheck_ServicePermissions(t *testing.T) {
 		}
 
 		req := types.BatchCheckRequest{
+			Namespace: "stacks-12",
 			Checks: []types.BatchCheckItem{
-				{CorrelationID: "dash-check", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12", Name: "dash1"},
-				{CorrelationID: "folder-check", Group: "folders.grafana.app", Resource: "folders", Verb: "get", Namespace: "stacks-12", Name: "folder1"},
+				{CorrelationID: "dash-check", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Name: "dash1"},
+				{CorrelationID: "folder-check", Group: "folders.grafana.app", Resource: "folders", Verb: "get", Name: "folder1"},
 			},
 		}
 
@@ -1461,7 +1478,7 @@ func TestClient_BatchCheck_ServicePermissions(t *testing.T) {
 		require.False(t, resp.Results["folder-check"].Allowed)
 		// AuthZ service should have been called with both checks
 		require.True(t, authz.batchCheckCalled)
-		require.Len(t, authz.batchCheckReq.Checks, 2)
+		require.Len(t, authz.batchCheckReqs[0].Checks, 2)
 	})
 
 	t.Run("Service call with multiple checks - all resolved without AuthZ", func(t *testing.T) {
@@ -1474,9 +1491,10 @@ func TestClient_BatchCheck_ServicePermissions(t *testing.T) {
 		})
 
 		req := types.BatchCheckRequest{
+			Namespace: "stacks-12",
 			Checks: []types.BatchCheckItem{
-				{CorrelationID: "dash-check", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Namespace: "stacks-12", Name: "dash1"},
-				{CorrelationID: "folder-check", Group: "folders.grafana.app", Resource: "folders", Verb: "get", Namespace: "stacks-12", Name: "folder1"},
+				{CorrelationID: "dash-check", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Name: "dash1"},
+				{CorrelationID: "folder-check", Group: "folders.grafana.app", Resource: "folders", Verb: "get", Name: "folder1"},
 			},
 		}
 
@@ -1507,7 +1525,7 @@ type FakeAuthzServiceClient struct {
 	batchCheckRes    *authzv1.BatchCheckResponse
 	batchCheckErr    error
 	batchCheckCalled bool
-	batchCheckReq    *authzv1.BatchCheckRequest
+	batchCheckReqs   []*authzv1.BatchCheckRequest
 }
 
 func (f *FakeAuthzServiceClient) Check(ctx context.Context, in *authzv1.CheckRequest, opts ...grpc.CallOption) (*authzv1.CheckResponse, error) {
@@ -1520,7 +1538,7 @@ func (f *FakeAuthzServiceClient) List(ctx context.Context, in *authzv1.ListReque
 
 func (f *FakeAuthzServiceClient) BatchCheck(ctx context.Context, in *authzv1.BatchCheckRequest, opts ...grpc.CallOption) (*authzv1.BatchCheckResponse, error) {
 	f.batchCheckCalled = true
-	f.batchCheckReq = in
+	f.batchCheckReqs = append(f.batchCheckReqs, in)
 	if f.batchCheckErr != nil {
 		return nil, f.batchCheckErr
 	}
