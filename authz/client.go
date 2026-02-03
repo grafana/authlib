@@ -313,7 +313,15 @@ func (c *ClientImpl) BatchCheck(ctx context.Context, authInfo types.AuthInfo, re
 		return types.BatchCheckResponse{}, ErrMissingAuthInfo
 	}
 
+	// Validate namespace matches
+	if !types.NamespaceMatches(authInfo.GetNamespace(), req.Namespace) {
+		err := namespaceMismatchError(authInfo.GetNamespace(), req.Namespace)
+		span.RecordError(err)
+		return types.BatchCheckResponse{}, err
+	}
+
 	span.SetAttributes(attribute.String("subject", authInfo.GetSubject()))
+	span.SetAttributes(attribute.String("namespace", req.Namespace))
 	span.SetAttributes(attribute.Int("check_count", len(req.Checks)))
 	span.SetAttributes(attribute.Bool("skip_cache", req.SkipCache))
 
@@ -349,7 +357,6 @@ func (c *ClientImpl) BatchCheck(ctx context.Context, authInfo types.AuthInfo, re
 			Verb:               check.Verb,
 			Group:              check.Group,
 			Resource:           check.Resource,
-			Namespace:          check.Namespace,
 			Name:               check.Name,
 			Subresource:        check.Subresource,
 			Path:               check.Path,
@@ -368,8 +375,9 @@ func (c *ClientImpl) BatchCheck(ctx context.Context, authInfo types.AuthInfo, re
 	}
 
 	protoReq := &authzv1.BatchCheckRequest{
-		Subject: authInfo.GetUID(),
-		Checks:  protoChecks,
+		Subject:   authInfo.GetUID(),
+		Namespace: req.Namespace,
+		Checks:    protoChecks,
 		Options: &authzv1.BatchCheckOptions{
 			Skipcache: req.SkipCache,
 		},
