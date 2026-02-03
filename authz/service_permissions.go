@@ -46,6 +46,30 @@ func CheckServicePermissions(authInfo types.AuthInfo, group, resource, verb stri
 	return res
 }
 
+// allowedWildcardGroups are the only permission groups that may use wildcard matching; all others require exact match.
+var allowedWildcardGroups = []string{
+	"*.datasource.grafana.app",
+}
+
+// check wildcard group matching as well as exact match
+func groupMatches(permissionGroup, requestGroup string) bool {
+	// if granted permission is a wildcard, it must be allowlisted and the request must match
+	if strings.HasPrefix(permissionGroup, "*.") {
+		if !slices.Contains(allowedWildcardGroups, permissionGroup) {
+			return false
+		}
+		suffix := permissionGroup[1:]                                // remove leading "*"
+		prefixSegment, ok := strings.CutSuffix(requestGroup, suffix) // e.g. "prometheus.datasource.grafana.app" -> "prometheus"
+		if !ok || len(prefixSegment) == 0 {
+			return false
+		}
+		// the prefix segment must not contain any dots (e.g. "prometheus" is allowed, "prometheus.bad" is not)
+		return !strings.Contains(prefixSegment, ".")
+	}
+	// otherwise, exact match is required
+	return permissionGroup == requestGroup
+}
+
 func hasPermissionInToken(tokenPermissions []string, group, resource, verb string) bool {
 	verbs := []string{verb}
 
@@ -68,11 +92,11 @@ func hasPermissionInToken(tokenPermissions []string, group, resource, verb strin
 		parts = strings.SplitN(parts[0], "/", 2)
 		switch len(parts) {
 		case 1:
-			if parts[0] == group {
+			if groupMatches(parts[0], group) {
 				return true
 			}
 		case 2:
-			if parts[0] == group && parts[1] == resource {
+			if groupMatches(parts[0], group) && parts[1] == resource {
 				return true
 			}
 		}
