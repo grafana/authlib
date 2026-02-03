@@ -179,6 +179,23 @@ func request_AuthzService_BatchCheck_0(ctx context.Context, marshaler runtime.Ma
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
 	}
 
+	var (
+		val string
+		ok  bool
+		err error
+		_   = err
+	)
+
+	val, ok = pathParams["namespace"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "namespace")
+	}
+
+	protoReq.Namespace, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "namespace", err)
+	}
+
 	msg, err := client.BatchCheck(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
 	return msg, metadata, err
 
@@ -194,6 +211,23 @@ func local_request_AuthzService_BatchCheck_0(ctx context.Context, marshaler runt
 	}
 	if err := marshaler.NewDecoder(newReader()).Decode(&protoReq); err != nil && err != io.EOF {
 		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+
+	var (
+		val string
+		ok  bool
+		err error
+		_   = err
+	)
+
+	val, ok = pathParams["namespace"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "namespace")
+	}
+
+	protoReq.Namespace, err = runtime.String(val)
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "namespace", err)
 	}
 
 	msg, err := server.BatchCheck(ctx, &protoReq)
@@ -265,7 +299,7 @@ func RegisterAuthzServiceHandlerServer(ctx context.Context, mux *runtime.ServeMu
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/authz.v1.AuthzService/BatchCheck", runtime.WithHTTPPathPattern("/v1/batchcheck"))
+		annotatedContext, err = runtime.AnnotateIncomingContext(ctx, mux, req, "/authz.v1.AuthzService/BatchCheck", runtime.WithHTTPPathPattern("/v1/namespace/{namespace}/batchcheck"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -373,7 +407,7 @@ func RegisterAuthzServiceHandlerClient(ctx context.Context, mux *runtime.ServeMu
 		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
 		var err error
 		var annotatedContext context.Context
-		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/authz.v1.AuthzService/BatchCheck", runtime.WithHTTPPathPattern("/v1/batchcheck"))
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/authz.v1.AuthzService/BatchCheck", runtime.WithHTTPPathPattern("/v1/namespace/{namespace}/batchcheck"))
 		if err != nil {
 			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
 			return
@@ -397,7 +431,7 @@ var (
 
 	pattern_AuthzService_List_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 1, 5, 1, 2, 2}, []string{"v1", "namespace", "list"}, ""))
 
-	pattern_AuthzService_BatchCheck_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1}, []string{"v1", "batchcheck"}, ""))
+	pattern_AuthzService_BatchCheck_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 1, 0, 4, 1, 5, 1, 2, 2}, []string{"v1", "namespace", "batchcheck"}, ""))
 )
 
 var (

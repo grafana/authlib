@@ -357,7 +357,6 @@ func (c *ClientImpl) BatchCheck(ctx context.Context, authInfo types.AuthInfo, re
 			Verb:               check.Verb,
 			Group:              check.Group,
 			Resource:           check.Resource,
-			Namespace:          req.Namespace,
 			Name:               check.Name,
 			Subresource:        check.Subresource,
 			Path:               check.Path,
@@ -376,8 +375,9 @@ func (c *ClientImpl) BatchCheck(ctx context.Context, authInfo types.AuthInfo, re
 	}
 
 	protoReq := &authzv1.BatchCheckRequest{
-		Subject: authInfo.GetUID(),
-		Checks:  protoChecks,
+		Subject:   authInfo.GetUID(),
+		Namespace: req.Namespace,
+		Checks:    protoChecks,
 		Options: &authzv1.BatchCheckOptions{
 			Skipcache: req.SkipCache,
 		},
