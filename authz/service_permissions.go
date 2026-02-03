@@ -71,11 +71,6 @@ func groupMatches(permissionGroup, requestGroup string) bool {
 }
 
 func hasPermissionInToken(tokenPermissions []string, group, resource, verb string) bool {
-	// can't request access to a wildcard group
-	if strings.HasPrefix(group, "*") {
-		return false
-	}
-
 	verbs := []string{verb}
 
 	// we always map list to get for authz
