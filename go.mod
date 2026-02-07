@@ -6,7 +6,7 @@ require (
 	github.com/go-jose/go-jose/v4 v4.1.3
 	github.com/google/go-querystring v1.2.0
 	github.com/grafana/authlib/types v0.0.0-20251203163023-dd5a97c606e3
-	github.com/grafana/dskit v0.0.0-20260108123158-1a1acfb6ef2e
+	github.com/grafana/dskit v0.0.0-20260207150213-d7b5e84e3d70
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.7
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/stretchr/testify v1.11.1
@@ -28,7 +28,7 @@ require (
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel/metric v1.40.0 // indirect
 	golang.org/x/net v0.48.0 // indirect
-	golang.org/x/sys v0.39.0 // indirect
+	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/text v0.33.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260128011058-8636f8732409 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
