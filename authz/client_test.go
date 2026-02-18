@@ -1156,10 +1156,10 @@ func TestBatchCheckRequest_Validate(t *testing.T) {
 			wantErr: nil,
 		},
 		{
-			name: "Too many checks (51)",
+			name: "Too many checks (501)",
 			req: func() types.BatchCheckRequest {
-				checks := make([]types.BatchCheckItem, 51)
-				for i := 0; i < 51; i++ {
+				checks := make([]types.BatchCheckItem, 501)
+				for i := 0; i < 501; i++ {
 					checks[i] = types.BatchCheckItem{
 						CorrelationID: fmt.Sprintf("id-%d", i),
 						Group:         "dashboards.grafana.app",
