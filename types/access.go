@@ -19,7 +19,7 @@ var (
 )
 
 // MaxBatchCheckItems is the maximum number of checks allowed in a single BatchCheckRequest
-const MaxBatchCheckItems = 500
+const MaxBatchCheckItems = 50
 
 // CheckRequest describes the requested access.
 // This is designed bo to play nicely with the kubernetes authorization system:
