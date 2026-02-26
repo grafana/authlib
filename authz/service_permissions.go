@@ -49,6 +49,7 @@ func CheckServicePermissions(authInfo types.AuthInfo, group, resource, verb stri
 // allowedWildcardGroups are the only permission groups that may use wildcard matching; all others require exact match.
 var allowedWildcardGroups = []string{
 	"*.datasource.grafana.app",
+	"*.ext.grafana.app",
 }
 
 // check wildcard group matching as well as exact match
