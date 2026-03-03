@@ -72,6 +72,9 @@ type AuthInfo interface {
 	// Examples: password, oauth_azuread, etc
 	GetAuthenticatedBy() string
 
+	// GetAccessToken returns the access token that went into authenticating this identity. This will be empty for legacy auth mechanisms and in-process service identities.
+	GetAccessToken() string
+
 	// GetIDToken returns the singed id token used during authentication.
 	// Will be empty if authencation was performed only using access token.
 	GetIDToken() string
