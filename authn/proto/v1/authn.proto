@@ -9,10 +9,20 @@ service AuthnService {
 }
 
 message AuthenticateRequest {
-  string stack_id = 1;
+  string namespace = 1;
   map<string, string> http_headers = 2;
 }
 
+enum AuthenticateCode {
+  AUTHENTICATE_CODE_UNSPECIFIED = 0;
+  AUTHENTICATE_CODE_OK = 1;
+  AUTHENTICATE_CODE_FAILED = 2;
+  // The service does not recognize the supplied credentials.
+  // The gateway should fall through to its default routing path.
+  AUTHENTICATE_CODE_UNSUPPORTED_CREDENTIALS = 3;
+}
+
 message AuthenticateResponse {
-  string token = 1;
+  AuthenticateCode code = 1;
+  string token = 2;
 }
