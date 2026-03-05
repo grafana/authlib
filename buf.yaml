@@ -1,4 +1,9 @@
 version: v1
+# authn has its own buf module at authn/proto/v1/ with separate
+# generation config. Exclude it so this root module only processes authz.
+build:
+  excludes:
+    - authn
 deps:
   - buf.build/googleapis/googleapis
   - buf.build/grpc-ecosystem/grpc-gateway

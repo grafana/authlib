@@ -54,16 +54,22 @@ jobs:
           persist-credentials: false
       - name: Install buf
         uses: bufbuild/buf-setup-action@a47c93e0b1648d5651a065437926377d060baa99 #v1
-      - name: Generate protobuf
+      - name: Generate protobuf (authz)
         run: buf generate
+      - name: Generate protobuf (authn)
+        run: buf generate
+        working-directory: authn/proto/v1
       - name: Check for git diff
         run: |
           if [[ `git status --porcelain` ]]; then
             git status
             exit 1
           fi
-      - name: Format protobuf
+      - name: Format protobuf (authz)
         run: buf format --write
+      - name: Format protobuf (authn)
+        run: buf format --write
+        working-directory: authn/proto/v1
       - name: Check for git diff
         run: |
           if [[ `git status --porcelain` ]]; then
