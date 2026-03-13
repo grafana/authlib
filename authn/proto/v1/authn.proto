@@ -17,9 +17,9 @@ enum AuthenticateCode {
   AUTHENTICATE_CODE_UNSPECIFIED = 0;
   AUTHENTICATE_CODE_OK = 1;
   AUTHENTICATE_CODE_FAILED = 2;
-  // The service does not recognize the supplied credentials.
+  // The service does not handle the supplied credentials.
   // The gateway should fall through to its default routing path.
-  AUTHENTICATE_CODE_UNSUPPORTED_CREDENTIALS = 3;
+  AUTHENTICATE_CODE_NOT_HANDLED = 3;
 }
 
 message AuthenticateResponse {
