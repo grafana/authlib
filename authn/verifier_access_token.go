@@ -7,8 +7,9 @@ import (
 )
 
 type ActorClaims struct {
-	Subject string       `json:"sub"`
-	Actor   *ActorClaims `json:"act,omitempty"`
+	Subject         string       `json:"sub"`
+	ServiceIdentity string       `json:"serviceIdentity,omitempty"`
+	Actor           *ActorClaims `json:"act,omitempty"`
 
 	// Embed IDTokenClaims for on behalf of flow.
 	IDTokenClaims

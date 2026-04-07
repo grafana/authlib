@@ -18,22 +18,27 @@ func TestAccessToken_getInnermostActor(t *testing.T) {
 	t.Run("root-level actor", func(t *testing.T) {
 		claims := AccessTokenClaims{
 			Actor: &ActorClaims{
-				Subject: "subject",
+				Subject:         "subject",
+				ServiceIdentity: "service-identity",
 			},
 		}
 
 		actor := claims.getInnermostActor()
 		assert.Equal(t, "subject", actor.Subject)
+		assert.Equal(t, "service-identity", actor.ServiceIdentity)
 	})
 
 	t.Run("innermost actor", func(t *testing.T) {
 		claims := AccessTokenClaims{
 			Actor: &ActorClaims{
-				Subject: "subject",
+				Subject:         "subject",
+				ServiceIdentity: "service-identity",
 				Actor: &ActorClaims{
-					Subject: "nested-subject",
+					Subject:         "nested-subject",
+					ServiceIdentity: "nested-service-identity",
 					Actor: &ActorClaims{
-						Subject: "innermost-subject",
+						Subject:         "innermost-subject",
+						ServiceIdentity: "innermost-service-identity",
 					},
 				},
 			},
@@ -41,6 +46,7 @@ func TestAccessToken_getInnermostActor(t *testing.T) {
 
 		actor := claims.getInnermostActor()
 		assert.Equal(t, "innermost-subject", actor.Subject)
+		assert.Equal(t, "innermost-service-identity", actor.ServiceIdentity)
 	})
 }
 
