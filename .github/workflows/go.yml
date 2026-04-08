@@ -38,7 +38,7 @@ jobs:
         with:
           go-version-file: ./go.mod
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@b62bd5d2341b1c3d8e43b6c576edb853a7e63ada
+        uses: golangci/golangci-lint-action@46c9287ccb5fd9a896cb5705a7012084e34f6736
         with:
           version: v2.6.2
           args: |
