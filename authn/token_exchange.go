@@ -131,9 +131,59 @@ func (r TokenExchangeRequest) hash() string {
 	br.WriteByte('-')
 	sort.Strings(r.Audiences)
 	br.WriteString(strings.Join(r.Audiences, "-"))
-	br.WriteString(r.SubjectToken)
+	br.WriteString(subjectCacheKey(r.SubjectToken))
 
 	return br.String()
+}
+
+type subjectTokenCacheClaims struct {
+	jwt.Claims
+	Actor *ActorClaims `json:"act,omitempty"`
+}
+
+func subjectCacheKey(subjectToken string) string {
+	if subjectToken == "" {
+		return ""
+	}
+
+	parsed, err := jwt.ParseSigned(subjectToken, tokenSignAlgs)
+	if err != nil {
+		// Fall back to old behavior if the token cannot be parsed.
+		return subjectToken
+	}
+
+	var claims subjectTokenCacheClaims
+	if err = parsed.UnsafeClaimsWithoutVerification(&claims); err != nil {
+		// Fall back to old behavior if claims extraction fails.
+		return subjectToken
+	}
+
+	parts := make([]string, 0, 4)
+	if claims.Subject != "" {
+		parts = append(parts, claims.Subject)
+	}
+	parts = append(parts, flattenedActorSubjects(claims.Actor)...)
+	if len(parts) == 0 {
+		// Fall back to old behavior if there is no stable subject signal.
+		return subjectToken
+	}
+
+	return strings.Join(parts, "|")
+}
+
+func flattenedActorSubjects(actor *ActorClaims) []string {
+	parts := make([]string, 0, 3)
+	for actor != nil {
+		if actor.Subject != "" {
+			parts = append(parts, actor.Subject)
+		}
+		actor = actor.Actor
+	}
+	// Canonicalize to originator-first order (deepest actor first).
+	for i, j := 0, len(parts)-1; i < j; i, j = i+1, j-1 {
+		parts[i], parts[j] = parts[j], parts[i]
+	}
+	return parts
 }
 
 type tokenExchangeResponse struct {

@@ -218,6 +218,96 @@ func Test_TokenExchangeClient_Exchange(t *testing.T) {
 		// This is only testing that the cache is used, so we do not repeat the other cases here.
 	})
 
+	t.Run("should use stable subject plus actor chain for cache key", func(t *testing.T) {
+		var calls int
+		c := setup(httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			calls++
+			require.Equal(t, r.Header.Get("Authorization"), "Bearer some-token")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data": {"token": "` + signAccessToken(t, expiresIn) + `"}}`))
+		})))
+
+		chain := &ActorClaims{
+			Subject: "access-policy:mycap",
+			Actor: &ActorClaims{
+				Subject: "service:gateway",
+				Actor: &ActorClaims{
+					Subject: "user:1",
+				},
+			},
+		}
+
+		token1 := signSubjectToken(t, 10*time.Minute, "access-policy:mycap", chain)
+		token2 := signSubjectToken(t, 11*time.Minute, "access-policy:mycap", chain)
+
+		res, err := c.Exchange(context.Background(), TokenExchangeRequest{
+			Namespace:    "*",
+			Audiences:    []string{"some-service"},
+			SubjectToken: token1,
+		})
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		require.Equal(t, 1, calls)
+
+		// Same stable subject + actor lineage should reuse cache, even if token body changed.
+		res, err = c.Exchange(context.Background(), TokenExchangeRequest{
+			Namespace:    "*",
+			Audiences:    []string{"some-service"},
+			SubjectToken: token2,
+		})
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		require.Equal(t, 1, calls)
+	})
+
+	t.Run("should not reuse cache for different actor chain", func(t *testing.T) {
+		var calls int
+		c := setup(httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			calls++
+			require.Equal(t, r.Header.Get("Authorization"), "Bearer some-token")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data": {"token": "` + signAccessToken(t, expiresIn) + `"}}`))
+		})))
+
+		tokenUser1 := signSubjectToken(t, 10*time.Minute, "access-policy:mycap", &ActorClaims{
+			Subject: "access-policy:mycap",
+			Actor: &ActorClaims{
+				Subject: "service:gateway",
+				Actor: &ActorClaims{
+					Subject: "user:1",
+				},
+			},
+		})
+		tokenUser2 := signSubjectToken(t, 10*time.Minute, "access-policy:mycap", &ActorClaims{
+			Subject: "access-policy:mycap",
+			Actor: &ActorClaims{
+				Subject: "service:gateway",
+				Actor: &ActorClaims{
+					Subject: "user:2",
+				},
+			},
+		})
+
+		res, err := c.Exchange(context.Background(), TokenExchangeRequest{
+			Namespace:    "*",
+			Audiences:    []string{"some-service"},
+			SubjectToken: tokenUser1,
+		})
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		require.Equal(t, 1, calls)
+
+		// Different actor lineage should create a different cache key.
+		res, err = c.Exchange(context.Background(), TokenExchangeRequest{
+			Namespace:    "*",
+			Audiences:    []string{"some-service"},
+			SubjectToken: tokenUser2,
+		})
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		require.Equal(t, 2, calls)
+	})
+
 	t.Run("should retry requests and return token on successful sign request", func(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			require.Equal(t, r.Header.Get("Authorization"), "Bearer some-token")
@@ -349,5 +439,28 @@ func signAccessToken(t *testing.T, expiresIn time.Duration) string {
 		Serialize()
 
 	require.NoError(t, err)
+	return token
+}
+
+func signSubjectToken(t *testing.T, expiresIn time.Duration, subject string, actor *ActorClaims) string {
+	signer, err := jose.NewSigner(jose.SigningKey{
+		Algorithm: jose.ES256,
+		Key:       testPrivateKey,
+	}, nil)
+	require.NoError(t, err)
+
+	customClaims := AccessTokenClaims{
+		Actor: actor,
+	}
+
+	token, err := jwt.Signed(signer).
+		Claims(&jwt.Claims{
+			Subject: subject,
+			Expiry:  jwt.NewNumericDate(time.Now().Add(expiresIn)),
+		}).
+		Claims(&customClaims).
+		Serialize()
+	require.NoError(t, err)
+
 	return token
 }
