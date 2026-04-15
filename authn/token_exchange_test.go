@@ -260,6 +260,38 @@ func Test_TokenExchangeClient_Exchange(t *testing.T) {
 		require.Equal(t, 1, calls)
 	})
 
+	t.Run("should use stable subject for first hop without actor chain", func(t *testing.T) {
+		var calls int
+		c := setup(httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			calls++
+			require.Equal(t, r.Header.Get("Authorization"), "Bearer some-token")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data": {"token": "` + signAccessToken(t, expiresIn) + `"}}`))
+		})))
+
+		token1 := signSubjectToken(t, 10*time.Minute, "access-policy:mycap", nil)
+		token2 := signSubjectToken(t, 11*time.Minute, "access-policy:mycap", nil)
+
+		res, err := c.Exchange(context.Background(), TokenExchangeRequest{
+			Namespace:    "*",
+			Audiences:    []string{"some-service"},
+			SubjectToken: token1,
+		})
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		require.Equal(t, 1, calls)
+
+		// No actor chain yet; stable top-level subject should still reuse cache.
+		res, err = c.Exchange(context.Background(), TokenExchangeRequest{
+			Namespace:    "*",
+			Audiences:    []string{"some-service"},
+			SubjectToken: token2,
+		})
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		require.Equal(t, 1, calls)
+	})
+
 	t.Run("should not reuse cache for different actor chain", func(t *testing.T) {
 		var calls int
 		c := setup(httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
