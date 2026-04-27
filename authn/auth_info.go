@@ -1,6 +1,7 @@
 package authn
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/go-jose/go-jose/v4/jwt"
@@ -104,6 +105,17 @@ func (a *AuthInfo) GetExtra() map[string][]string {
 
 	if a.at.Rest.ServiceIdentity != "" {
 		result[ServiceIdentityKey] = []string{a.at.Rest.ServiceIdentity}
+	}
+
+	// This sets the original service identity used in an authenticated request chain.
+	// It will first look for the service identity in the actor claims, and if there's no actor,
+	// it uses the service identity from the subject's claim metadata.
+	// If the actor claims is present but the service identity was not passed or empty, that value is still the one returned.
+	// This is so we preserve the intent of the method, and always return the original identity even when empty.
+	if actor := a.at.Rest.getInnermostActor(); actor != nil {
+		result[InnermostServiceIdentityKey] = []string{actor.ServiceIdentity}
+	} else {
+		result[InnermostServiceIdentityKey] = slices.Clone(result[ServiceIdentityKey])
 	}
 
 	return result

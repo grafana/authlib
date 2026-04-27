@@ -543,3 +543,86 @@ func TestAuthInfo_GetIdentifier(t *testing.T) {
 		})
 	}
 }
+
+func TestAuthInfo_GetExtra_InnermostServiceIdentity(t *testing.T) {
+	tests := []struct {
+		name     string
+		authInfo *AuthInfo
+		expected map[string][]string
+	}{
+		{
+			name: "with an access token without an actor, sets the innermost service identity from its metadata",
+			authInfo: &AuthInfo{
+				at: Claims[AccessTokenClaims]{
+					Rest: AccessTokenClaims{
+						ServiceIdentity: "service-identity",
+					},
+				},
+			},
+			expected: map[string][]string{
+				ServiceIdentityKey:          {"service-identity"},
+				InnermostServiceIdentityKey: {"service-identity"},
+			},
+		},
+		{
+			name: "with an access token with nested actors, sets the innermost service identity from the innermost actor",
+			authInfo: &AuthInfo{
+				at: Claims[AccessTokenClaims]{
+					Rest: AccessTokenClaims{
+						ServiceIdentity: "service-identity",
+						Actor: &ActorClaims{
+							ServiceIdentity: "actor-service-identity",
+							Actor: &ActorClaims{
+								ServiceIdentity: "nested-service-identity",
+								Actor: &ActorClaims{
+									ServiceIdentity: "innermost-service-identity",
+								},
+							},
+						},
+					},
+				},
+			},
+			expected: map[string][]string{
+				ServiceIdentityKey:          {"service-identity"},
+				InnermostServiceIdentityKey: {"innermost-service-identity"},
+			},
+		},
+		{
+			name: "with an access token with an actor, preserves the innermost service identity even when empty",
+			authInfo: &AuthInfo{
+				at: Claims[AccessTokenClaims]{
+					Rest: AccessTokenClaims{
+						ServiceIdentity: "service-identity",
+						Actor: &ActorClaims{
+							ServiceIdentity: "",
+						},
+					},
+				},
+			},
+			expected: map[string][]string{
+				ServiceIdentityKey:          {"service-identity"},
+				InnermostServiceIdentityKey: {""},
+			},
+		},
+		{
+			name: "with an ID token only, does not set any service identity",
+			authInfo: &AuthInfo{
+				id: &Claims[IDTokenClaims]{
+					Rest: IDTokenClaims{
+						Type:       "type",
+						Identifier: "identifier",
+					},
+				},
+			},
+			expected: map[string][]string{
+				InnermostServiceIdentityKey: nil,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.authInfo.GetExtra())
+		})
+	}
+}

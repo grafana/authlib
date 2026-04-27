@@ -7,5 +7,6 @@ const (
 	httpHeaderAccessToken = "X-Access-Token"
 	httpHeaderIDToken     = "X-Grafana-Id"
 
-	ServiceIdentityKey = "serviceIdentity"
+	ServiceIdentityKey          = "serviceIdentity"
+	InnermostServiceIdentityKey = "innermostServiceIdentity"
 )
