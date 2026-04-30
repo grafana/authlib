@@ -25,6 +25,9 @@ type IDTokenClaims struct {
 	DisplayName string `json:"name,omitempty"`
 	// Basic role of entity (Viewer, Editor, Admin)
 	Role string `json:"role,omitempty"`
+	// Groups the entity belongs to (from the Identity's Group attribute)
+	// Optional, might not be set
+	Groups []string `json:"groups,omitempty"`
 }
 
 // Helper for the id

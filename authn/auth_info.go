@@ -91,7 +91,16 @@ func (a *AuthInfo) GetNamespace() string {
 }
 
 func (a *AuthInfo) GetGroups() []string {
-	return []string{}
+	if a.id != nil {
+		return a.id.Rest.Groups
+	}
+
+	actor := a.at.Rest.getInnermostActor()
+	if actor != nil {
+		return actor.Groups
+	}
+
+	return nil
 }
 
 func (a *AuthInfo) GetExtra() map[string][]string {
