@@ -544,6 +544,120 @@ func TestAuthInfo_GetIdentifier(t *testing.T) {
 	}
 }
 
+func TestAuthInfo_GetGroups(t *testing.T) {
+	tests := []struct {
+		name     string
+		authInfo *AuthInfo
+		expected []string
+	}{
+		{
+			name: "ID token is present with groups, return ID token groups",
+			authInfo: &AuthInfo{
+				id: &Claims[IDTokenClaims]{
+					Rest: IDTokenClaims{
+						Groups: []string{"group1", "group2"},
+					},
+				},
+			},
+			expected: []string{"group1", "group2"},
+		},
+		{
+			name: "ID token is present without groups, return nil",
+			authInfo: &AuthInfo{
+				id: &Claims[IDTokenClaims]{
+					Rest: IDTokenClaims{
+						Type: types.TypeUser,
+					},
+				},
+			},
+			expected: nil,
+		},
+		{
+			name: "No ID token, no actor, return nil",
+			authInfo: &AuthInfo{
+				at: Claims[AccessTokenClaims]{
+					Claims: jwt.Claims{
+						Subject: "at_subject",
+					},
+				},
+				id: nil,
+			},
+			expected: nil,
+		},
+		{
+			name: "No ID token, actor with groups, return actor groups",
+			authInfo: &AuthInfo{
+				at: Claims[AccessTokenClaims]{
+					Claims: jwt.Claims{
+						Subject: "at_subject",
+					},
+					Rest: AccessTokenClaims{
+						Actor: &ActorClaims{
+							Subject: "actor_subject",
+							IDTokenClaims: IDTokenClaims{
+								Type:   types.TypeUser,
+								Groups: []string{"actor-group"},
+							},
+						},
+					},
+				},
+				id: nil,
+			},
+			expected: []string{"actor-group"},
+		},
+		{
+			name: "No ID token, nested actor level 2, return innermost actor groups",
+			authInfo: &AuthInfo{
+				at: Claims[AccessTokenClaims]{
+					Claims: jwt.Claims{
+						Subject: "at_subject",
+					},
+					Rest: AccessTokenClaims{
+						Actor: &ActorClaims{
+							Subject: "actor1_subject",
+							IDTokenClaims: IDTokenClaims{
+								Groups: []string{"actor1-group"},
+							},
+							Actor: &ActorClaims{
+								Subject: "actor2_subject",
+								IDTokenClaims: IDTokenClaims{
+									Groups: []string{"actor2-group"},
+								},
+							},
+						},
+					},
+				},
+				id: nil,
+			},
+			expected: []string{"actor2-group"},
+		},
+		{
+			name: "No ID token, actor without groups, return nil",
+			authInfo: &AuthInfo{
+				at: Claims[AccessTokenClaims]{
+					Claims: jwt.Claims{
+						Subject: "at_subject",
+					},
+					Rest: AccessTokenClaims{
+						Actor: &ActorClaims{
+							Subject: "actor_subject",
+						},
+					},
+				},
+				id: nil,
+			},
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.authInfo.GetGroups()
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 func TestAuthInfo_GetExtra_InnermostServiceIdentity(t *testing.T) {
 	tests := []struct {
 		name     string
