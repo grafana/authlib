@@ -624,7 +624,7 @@ func TestClient_Check_Cache(t *testing.T) {
 	require.True(t, got.Allowed)
 
 	// Check that the cache was populated correctly
-	ctrl, _, err := client.getCachedCheck(context.Background(), checkCacheKey("user:1", &req, folder))
+	ctrl, _, err := client.getCachedCheck(context.Background(), checkCacheKey("user:1", caller.GetGroups(), &req, folder))
 	require.NoError(t, err)
 	require.True(t, ctrl)
 
@@ -720,6 +720,73 @@ func TestClient_Check_Zookie(t *testing.T) {
 	require.False(t, got.Zookie.IsFresherThan(time.UnixMilli(expectedTimestamp+1000)))
 }
 
+func TestClient_Check_PropagatesTeams(t *testing.T) {
+	tests := []struct {
+		name      string
+		caller    *authn.AuthInfo
+		wantTeams []string
+	}{
+		{
+			name:      "ID token groups",
+			caller:    newTeamsCaller([]string{"team-a", "team-b"}),
+			wantTeams: []string{"team-a", "team-b"},
+		},
+		{
+			name:      "access token actor groups",
+			caller:    newActorTeamsCaller([]string{"actor-team"}),
+			wantTeams: []string{"actor-team"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			client, authz := setupAccessClient()
+			authz.checkRes = &authzv1.CheckResponse{Allowed: true}
+
+			req := types.CheckRequest{
+				Namespace: "stacks-12",
+				Group:     "dashboards.grafana.app",
+				Resource:  "dashboards",
+				Verb:      "get",
+				Name:      "dash1",
+			}
+
+			got, err := client.Check(context.Background(), tt.caller, req, "folder1")
+			require.NoError(t, err)
+			require.True(t, got.Allowed)
+			require.Len(t, authz.checkReqs, 1)
+			require.Equal(t, "user:1", authz.checkReqs[0].Subject)
+			require.Equal(t, tt.wantTeams, authz.checkReqs[0].Teams)
+		})
+	}
+}
+
+func TestClient_Check_CacheIncludesTeams(t *testing.T) {
+	client, authz := setupAccessClient()
+	authz.checkRes = &authzv1.CheckResponse{Allowed: true}
+
+	req := types.CheckRequest{
+		Namespace: "stacks-12",
+		Group:     "dashboards.grafana.app",
+		Resource:  "dashboards",
+		Verb:      "get",
+		Name:      "dash1",
+	}
+
+	got, err := client.Check(context.Background(), newTeamsCaller([]string{"team-a"}), req, "")
+	require.NoError(t, err)
+	require.True(t, got.Allowed)
+
+	authz.checkRes = &authzv1.CheckResponse{Allowed: false}
+
+	got, err = client.Check(context.Background(), newTeamsCaller([]string{"team-b"}), req, "")
+	require.NoError(t, err)
+	require.False(t, got.Allowed)
+	require.Len(t, authz.checkReqs, 2)
+	require.Equal(t, []string{"team-a"}, authz.checkReqs[0].Teams)
+	require.Equal(t, []string{"team-b"}, authz.checkReqs[1].Teams)
+}
+
 func TestClient_Compile_Cache(t *testing.T) {
 	client, authz := setupAccessClient()
 
@@ -763,7 +830,7 @@ func TestClient_Compile_Cache(t *testing.T) {
 	require.True(t, zookie.IsFresherThan(now.Add(-time.Minute)))
 
 	// Check that the cache was populated correctly
-	ctrl, err := client.getCachedItemChecker(context.Background(), itemCheckerCacheKey("user:1", &req))
+	ctrl, err := client.getCachedItemChecker(context.Background(), itemCheckerCacheKey("user:1", caller.GetGroups(), &req))
 	require.NoError(t, err)
 	require.False(t, ctrl.All)
 	require.True(t, ctrl.Items["dash1"])
@@ -1116,6 +1183,51 @@ func TestClient_Compile_Zookie(t *testing.T) {
 		require.False(t, zookie.IsFresherThan(time.Now().Add(-30*time.Minute)))
 		require.True(t, zookie.IsFresherThan(time.Now().Add(-2*time.Hour)))
 	})
+}
+
+func TestClient_Compile_PropagatesTeams(t *testing.T) {
+	client, authz := setupAccessClient()
+	authz.listRes = &authzv1.ListResponse{All: true}
+
+	req := types.ListRequest{
+		Namespace: "stacks-12",
+		Group:     "dashboards.grafana.app",
+		Resource:  "dashboards",
+		Verb:      "get",
+	}
+
+	checker, _, err := client.Compile(context.Background(), newTeamsCaller([]string{"team-a", "team-b"}), req)
+	require.NoError(t, err)
+	require.NotNil(t, checker)
+	require.Len(t, authz.listReqs, 1)
+	require.Equal(t, "user:1", authz.listReqs[0].Subject)
+	require.Equal(t, []string{"team-a", "team-b"}, authz.listReqs[0].Teams)
+}
+
+func TestClient_Compile_CacheIncludesTeams(t *testing.T) {
+	client, authz := setupAccessClient()
+	authz.listRes = &authzv1.ListResponse{Items: []string{"dash1"}}
+
+	req := types.ListRequest{
+		Namespace: "stacks-12",
+		Group:     "dashboards.grafana.app",
+		Resource:  "dashboards",
+		Verb:      "get",
+	}
+
+	checker, _, err := client.Compile(context.Background(), newTeamsCaller([]string{"team-a"}), req)
+	require.NoError(t, err)
+	require.True(t, checker("dash1", ""))
+
+	authz.listRes = &authzv1.ListResponse{Items: []string{"dash2"}}
+
+	checker, _, err = client.Compile(context.Background(), newTeamsCaller([]string{"team-b"}), req)
+	require.NoError(t, err)
+	require.False(t, checker("dash1", ""))
+	require.True(t, checker("dash2", ""))
+	require.Len(t, authz.listReqs, 2)
+	require.Equal(t, []string{"team-a"}, authz.listReqs[0].Teams)
+	require.Equal(t, []string{"team-b"}, authz.listReqs[1].Teams)
 }
 
 func TestBatchCheckRequest_Validate(t *testing.T) {
@@ -1615,6 +1727,69 @@ func TestClient_BatchCheck_ServicePermissions(t *testing.T) {
 	})
 }
 
+func TestClient_BatchCheck_PropagatesTeams(t *testing.T) {
+	client, authz := setupAccessClient()
+	authz.batchCheckRes = &authzv1.BatchCheckResponse{
+		Results: map[string]*authzv1.BatchCheckResult{
+			"check-1": {Allowed: true},
+		},
+	}
+
+	req := types.BatchCheckRequest{
+		Namespace: "stacks-12",
+		Checks: []types.BatchCheckItem{
+			{CorrelationID: "check-1", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "get", Name: "dash1"},
+		},
+	}
+
+	resp, err := client.BatchCheck(context.Background(), newTeamsCaller([]string{"team-a", "team-b"}), req)
+	require.NoError(t, err)
+	require.True(t, resp.Results["check-1"].Allowed)
+	require.Len(t, authz.batchCheckReqs, 1)
+	require.Equal(t, "user:1", authz.batchCheckReqs[0].Subject)
+	require.Equal(t, []string{"team-a", "team-b"}, authz.batchCheckReqs[0].Teams)
+}
+
+func newTeamsCaller(teams []string) *authn.AuthInfo {
+	return authn.NewIDTokenAuthInfo(
+		authn.Claims[authn.AccessTokenClaims]{
+			Claims: jwt.Claims{Subject: "service"},
+			Rest: authn.AccessTokenClaims{
+				Namespace:            "stacks-12",
+				DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get"},
+			},
+		},
+		&authn.Claims[authn.IDTokenClaims]{
+			Claims: jwt.Claims{Subject: "user:1"},
+			Rest: authn.IDTokenClaims{
+				Identifier: "1",
+				Type:       types.TypeUser,
+				Namespace:  "stacks-12",
+				Groups:     teams,
+			},
+		},
+	)
+}
+
+func newActorTeamsCaller(teams []string) *authn.AuthInfo {
+	return authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{
+		Claims: jwt.Claims{Subject: "service"},
+		Rest: authn.AccessTokenClaims{
+			Namespace:            "stacks-12",
+			DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get"},
+			Actor: &authn.ActorClaims{
+				Subject: "user:1",
+				IDTokenClaims: authn.IDTokenClaims{
+					Identifier: "1",
+					Type:       types.TypeUser,
+					Namespace:  "stacks-12",
+					Groups:     teams,
+				},
+			},
+		},
+	})
+}
+
 func setupAccessClient() (*ClientImpl, *FakeAuthzServiceClient) {
 	fakeClient := &FakeAuthzServiceClient{}
 	return &ClientImpl{
@@ -1626,7 +1801,9 @@ func setupAccessClient() (*ClientImpl, *FakeAuthzServiceClient) {
 
 type FakeAuthzServiceClient struct {
 	checkRes         *authzv1.CheckResponse
+	checkReqs        []*authzv1.CheckRequest
 	listRes          *authzv1.ListResponse
+	listReqs         []*authzv1.ListRequest
 	batchCheckRes    *authzv1.BatchCheckResponse
 	batchCheckErr    error
 	batchCheckCalled bool
@@ -1634,10 +1811,12 @@ type FakeAuthzServiceClient struct {
 }
 
 func (f *FakeAuthzServiceClient) Check(ctx context.Context, in *authzv1.CheckRequest, opts ...grpc.CallOption) (*authzv1.CheckResponse, error) {
+	f.checkReqs = append(f.checkReqs, in)
 	return f.checkRes, nil
 }
 
 func (f *FakeAuthzServiceClient) List(ctx context.Context, in *authzv1.ListRequest, opts ...grpc.CallOption) (*authzv1.ListResponse, error) {
+	f.listReqs = append(f.listReqs, in)
 	return f.listRes, nil
 }
 

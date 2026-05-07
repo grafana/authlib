@@ -60,6 +60,8 @@ message CheckRequest {
   string path = 8;
   string folder = 9;
   bool skipcache = 10;
+  // teams contains the team identifiers for the subject.
+  repeated string teams = 11;
 }
 
 message CheckResponse {
@@ -75,6 +77,8 @@ message ListRequest {
   string namespace = 5;
   string subresource = 6;
   ListRequestOptions options = 7;
+  // teams contains the team identifiers for the subject.
+  repeated string teams = 8;
 }
 
 message ListRequestOptions {
@@ -99,6 +103,8 @@ message BatchCheckRequest {
   repeated BatchCheckItem checks = 2;
   BatchCheckOptions options = 3;
   string namespace = 4;
+  // teams contains the team identifiers for the subject.
+  repeated string teams = 5;
 }
 
 // BatchCheckItem represents a single check in a batch request.

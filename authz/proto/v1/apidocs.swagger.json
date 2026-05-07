@@ -60,6 +60,13 @@
                 },
                 "options": {
                   "$ref": "#/definitions/v1BatchCheckOptions"
+                },
+                "teams": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "teams contains the team identifiers for the subject."
                 }
               },
               "description": "BatchCheckRequest contains multiple checks to be performed at once.\nMaximum of 50 checks per request."
@@ -130,6 +137,13 @@
                 },
                 "skipcache": {
                   "type": "boolean"
+                },
+                "teams": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "teams contains the team identifiers for the subject."
                 }
               }
             }
@@ -190,6 +204,13 @@
                 },
                 "options": {
                   "$ref": "#/definitions/v1ListRequestOptions"
+                },
+                "teams": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "teams contains the team identifiers for the subject."
                 }
               }
             }
