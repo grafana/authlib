@@ -3,6 +3,7 @@ package authn
 import (
 	"context"
 
+	"github.com/grafana/authlib/types"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/noop"
@@ -94,9 +95,16 @@ func (i *GrpcClientInterceptor) wrapContext(ctx context.Context) (context.Contex
 		md = make(metadata.MD)
 	}
 
+	subjectToken := ""
+	if authInfo, ok := types.AuthInfoFrom(ctx); ok && authInfo != nil && authInfo.GetAccessToken() != "" {
+		subjectToken = authInfo.GetAccessToken()
+	}
+	span.SetAttributes(attribute.Bool("with_subject_token", subjectToken != ""))
+
 	token, err := i.tc.Exchange(spanCtx, TokenExchangeRequest{
-		Namespace: i.namespace,
-		Audiences: i.aud,
+		Namespace:    i.namespace,
+		Audiences:    i.aud,
+		SubjectToken: subjectToken,
 	})
 	if err != nil {
 		span.RecordError(err)
