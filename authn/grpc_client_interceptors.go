@@ -16,6 +16,7 @@ type GrpcClientInterceptor struct {
 	tracer trace.Tracer
 
 	namespace        string
+	subjectToken     string
 	aud              []string
 	idTokenExtractor func(context.Context) (string, error)
 }
@@ -49,6 +50,13 @@ func WithClientInterceptorNamespace(namespace string) GrpcClientInterceptorOptio
 func WithClientInterceptorAudience(aud []string) GrpcClientInterceptorOption {
 	return func(i *GrpcClientInterceptor) {
 		i.aud = aud
+	}
+}
+
+// WithClientInterceptorSubjectToken sets the subject token used in signed access token.
+func WithClientInterceptorSubjectToken(subjectToken string) GrpcClientInterceptorOption {
+	return func(i *GrpcClientInterceptor) {
+		i.subjectToken = subjectToken
 	}
 }
 
@@ -95,14 +103,16 @@ func (i *GrpcClientInterceptor) wrapContext(ctx context.Context) (context.Contex
 	}
 
 	token, err := i.tc.Exchange(spanCtx, TokenExchangeRequest{
-		Namespace: i.namespace,
-		Audiences: i.aud,
+		Namespace:    i.namespace,
+		Audiences:    i.aud,
+		SubjectToken: i.subjectToken,
 	})
 	if err != nil {
 		span.RecordError(err)
 		return ctx, err
 	}
 
+	span.SetAttributes(attribute.Bool("with_subject_token", i.subjectToken != ""))
 	span.SetAttributes(attribute.Bool("with_accesstoken", true))
 	md.Set(metadataKeyAccessToken, token.Token)
 
