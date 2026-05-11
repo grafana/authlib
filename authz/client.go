@@ -3,9 +3,13 @@ package authz
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/gob"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -100,7 +104,8 @@ func (c *ClientImpl) check(ctx context.Context, authInfo types.AuthInfo, req *ty
 		return false, time.Now().UnixMilli(), nil
 	}
 
-	key := checkCacheKey(authInfo.GetSubject(), req, folder)
+	teams := authInfo.GetGroups()
+	key := checkCacheKey(authInfo.GetSubject(), teams, req, folder)
 
 	// Skip the cache if requested
 	if !req.SkipCache {
@@ -112,6 +117,7 @@ func (c *ClientImpl) check(ctx context.Context, authInfo types.AuthInfo, req *ty
 
 	checkReq := &authzv1.CheckRequest{
 		Subject:     authInfo.GetUID(),
+		Teams:       teams,
 		Verb:        req.Verb,
 		Group:       req.Group,
 		Resource:    req.Resource,
@@ -203,7 +209,8 @@ func (c *ClientImpl) Check(ctx context.Context, authInfo types.AuthInfo, req typ
 }
 
 func (c *ClientImpl) compile(ctx context.Context, authInfo types.AuthInfo, list *types.ListRequest) (*itemChecker, error) {
-	key := itemCheckerCacheKey(authInfo.GetSubject(), list)
+	teams := authInfo.GetGroups()
+	key := itemCheckerCacheKey(authInfo.GetSubject(), teams, list)
 
 	// Skip the cache if requested
 	if !list.SkipCache {
@@ -219,6 +226,7 @@ func (c *ClientImpl) compile(ctx context.Context, authInfo types.AuthInfo, list 
 	// Query the authz service
 	listReq := &authzv1.ListRequest{
 		Subject:     authInfo.GetUID(),
+		Teams:       teams,
 		Group:       list.Group,
 		Resource:    list.Resource,
 		Verb:        list.Verb,
@@ -376,6 +384,7 @@ func (c *ClientImpl) BatchCheck(ctx context.Context, authInfo types.AuthInfo, re
 
 	protoReq := &authzv1.BatchCheckRequest{
 		Subject:   authInfo.GetUID(),
+		Teams:     authInfo.GetGroups(),
 		Namespace: req.Namespace,
 		Checks:    protoChecks,
 		Options: &authzv1.BatchCheckOptions{
@@ -445,8 +454,8 @@ func newOutgoingContext(ctx context.Context) context.Context {
 // CACHE
 // -----
 
-func checkCacheKey(subj string, req *types.CheckRequest, folder string) string {
-	return fmt.Sprintf("check-%s-%s-%s-%s-%s-%s-%s-%s-%s", req.Namespace, subj, req.Group, req.Resource, req.Verb, req.Name, req.Subresource, req.Path, folder)
+func checkCacheKey(subj string, teams []string, req *types.CheckRequest, folder string) string {
+	return fmt.Sprintf("check-%s-%s-%s-%s-%s-%s-%s-%s-%s-%s", req.Namespace, subj, teamsCacheKey(teams), req.Group, req.Resource, req.Verb, req.Name, req.Subresource, req.Path, folder)
 }
 
 type checkCacheEntry struct {
@@ -486,8 +495,26 @@ func (c *ClientImpl) getCachedCheck(ctx context.Context, key string) (bool, int6
 	return entry.Allowed, entry.Timestamp, nil
 }
 
-func itemCheckerCacheKey(subj string, req *types.ListRequest) string {
-	return fmt.Sprintf("list-%s-%s-%s-%s-%s-%s", req.Namespace, subj, req.Group, req.Resource, req.Verb, req.Subresource)
+func itemCheckerCacheKey(subj string, teams []string, req *types.ListRequest) string {
+	return fmt.Sprintf("list-%s-%s-%s-%s-%s-%s-%s", req.Namespace, subj, teamsCacheKey(teams), req.Group, req.Resource, req.Verb, req.Subresource)
+}
+
+func teamsCacheKey(teams []string) string {
+	if len(teams) == 0 {
+		return ""
+	}
+
+	sorted := slices.Clone(teams)
+	slices.Sort(sorted)
+
+	hash := sha256.New()
+	var length [8]byte
+	for _, team := range sorted {
+		binary.BigEndian.PutUint64(length[:], uint64(len(team)))
+		_, _ = hash.Write(length[:])
+		_, _ = hash.Write([]byte(team))
+	}
+	return hex.EncodeToString(hash.Sum(nil))
 }
 
 func (c *ClientImpl) cacheItemChecker(ctx context.Context, key string, checker *itemChecker) error {
