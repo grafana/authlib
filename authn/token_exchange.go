@@ -119,6 +119,10 @@ type TokenExchangeRequest struct {
 	SubjectToken string `json:"subjectToken,omitempty"`
 	// [Optional] ExpiresIn is the duration, in seconds, before the token expires.
 	ExpiresIn *int `json:"expiresIn,omitempty"`
+	// [Optional] RestrictedDelegatedPermissions narrows the token's delegated permissions
+	// to the intersection of this list and the CAP's delegated permissions. If omitted,
+	// the full set of CAP delegated permissions is used.
+	RestrictedDelegatedPermissions []string `json:"restrictedDelegatedPermissions,omitempty"`
 }
 
 type TokenExchangeResponse struct {
@@ -132,6 +136,13 @@ func (r TokenExchangeRequest) hash() string {
 	sort.Strings(r.Audiences)
 	br.WriteString(strings.Join(r.Audiences, "-"))
 	br.WriteString(subjectCacheKey(r.SubjectToken))
+	if len(r.RestrictedDelegatedPermissions) > 0 {
+		br.WriteByte('-')
+		sorted := make([]string, len(r.RestrictedDelegatedPermissions))
+		copy(sorted, r.RestrictedDelegatedPermissions)
+		sort.Strings(sorted)
+		br.WriteString(strings.Join(sorted, "-"))
+	}
 
 	return br.String()
 }
