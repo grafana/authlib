@@ -119,10 +119,39 @@ type TokenExchangeRequest struct {
 	SubjectToken string `json:"subjectToken,omitempty"`
 	// [Optional] ExpiresIn is the duration, in seconds, before the token expires.
 	ExpiresIn *int `json:"expiresIn,omitempty"`
-	// [Optional] RestrictedDelegatedPermissions narrows the token's delegated permissions
-	// to the intersection of this list and the CAP's delegated permissions. If omitted,
-	// the full set of CAP delegated permissions is used.
-	RestrictedDelegatedPermissions []string `json:"restrictedDelegatedPermissions,omitempty"`
+	// [Optional] RestrictedDelegatedPermissions narrows the token's delegated permissions.
+	// Each entry specifies an action that should be allowed, optionally scoped to specific
+	// resources. When omitted, the full set of CAP delegated permissions is used.
+	//
+	// Action-only entries restrict at the action level (equivalent to the previous []string behavior):
+	//   {Action: "datasources:read"}
+	//
+	// Scoped entries further restrict to specific resources:
+	//   {Action: "datasources:query", Scope: "datasources:uid:prometheus"}
+	//
+	// The same action may appear multiple times with different scopes to allow access
+	// to multiple specific resources.
+	RestrictedDelegatedPermissions []RestrictedPermission `json:"restrictedDelegatedPermissions,omitempty"`
+}
+
+// RestrictedPermission represents a delegated permission restriction with optional scope.
+// When Scope is empty, the restriction applies to the entire action (all scopes).
+// When Scope is set, only the specified resource scope is allowed for that action.
+type RestrictedPermission struct {
+	// Action is the permission action to restrict (e.g., "datasources:read").
+	Action string `json:"action"`
+	// Scope optionally narrows the restriction to a specific resource scope
+	// (e.g., "datasources:uid:prometheus"). When empty, all scopes are allowed
+	// for this action.
+	Scope string `json:"scope,omitempty"`
+}
+
+// String returns a canonical string representation for hashing and logging.
+func (p RestrictedPermission) String() string {
+	if p.Scope != "" {
+		return p.Action + "|" + p.Scope
+	}
+	return p.Action
 }
 
 type TokenExchangeResponse struct {
@@ -138,10 +167,12 @@ func (r TokenExchangeRequest) hash() string {
 	br.WriteString(subjectCacheKey(r.SubjectToken))
 	if len(r.RestrictedDelegatedPermissions) > 0 {
 		br.WriteByte('-')
-		sorted := make([]string, len(r.RestrictedDelegatedPermissions))
-		copy(sorted, r.RestrictedDelegatedPermissions)
-		sort.Strings(sorted)
-		br.WriteString(strings.Join(sorted, "-"))
+		strs := make([]string, len(r.RestrictedDelegatedPermissions))
+		for i, p := range r.RestrictedDelegatedPermissions {
+			strs[i] = p.String()
+		}
+		sort.Strings(strs)
+		br.WriteString(strings.Join(strs, "-"))
 	}
 
 	return br.String()

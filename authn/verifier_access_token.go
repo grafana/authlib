@@ -25,6 +25,10 @@ type AccessTokenClaims struct {
 	Permissions []string `json:"permissions"`
 	// On-behalf-of user
 	DelegatedPermissions []string `json:"delegatedPermissions"`
+	// RestrictedDelegatedPermissionScopes further restricts delegated permissions
+	// to specific resource scopes. Map of action -> allowed scope patterns.
+	// Populated by the auth API when the caller provides scoped restrictions.
+	RestrictedDelegatedPermissionScopes map[string][]string `json:"restrictedDelegatedPermissionScopes,omitempty"`
 	// Actor is the user/service that is acting on behalf of the subject.
 	Actor *ActorClaims `json:"act,omitempty"`
 	// ServiceIdentity is the name/identity of the service that has been created/signed the access token.
