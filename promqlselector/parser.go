@@ -85,8 +85,6 @@ func (p *parser) parseSelector() ([]Matcher, error) {
 		if err != nil {
 			return nil, err
 		}
-	} else if metricName == "" {
-		return nil, p.errorAt(p.peek(), fmt.Sprintf("expected '{', got %s", p.peek().typ))
 	}
 
 	if metricName != "" {
