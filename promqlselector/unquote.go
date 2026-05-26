@@ -11,9 +11,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// This file was ported verbatim from
+// This file was ported from
 // github.com/prometheus/prometheus/util/strutil/quote.go (pinned version
-// v1.8.2-0.20220315145411-881111fec433). See LICENSE-PROMETHEUS in this
+// v1.8.2-0.20220315145411-881111fec433), with one deviation: unquoteChar
+// rejects surrogate code points (0xD800-0xDFFF) in \u and \U escapes, to
+// match upstream's PromQL lexer (promql/parser/lex.go:lexEscape) which
+// performs that check before strutil.Unquote ever sees the input. The
+// deviation is marked inline at its site. See LICENSE-PROMETHEUS in this
 // directory for the upstream license. The functions here (Unquote,
 // unquoteChar, contains, unhex) were themselves adapted by Prometheus from
 // Go's strconv package; Go's BSD 3-clause notice is preserved below.
