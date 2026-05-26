@@ -11,16 +11,38 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// This file contains regression test cases ported from
+// This file contains regression test cases derived from
 // github.com/prometheus/prometheus/promql/parser/parse_test.go (pinned
-// version v1.8.2-0.20220315145411-881111fec433 at commit 881111fec433), from
-// the testExpr table (selector-shaped inputs) and TestExtractSelectors. See
-// LICENSE-PROMETHEUS in this directory.
+// version v1.8.2-0.20220315145411-881111fec433 at commit 881111fec433). See
+// LICENSE-PROMETHEUS in this directory for the upstream license.
 //
-// Cases are adapted for ParseMetricSelector, which uses the same grammar as
-// upstream's vector_selector rule but skips checkAST — so selectors like
-// {} or foo{__name__="bar"} that upstream's ParseExpr rejects at the AST
-// check layer are accepted here, matching upstream's ParseMetricSelector.
+// Methodology (not a verbatim port):
+//
+//   - promAccept: selector-shaped inputs hand-picked from upstream's
+//     testExpr table — entries whose expected: field was a *VectorSelector
+//     — plus the two ParseMetricSelector inputs from TestExtractSelectors.
+//     PosRange was stripped (we don't track positions), *labels.Matcher
+//     was converted to our value-type Matcher, and the matcher slice was
+//     used directly.
+//
+//   - promReject: selector-shaped fail entries from upstream's testExpr
+//     table — fail-true cases that exercise the selector grammar itself,
+//     not things outside ParseMetricSelector's scope. Error messages are
+//     not asserted; only accept/reject is. Cases that fail upstream solely
+//     because of checkAST (which ParseMetricSelector skips) were moved to
+//     promAccept and labeled (checkAST-skip): {}, {x=""}, {x=~".*"},
+//     {x!~".+"}, {x!="a"}, foo{__name__="bar"}. The parity harness on a
+//     ~13k corpus confirmed those are accepted by upstream's
+//     ParseMetricSelector.
+//
+//   - promParityGaps: divergences this package's parity harness surfaced
+//     when comparing implementations side-by-side — behaviors upstream's
+//     own test suite does not exercise. Source of truth for each set is
+//     noted in-line (grammar rule or lex.go function).
+//
+// The selection is hand-curated rather than mechanically extracted; if
+// upstream adds new selector-shaped test entries, they should be brought
+// over here manually (or via a one-shot extraction script).
 
 package promqlselector
 
