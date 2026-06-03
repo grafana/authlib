@@ -204,3 +204,48 @@ func TestFilterAuthorized_NamespaceSwitch(t *testing.T) {
 	assert.Len(t, fakeClient.batchCheckReqs[2].Checks, 1)
 	assert.Equal(t, "ns3", fakeClient.batchCheckReqs[2].Namespace)
 }
+
+func TestFilterAuthorized_ForwardsSubresource(t *testing.T) {
+	items := []testItem{{name: "item-0", folder: "folder1", namespace: "ns1"}}
+
+	client, fakeClient := setupAccessClient()
+	fakeClient.checkRes = &authzv1.CheckResponse{Allowed: true}
+
+	// IDTokenAuthInfo routes the check through authz (rather than the service path),
+	// so it reaches the proto request we record.
+	authInfo := authn.NewIDTokenAuthInfo(
+		authn.Claims[authn.AccessTokenClaims]{
+			Claims: jwt.Claims{Subject: "access-policy"},
+			Rest: authn.AccessTokenClaims{
+				Namespace:            "*",
+				DelegatedPermissions: []string{"test.grafana.app/items:get"},
+			},
+		},
+		&authn.Claims[authn.IDTokenClaims]{
+			Claims: jwt.Claims{Subject: "user:1"},
+			Rest:   authn.IDTokenClaims{Namespace: "*"},
+		},
+	)
+	ctx := types.WithAuthInfo(context.Background(), authInfo)
+
+	extract := func(item testItem) BatchCheckItem {
+		return BatchCheckItem{
+			Name:        item.name,
+			Folder:      item.folder,
+			Verb:        "get",
+			Group:       "test.grafana.app",
+			Resource:    "items",
+			Subresource: "status",
+			Namespace:   item.namespace,
+		}
+	}
+
+	for _, err := range FilterAuthorized(ctx, client, toSeq(items), extract) {
+		require.NoError(t, err)
+	}
+
+	// The subresource set on the convenience item must reach the underlying check.
+	require.Len(t, fakeClient.batchCheckReqs, 1)
+	require.Len(t, fakeClient.batchCheckReqs[0].Checks, 1)
+	assert.Equal(t, "status", fakeClient.batchCheckReqs[0].Checks[0].Subresource)
+}

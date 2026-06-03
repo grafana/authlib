@@ -16,12 +16,13 @@ import (
 
 // BatchCheckItem represents an item that needs batch authorization.
 type BatchCheckItem struct {
-	Name      string
-	Folder    string
-	Group     string
-	Resource  string
-	Verb      string
-	Namespace string
+	Name        string
+	Folder      string
+	Group       string
+	Resource    string
+	Subresource string
+	Verb        string
+	Namespace   string
 	// FreshnessTimestamp is when the resource was last modified.
 	// If provided, the server will skip cache for this item if the cached result
 	// is older than this timestamp.
@@ -122,6 +123,7 @@ func FilterAuthorized[T any](
 				Verb:               info.Verb,
 				Group:              info.Group,
 				Resource:           info.Resource,
+				Subresource:        info.Subresource,
 				Name:               info.Name,
 				Folder:             info.Folder,
 				FreshnessTimestamp: info.FreshnessTimestamp,
