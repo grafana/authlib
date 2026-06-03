@@ -1,6 +1,6 @@
 module github.com/grafana/authlib
 
-go 1.24.0
+go 1.25.6
 
 require (
 	github.com/go-jose/go-jose/v4 v4.1.4
