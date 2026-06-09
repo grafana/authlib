@@ -28,7 +28,7 @@ enum AuthenticateCode {
 message AuthenticateResponse {
   AuthenticateCode code = 1;
   // token is deprecated and will be put into the appropriate request_headers.
-  string token = 2 [ deprecated = true ];
+  string token = 2 [deprecated = true];
   // request_headers are additional or replacement headers which the caller
   // should put into the client's request before it's sent downstream.
   map<string, string> request_headers = 3;
