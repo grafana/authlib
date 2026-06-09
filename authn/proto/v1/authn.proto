@@ -20,8 +20,6 @@ enum AuthenticateCode {
   // The service does not handle the supplied credentials.
   // The gateway should fall through to its default routing path.
   AUTHENTICATE_CODE_NOT_HANDLED = 3;
-  AUTHENTICATE_CODE_REVOKED = 4;
-  AUTHENTICATE_CODE_NEEDS_ROTATION = 5;
 }
 
 message AuthenticateResponse {
