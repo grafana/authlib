@@ -16,6 +16,9 @@ message AuthenticateRequest {
 enum AuthenticateCode {
   AUTHENTICATE_CODE_UNSPECIFIED = 0;
   AUTHENTICATE_CODE_OK = 1;
+  // The service handles the supplied credentials, but could not authenticate
+  // them for some expected reason. Unexpected failures are returned through
+  // the typical gRPC error mechanism.
   AUTHENTICATE_CODE_FAILED = 2;
   // The service does not handle the supplied credentials.
   // The gateway should fall through to its default routing path.
@@ -24,5 +27,12 @@ enum AuthenticateCode {
 
 message AuthenticateResponse {
   AuthenticateCode code = 1;
-  string token = 2;
+  // token is deprecated and will be put into the appropriate request_headers.
+  string token = 2 [deprecated = true];
+  // request_headers are additional or replacement headers which the caller
+  // should put into the client's request before it's sent downstream.
+  map<string, string> request_headers = 3;
+  // response_body should be returned to the client when
+  // code == AUTHENTICATE_CODE_FAILED.
+  bytes response_body = 4;
 }
