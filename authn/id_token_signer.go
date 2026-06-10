@@ -3,6 +3,8 @@ package authn
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,7 +27,24 @@ import (
 
 // IDTokenSigner signs ID tokens via the auth API.
 type IDTokenSigner interface {
-	SignIDToken(ctx context.Context, r SignIDTokenRequest) (*SignIDTokenResponse, error)
+	SignIDToken(ctx context.Context, r SignIDTokenRequest, opts ...SignIDTokenOption) (*SignIDTokenResponse, error)
+}
+
+// SignIDTokenOption is a function that modifies the outgoing HTTP request for
+// a single SignIDToken call. It is applied after default and client-level
+// headers, so it can override anything. Use this for per-request concerns
+// like setting tenant-scoped X-Org-ID / X-Realms headers.
+type SignIDTokenOption func(*http.Request)
+
+// WithSignerHeaders returns a SignIDTokenOption that sets the given HTTP
+// headers on the request. This is a convenience helper for the common case
+// of overriding headers per-request (e.g. X-Org-ID, X-Realms).
+func WithSignerHeaders(headers map[string]string) SignIDTokenOption {
+	return func(r *http.Request) {
+		for k, v := range headers {
+			r.Header.Set(k, v)
+		}
+	}
 }
 
 var _ IDTokenSigner = &IDTokenSignerClient{}
@@ -53,6 +72,7 @@ func WithIDTokenSignerTracer(tracer trace.Tracer) IDTokenSignerClientOpts {
 		c.tracer = tracer
 	}
 }
+
 
 func NewIDTokenSignerClient(cfg IDTokenSignerConfig, opts ...IDTokenSignerClientOpts) (*IDTokenSignerClient, error) {
 	if cfg.Token == "" {
@@ -92,12 +112,12 @@ func NewIDTokenSignerClient(cfg IDTokenSignerConfig, opts ...IDTokenSignerClient
 }
 
 type IDTokenSignerClient struct {
-	cache      cache.Cache
-	cfg        IDTokenSignerConfig
-	client     *http.Client
-	singlef    singleflight.Group
-	tracer     trace.Tracer
-	backoffCfg backoff.Config
+	cache        cache.Cache
+	cfg          IDTokenSignerConfig
+	client       *http.Client
+	singlef      singleflight.Group
+	tracer       trace.Tracer
+	backoffCfg   backoff.Config
 }
 
 type SignIDTokenRequest struct {
@@ -105,6 +125,10 @@ type SignIDTokenRequest struct {
 	Subject string
 	// Namespace is the namespace to scope the token to (e.g. "stacks-12345").
 	Namespace string
+	// Extra contains additional claims to include in the signed token
+	// (e.g. email, username, type, role). Keys that conflict with
+	// registered JWT claims are stripped server-side.
+	Extra map[string]any
 }
 
 type SignIDTokenResponse struct {
@@ -115,6 +139,7 @@ type SignIDTokenResponse struct {
 type signIDTokenRequestBody struct {
 	Claims    signIDTokenClaims `json:"claims"`
 	Namespace string            `json:"namespace"`
+	Extra     map[string]any    `json:"extra,omitempty"`
 }
 
 type signIDTokenClaims struct {
@@ -122,7 +147,17 @@ type signIDTokenClaims struct {
 }
 
 func (r SignIDTokenRequest) hash() string {
-	return r.Subject + "-" + r.Namespace
+	if len(r.Extra) == 0 {
+		return r.Subject + "-" + r.Namespace
+	}
+	h := sha256.New()
+	h.Write([]byte(r.Subject))
+	h.Write([]byte{0})
+	h.Write([]byte(r.Namespace))
+	h.Write([]byte{0})
+	data, _ := json.Marshal(r.Extra)
+	h.Write(data)
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 type signIDTokenResponseBody struct {
@@ -135,7 +170,7 @@ type signIDTokenData struct {
 	Token string `json:"token"`
 }
 
-func (c *IDTokenSignerClient) SignIDToken(ctx context.Context, r SignIDTokenRequest) (*SignIDTokenResponse, error) {
+func (c *IDTokenSignerClient) SignIDToken(ctx context.Context, r SignIDTokenRequest, opts ...SignIDTokenOption) (*SignIDTokenResponse, error) {
 	ctx, span := c.tracer.Start(ctx, "authn.IDTokenSignerClient.SignIDToken")
 	defer span.End()
 	span.SetAttributes(attribute.Bool("cache_hit", false))
@@ -159,6 +194,7 @@ func (c *IDTokenSignerClient) SignIDToken(ctx context.Context, r SignIDTokenRequ
 		body := signIDTokenRequestBody{
 			Claims:    signIDTokenClaims{Subject: r.Subject},
 			Namespace: r.Namespace,
+			Extra:     r.Extra,
 		}
 
 		data, err := json.Marshal(&body)
@@ -176,7 +212,12 @@ func (c *IDTokenSignerClient) SignIDToken(ctx context.Context, r SignIDTokenRequ
 				return nil, fmt.Errorf("failed to build http request: %w", err)
 			}
 
-			res, err = c.client.Do(c.withHeaders(req))
+			req = c.withHeaders(req)
+			for _, opt := range opts {
+				opt(req)
+			}
+
+			res, err = c.client.Do(req)
 			addResponseInformationToSpan(span, res, err)
 			if shouldRetry(res, err) {
 				if res != nil {
@@ -213,15 +254,14 @@ func (c *IDTokenSignerClient) SignIDToken(ctx context.Context, r SignIDTokenRequ
 		}
 
 		_ = c.setCache(ctx, response.Data.Token, key)
-		return response, nil
+		return &SignIDTokenResponse{Token: response.Data.Token}, nil
 	})
 
 	if err != nil {
 		return nil, err
 	}
 
-	response := resp.(signIDTokenResponseBody)
-	return &SignIDTokenResponse{Token: response.Data.Token}, nil
+	return resp.(*SignIDTokenResponse), nil
 }
 
 func (c *IDTokenSignerClient) withHeaders(r *http.Request) *http.Request {
@@ -230,8 +270,7 @@ func (c *IDTokenSignerClient) withHeaders(r *http.Request) *http.Request {
 	r.Header.Set("Accept", "application/json")
 	r.Header.Set("User-Agent", "authlib-client")
 
-	// Always propagate system token headers.
-	// These will be ignored for non system tokens.
+	// Default system-scoped headers.
 	r.Header.Set("X-Org-ID", "0")
 	r.Header.Set("X-Realms", `[{"type": "system", "identifier": "system"}]`)
 
