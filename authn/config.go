@@ -37,3 +37,15 @@ func (c *TokenExchangeConfig) RegisterFlags(prefix string, fs *flag.FlagSet) {
 	fs.StringVar(&c.Token, prefix+".token", "", "Token used to perform the exchange request.")
 	fs.StringVar(&c.TokenExchangeURL, prefix+".token-exchange-url", "", "Url called to perform exchange request.")
 }
+
+type IDTokenSignerConfig struct {
+	// Token used to authenticate the sign request.
+	Token string `yaml:"token"`
+	// URL called to sign ID tokens.
+	SignIDTokenURL string `yaml:"signIdTokenUrl"`
+}
+
+func (c *IDTokenSignerConfig) RegisterFlags(prefix string, fs *flag.FlagSet) {
+	fs.StringVar(&c.Token, prefix+".token", "", "Token used to authenticate the sign request.")
+	fs.StringVar(&c.SignIDTokenURL, prefix+".sign-id-token-url", "", "URL called to sign ID tokens.")
+}
