@@ -117,12 +117,34 @@ type TokenExchangeRequest struct {
 	Audiences []string `json:"audiences"`
 	// [Optional] SubjectToken is the token to exchange in case of a token exchange request.
 	SubjectToken string `json:"subjectToken,omitempty"`
+	// [Optional] Subject is a user identity to sign an on-behalf-of token for,
+	// without first obtaining a signed subjectToken. It is mutually exclusive
+	// with SubjectToken. The auth API requires the caller to hold the
+	// grafana-id-token:sign scope (in addition to access-token:sign) to use it.
+	Subject *TokenExchangeSubject `json:"subject,omitempty"`
 	// [Optional] ExpiresIn is the duration, in seconds, before the token expires.
 	ExpiresIn *int `json:"expiresIn,omitempty"`
 	// [Optional] RestrictedDelegatedPermissions narrows the token's delegated permissions
 	// to the intersection of this list and the CAP's delegated permissions. If omitted,
 	// the full set of CAP delegated permissions is used.
 	RestrictedDelegatedPermissions []string `json:"restrictedDelegatedPermissions,omitempty"`
+}
+
+// TokenExchangeSubject carries a user identity that the caller asserts when
+// exchanging for an on-behalf-of access token. Its JSON shape matches the
+// auth API's sign-access-token "subject" object and mirrors the claim set of
+// an ID token.
+type TokenExchangeSubject struct {
+	Identifier      string   `json:"identifier"`
+	Type            string   `json:"type"`
+	Namespace       string   `json:"namespace"`
+	AuthenticatedBy string   `json:"authenticatedBy,omitempty"`
+	Email           string   `json:"email,omitempty"`
+	EmailVerified   bool     `json:"email_verified,omitempty"`
+	Username        string   `json:"username,omitempty"`
+	DisplayName     string   `json:"name,omitempty"`
+	Role            string   `json:"role,omitempty"`
+	Groups          []string `json:"groups,omitempty"`
 }
 
 type TokenExchangeResponse struct {
@@ -136,6 +158,14 @@ func (r TokenExchangeRequest) hash() string {
 	sort.Strings(r.Audiences)
 	br.WriteString(strings.Join(r.Audiences, "-"))
 	br.WriteString(subjectCacheKey(r.SubjectToken))
+	if r.Subject != nil {
+		// json.Marshal of a struct is deterministic (field order is stable), so
+		// this yields a stable cache key that differs per subject identity.
+		if data, err := json.Marshal(r.Subject); err == nil {
+			br.WriteByte('-')
+			br.Write(data)
+		}
+	}
 	if len(r.RestrictedDelegatedPermissions) > 0 {
 		br.WriteByte('-')
 		sorted := make([]string, len(r.RestrictedDelegatedPermissions))
@@ -218,6 +248,10 @@ func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeReque
 
 	if len(r.Audiences) == 0 {
 		return nil, ErrMissingAudiences
+	}
+
+	if r.Subject != nil && r.SubjectToken != "" {
+		return nil, ErrMutuallyExclusiveSubject
 	}
 
 	key := r.hash()

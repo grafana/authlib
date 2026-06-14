@@ -17,10 +17,11 @@ var (
 	ErrInvalidAudience      = fmt.Errorf("%w: invalid audience", errInvalidToken)
 	ErrMissingRequiredToken = fmt.Errorf("%w: missing required token", errInvalidToken)
 
-	ErrMissingConfig           = errors.New("missing config")
-	ErrMissingNamespace        = errors.New("missing required namespace")
-	ErrMissingAudiences        = errors.New("missing required audiences")
-	ErrInvalidExchangeResponse = errors.New("invalid exchange response")
+	ErrMissingConfig            = errors.New("missing config")
+	ErrMissingNamespace         = errors.New("missing required namespace")
+	ErrMissingAudiences         = errors.New("missing required audiences")
+	ErrInvalidExchangeResponse  = errors.New("invalid exchange response")
+	ErrMutuallyExclusiveSubject = errors.New("subject and subjectToken are mutually exclusive")
 )
 
 func IsUnauthenticatedErr(err error) bool {

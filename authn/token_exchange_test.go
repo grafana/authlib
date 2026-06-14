@@ -186,6 +186,85 @@ func Test_TokenExchangeClient_Exchange(t *testing.T) {
 		require.InDelta(t, expectedExpiry.Unix(), claims.Expiry.Time().Unix(), 1)
 	})
 
+	t.Run("should include subject in request when provided", func(t *testing.T) {
+		var got TokenExchangeRequest
+		c := setup(httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			requestBody, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+			require.NoError(t, json.Unmarshal(requestBody, &got))
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data": {"token": "` + signAccessToken(t, expiresIn) + `"}}`))
+		})))
+
+		res, err := c.Exchange(context.Background(), TokenExchangeRequest{
+			Namespace: "stacks-1",
+			Audiences: []string{"some-service"},
+			Subject: &TokenExchangeSubject{
+				Identifier: "1",
+				Type:       "user",
+				Namespace:  "stacks-1",
+				Email:      "user@example.com",
+				Username:   "user",
+			},
+		})
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+
+		require.Empty(t, got.SubjectToken)
+		require.NotNil(t, got.Subject)
+		require.Equal(t, "1", got.Subject.Identifier)
+		require.Equal(t, "user", got.Subject.Type)
+		require.Equal(t, "stacks-1", got.Subject.Namespace)
+		require.Equal(t, "user@example.com", got.Subject.Email)
+		require.Equal(t, "user", got.Subject.Username)
+	})
+
+	t.Run("should return error when subject and subjectToken are both set", func(t *testing.T) {
+		c := setup(httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data": {"token": "` + signAccessToken(t, expiresIn) + `"}}`))
+		})))
+
+		res, err := c.Exchange(context.Background(), TokenExchangeRequest{
+			Namespace:    "stacks-1",
+			Audiences:    []string{"some-service"},
+			SubjectToken: signAccessToken(t, expiresIn),
+			Subject: &TokenExchangeSubject{
+				Identifier: "1",
+				Type:       "user",
+				Namespace:  "stacks-1",
+			},
+		})
+		require.ErrorIs(t, err, ErrMutuallyExclusiveSubject)
+		require.Nil(t, res)
+	})
+
+	t.Run("should not reuse cache for different subjects", func(t *testing.T) {
+		var calls int
+		c := setup(httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			calls++
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"data": {"token": "` + signAccessToken(t, expiresIn) + `"}}`))
+		})))
+
+		subject1 := &TokenExchangeSubject{Identifier: "1", Type: "user", Namespace: "stacks-1"}
+		subject2 := &TokenExchangeSubject{Identifier: "2", Type: "user", Namespace: "stacks-1"}
+
+		_, err := c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "stacks-1", Audiences: []string{"some-service"}, Subject: subject1})
+		assert.NoError(t, err)
+		require.Equal(t, 1, calls)
+
+		// Same subject should reuse the cache.
+		_, err = c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "stacks-1", Audiences: []string{"some-service"}, Subject: subject1})
+		assert.NoError(t, err)
+		require.Equal(t, 1, calls)
+
+		// Different subject should miss the cache.
+		_, err = c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "stacks-1", Audiences: []string{"some-service"}, Subject: subject2})
+		assert.NoError(t, err)
+		require.Equal(t, 2, calls)
+	})
+
 	t.Run("should use an alternate cache if provided", func(t *testing.T) {
 		testcache := &testCache{data: make(map[string][]byte)}
 
