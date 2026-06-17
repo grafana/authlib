@@ -160,8 +160,10 @@ func (r TokenExchangeRequest) hash() (string, error) {
 	br := strings.Builder{}
 	br.WriteString(r.Namespace)
 	br.WriteByte('-')
-	sort.Strings(r.Audiences)
-	br.WriteString(strings.Join(r.Audiences, "-"))
+	audiences := make([]string, len(r.Audiences))
+	copy(audiences, r.Audiences)
+	sort.Strings(audiences)
+	br.WriteString(strings.Join(audiences, "-"))
 	br.WriteString(subjectTokenCacheKey(r.SubjectToken))
 	br.WriteString(subjectKey)
 	br.WriteString(restrictedPermissionsCacheKey(r.RestrictedDelegatedPermissions))
