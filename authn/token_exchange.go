@@ -157,15 +157,8 @@ func (r TokenExchangeRequest) hash() string {
 	br.WriteByte('-')
 	sort.Strings(r.Audiences)
 	br.WriteString(strings.Join(r.Audiences, "-"))
-	br.WriteString(subjectCacheKey(r.SubjectToken))
-	if r.Subject != nil {
-		// json.Marshal of a struct is deterministic (field order is stable), so
-		// this yields a stable cache key that differs per subject identity.
-		if data, err := json.Marshal(r.Subject); err == nil {
-			br.WriteByte('-')
-			br.Write(data)
-		}
-	}
+	br.WriteString(subjectTokenCacheKey(r.SubjectToken))
+	br.WriteString(subjectCacheKey(r.Subject))
 	if len(r.RestrictedDelegatedPermissions) > 0 {
 		br.WriteByte('-')
 		sorted := make([]string, len(r.RestrictedDelegatedPermissions))
@@ -182,7 +175,7 @@ type subjectTokenCacheClaims struct {
 	Actor *ActorClaims `json:"act,omitempty"`
 }
 
-func subjectCacheKey(subjectToken string) string {
+func subjectTokenCacheKey(subjectToken string) string {
 	if subjectToken == "" {
 		return ""
 	}
@@ -225,6 +218,26 @@ func flattenedActorSubjects(actor *ActorClaims) []string {
 		parts[i], parts[j] = parts[j], parts[i]
 	}
 	return parts
+}
+
+func subjectCacheKey(subject *TokenExchangeSubject) string {
+	if subject == nil {
+		return ""
+	}
+
+	s := *subject
+	if len(s.Groups) > 0 {
+		groups := make([]string, len(s.Groups))
+		copy(groups, s.Groups)
+		sort.Strings(groups)
+		s.Groups = groups
+	}
+
+	data, err := json.Marshal(s)
+	if err != nil {
+		return ""
+	}
+	return "-" + string(data)
 }
 
 type tokenExchangeResponse struct {
