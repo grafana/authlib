@@ -151,14 +151,19 @@ type TokenExchangeResponse struct {
 	Token string
 }
 
-func (r TokenExchangeRequest) hash() string {
+func (r TokenExchangeRequest) hash() (string, error) {
+	subjectKey, err := subjectCacheKey(r.Subject)
+	if err != nil {
+		return "", err
+	}
+
 	br := strings.Builder{}
 	br.WriteString(r.Namespace)
 	br.WriteByte('-')
 	sort.Strings(r.Audiences)
 	br.WriteString(strings.Join(r.Audiences, "-"))
 	br.WriteString(subjectTokenCacheKey(r.SubjectToken))
-	br.WriteString(subjectCacheKey(r.Subject))
+	br.WriteString(subjectKey)
 	if len(r.RestrictedDelegatedPermissions) > 0 {
 		br.WriteByte('-')
 		sorted := make([]string, len(r.RestrictedDelegatedPermissions))
@@ -167,7 +172,7 @@ func (r TokenExchangeRequest) hash() string {
 		br.WriteString(strings.Join(sorted, "-"))
 	}
 
-	return br.String()
+	return br.String(), nil
 }
 
 type subjectTokenCacheClaims struct {
@@ -220,9 +225,9 @@ func flattenedActorSubjects(actor *ActorClaims) []string {
 	return parts
 }
 
-func subjectCacheKey(subject *TokenExchangeSubject) string {
+func subjectCacheKey(subject *TokenExchangeSubject) (string, error) {
 	if subject == nil {
-		return ""
+		return "", nil
 	}
 
 	s := *subject
@@ -235,9 +240,9 @@ func subjectCacheKey(subject *TokenExchangeSubject) string {
 
 	data, err := json.Marshal(s)
 	if err != nil {
-		return ""
+		return "", err
 	}
-	return "-" + string(data)
+	return "-" + string(data), nil
 }
 
 type tokenExchangeResponse struct {
@@ -267,7 +272,11 @@ func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeReque
 		return nil, ErrMutuallyExclusiveSubject
 	}
 
-	key := r.hash()
+	key, err := r.hash()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build token exchange cache key: %w", err)
+	}
+
 	token, ok := c.getCache(ctx, key)
 	if ok {
 		span.SetAttributes(attribute.Bool("cache_hit", true))
