@@ -164,15 +164,20 @@ func (r TokenExchangeRequest) hash() (string, error) {
 	br.WriteString(strings.Join(r.Audiences, "-"))
 	br.WriteString(subjectTokenCacheKey(r.SubjectToken))
 	br.WriteString(subjectKey)
-	if len(r.RestrictedDelegatedPermissions) > 0 {
-		br.WriteByte('-')
-		sorted := make([]string, len(r.RestrictedDelegatedPermissions))
-		copy(sorted, r.RestrictedDelegatedPermissions)
-		sort.Strings(sorted)
-		br.WriteString(strings.Join(sorted, "-"))
-	}
+	br.WriteString(restrictedPermissionsCacheKey(r.RestrictedDelegatedPermissions))
 
 	return br.String(), nil
+}
+
+func restrictedPermissionsCacheKey(permissions []string) string {
+	if len(permissions) == 0 {
+		return ""
+	}
+
+	sorted := make([]string, len(permissions))
+	copy(sorted, permissions)
+	sort.Strings(sorted)
+	return "-" + strings.Join(sorted, "-")
 }
 
 type subjectTokenCacheClaims struct {
