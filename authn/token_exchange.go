@@ -117,6 +117,11 @@ type TokenExchangeRequest struct {
 	Audiences []string `json:"audiences"`
 	// [Optional] SubjectToken is the token to exchange in case of a token exchange request.
 	SubjectToken string `json:"subjectToken,omitempty"`
+	// [Optional] Subject is a user identity to sign an on-behalf-of token for,
+	// without first obtaining a signed subjectToken. It is mutually exclusive
+	// with SubjectToken. The auth API requires the caller to hold the
+	// grafana-id-token:sign scope (in addition to access-token:sign) to use it.
+	Subject *TokenExchangeSubject `json:"subject,omitempty"`
 	// [Optional] ExpiresIn is the duration, in seconds, before the token expires.
 	ExpiresIn *int `json:"expiresIn,omitempty"`
 	// [Optional] RestrictedDelegatedPermissions narrows the token's delegated permissions
@@ -125,26 +130,56 @@ type TokenExchangeRequest struct {
 	RestrictedDelegatedPermissions []string `json:"restrictedDelegatedPermissions,omitempty"`
 }
 
+// TokenExchangeSubject carries a user identity that the caller asserts when
+// exchanging for an on-behalf-of access token. Its JSON shape matches the
+// auth API's sign-access-token "subject" object and mirrors the claim set of
+// an ID token.
+type TokenExchangeSubject struct {
+	Identifier      string   `json:"identifier"`
+	Type            string   `json:"type"`
+	Namespace       string   `json:"namespace"`
+	AuthenticatedBy string   `json:"authenticatedBy,omitempty"`
+	Email           string   `json:"email,omitempty"`
+	EmailVerified   bool     `json:"email_verified,omitempty"`
+	Username        string   `json:"username,omitempty"`
+	DisplayName     string   `json:"name,omitempty"`
+	Role            string   `json:"role,omitempty"`
+	Groups          []string `json:"groups,omitempty"`
+}
+
 type TokenExchangeResponse struct {
 	Token string
 }
 
-func (r TokenExchangeRequest) hash() string {
+func (r TokenExchangeRequest) hash() (string, error) {
+	subjectKey, err := subjectCacheKey(r.Subject)
+	if err != nil {
+		return "", err
+	}
+
 	br := strings.Builder{}
 	br.WriteString(r.Namespace)
 	br.WriteByte('-')
-	sort.Strings(r.Audiences)
-	br.WriteString(strings.Join(r.Audiences, "-"))
-	br.WriteString(subjectCacheKey(r.SubjectToken))
-	if len(r.RestrictedDelegatedPermissions) > 0 {
-		br.WriteByte('-')
-		sorted := make([]string, len(r.RestrictedDelegatedPermissions))
-		copy(sorted, r.RestrictedDelegatedPermissions)
-		sort.Strings(sorted)
-		br.WriteString(strings.Join(sorted, "-"))
+	audiences := make([]string, len(r.Audiences))
+	copy(audiences, r.Audiences)
+	sort.Strings(audiences)
+	br.WriteString(strings.Join(audiences, "-"))
+	br.WriteString(subjectTokenCacheKey(r.SubjectToken))
+	br.WriteString(subjectKey)
+	br.WriteString(restrictedPermissionsCacheKey(r.RestrictedDelegatedPermissions))
+
+	return br.String(), nil
+}
+
+func restrictedPermissionsCacheKey(permissions []string) string {
+	if len(permissions) == 0 {
+		return ""
 	}
 
-	return br.String()
+	sorted := make([]string, len(permissions))
+	copy(sorted, permissions)
+	sort.Strings(sorted)
+	return "-" + strings.Join(sorted, "-")
 }
 
 type subjectTokenCacheClaims struct {
@@ -152,7 +187,7 @@ type subjectTokenCacheClaims struct {
 	Actor *ActorClaims `json:"act,omitempty"`
 }
 
-func subjectCacheKey(subjectToken string) string {
+func subjectTokenCacheKey(subjectToken string) string {
 	if subjectToken == "" {
 		return ""
 	}
@@ -197,6 +232,26 @@ func flattenedActorSubjects(actor *ActorClaims) []string {
 	return parts
 }
 
+func subjectCacheKey(subject *TokenExchangeSubject) (string, error) {
+	if subject == nil {
+		return "", nil
+	}
+
+	s := *subject
+	if len(s.Groups) > 0 {
+		groups := make([]string, len(s.Groups))
+		copy(groups, s.Groups)
+		sort.Strings(groups)
+		s.Groups = groups
+	}
+
+	data, err := json.Marshal(s)
+	if err != nil {
+		return "", err
+	}
+	return "-" + string(data), nil
+}
+
 type tokenExchangeResponse struct {
 	Data   tokenExchangeData `json:"data"`
 	Status string            `json:"status"`
@@ -220,7 +275,15 @@ func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeReque
 		return nil, ErrMissingAudiences
 	}
 
-	key := r.hash()
+	if r.Subject != nil && r.SubjectToken != "" {
+		return nil, ErrMutuallyExclusiveSubject
+	}
+
+	key, err := r.hash()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build token exchange cache key: %w", err)
+	}
+
 	token, ok := c.getCache(ctx, key)
 	if ok {
 		span.SetAttributes(attribute.Bool("cache_hit", true))
