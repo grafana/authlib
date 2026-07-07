@@ -52,6 +52,14 @@ var allowedWildcardGroups = []string{
 	"*.ext.grafana.app",
 }
 
+// IsAllowedWildcardGroup checks if a group is allowed to use wildcard matching.
+// We don't export the allowlist to prevent callers from mutating it.
+// This is a helper function to be used from grafana/auth and auth-signer packages, instead
+// of having to maintain three copies of the allowlist.
+func IsAllowedWildcardGroup(group string) bool {
+	return slices.Contains(allowedWildcardGroups, group)
+}
+
 // check wildcard group matching as well as exact match
 func groupMatches(permissionGroup, requestGroup string) bool {
 	// if granted permission is a wildcard, it must be allowlisted and the request must match
