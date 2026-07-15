@@ -263,6 +263,18 @@ func Test_TokenExchangeClient_Exchange(t *testing.T) {
 		_, err = c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "stacks-1", Audiences: []string{"some-service"}, Subject: subject2})
 		assert.NoError(t, err)
 		require.Equal(t, 2, calls)
+
+		// Subjects differing only by Sub should miss the cache.
+		subject3 := &TokenExchangeSubject{Sub: "user:1", Identifier: "abc", Type: "user", Namespace: "stacks-1"}
+		subject4 := &TokenExchangeSubject{Sub: "user:2", Identifier: "abc", Type: "user", Namespace: "stacks-1"}
+
+		_, err = c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "stacks-1", Audiences: []string{"some-service"}, Subject: subject3})
+		assert.NoError(t, err)
+		require.Equal(t, 3, calls)
+
+		_, err = c.Exchange(context.Background(), TokenExchangeRequest{Namespace: "stacks-1", Audiences: []string{"some-service"}, Subject: subject4})
+		assert.NoError(t, err)
+		require.Equal(t, 4, calls)
 	})
 
 	t.Run("should use an alternate cache if provided", func(t *testing.T) {
