@@ -637,6 +637,87 @@ func TestClient_Check_Cache(t *testing.T) {
 	require.True(t, got.Allowed)
 }
 
+func TestClient_Check_CacheKeyCollision(t *testing.T) {
+	client, authz := setupAccessClient()
+	authz.checkRes = &authzv1.CheckResponse{Allowed: true}
+
+	caller := authn.NewIDTokenAuthInfo(
+		authn.Claims[authn.AccessTokenClaims]{
+			Claims: jwt.Claims{Subject: "service"},
+			Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get"}},
+		},
+		&authn.Claims[authn.IDTokenClaims]{
+			Claims: jwt.Claims{Subject: "user:1"},
+			Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+		},
+	)
+
+	first := types.CheckRequest{
+		Namespace:   "stacks-12",
+		Group:       "dashboards.grafana.app",
+		Resource:    "dashboards",
+		Verb:        "get",
+		Name:        "resource-name",
+		Subresource: "status",
+	}
+	second := first
+	second.Name = "resource"
+	second.Subresource = "name-status"
+
+	got, err := client.Check(context.Background(), caller, first, "")
+	require.NoError(t, err)
+	require.True(t, got.Allowed)
+
+	authz.checkRes = &authzv1.CheckResponse{Allowed: false}
+	got, err = client.Check(context.Background(), caller, second, "")
+	require.NoError(t, err)
+	require.False(t, got.Allowed)
+	require.Len(t, authz.checkReqs, 2)
+}
+
+func TestAuthorizationCacheKeys(t *testing.T) {
+	checkOne := &types.CheckRequest{
+		Namespace:   "stacks-12",
+		Group:       "dashboards.grafana.app",
+		Resource:    "dashboards",
+		Verb:        "get",
+		Name:        "resource-name",
+		Subresource: "status",
+	}
+	checkTwo := *checkOne
+	checkTwo.Name = "resource"
+	checkTwo.Subresource = "name-status"
+
+	require.NotEqual(t,
+		checkCacheKey("user:1", []string{"team-a"}, checkOne, ""),
+		checkCacheKey("user:1", []string{"team-a"}, &checkTwo, ""),
+	)
+	require.Equal(t,
+		checkCacheKey("user:1", []string{"team-a", "team-b"}, checkOne, ""),
+		checkCacheKey("user:1", []string{"team-b", "team-a"}, checkOne, ""),
+	)
+	require.Equal(t,
+		checkCacheKey("user:1", []string{"team-a"}, checkOne, ""),
+		checkCacheKey("user:1", []string{"team-a"}, checkOne, ""),
+	)
+
+	listOne := &types.ListRequest{
+		Namespace:   "stacks-12",
+		Group:       "dashboards.grafana.app",
+		Resource:    "dashboards-view",
+		Verb:        "get",
+		Subresource: "status",
+	}
+	listTwo := *listOne
+	listTwo.Resource = "dashboards"
+	listTwo.Verb = "view-get"
+
+	require.NotEqual(t,
+		itemCheckerCacheKey("user:1", []string{"team-a"}, listOne),
+		itemCheckerCacheKey("user:1", []string{"team-a"}, &listTwo),
+	)
+}
+
 func TestClient_Check_SkipCache(t *testing.T) {
 	client, authz := setupAccessClient()
 	authz.checkRes = &authzv1.CheckResponse{Allowed: true}

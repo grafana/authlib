@@ -455,7 +455,7 @@ func newOutgoingContext(ctx context.Context) context.Context {
 // -----
 
 func checkCacheKey(subj string, teams []string, req *types.CheckRequest, folder string) string {
-	return fmt.Sprintf("check-%s-%s-%s-%s-%s-%s-%s-%s-%s-%s", req.Namespace, subj, teamsCacheKey(teams), req.Group, req.Resource, req.Verb, req.Name, req.Subresource, req.Path, folder)
+	return authorizationCacheKey("check", req.Namespace, subj, teamsCacheKey(teams), req.Group, req.Resource, req.Verb, req.Name, req.Subresource, req.Path, folder)
 }
 
 type checkCacheEntry struct {
@@ -496,7 +496,19 @@ func (c *ClientImpl) getCachedCheck(ctx context.Context, key string) (bool, int6
 }
 
 func itemCheckerCacheKey(subj string, teams []string, req *types.ListRequest) string {
-	return fmt.Sprintf("list-%s-%s-%s-%s-%s-%s-%s", req.Namespace, subj, teamsCacheKey(teams), req.Group, req.Resource, req.Verb, req.Subresource)
+	return authorizationCacheKey("list", req.Namespace, subj, teamsCacheKey(teams), req.Group, req.Resource, req.Verb, req.Subresource)
+}
+
+func authorizationCacheKey(prefix string, fields ...string) string {
+	hash := sha256.New()
+	var length [8]byte
+	for _, field := range fields {
+		binary.BigEndian.PutUint64(length[:], uint64(len(field)))
+		_, _ = hash.Write(length[:])
+		_, _ = hash.Write([]byte(field))
+	}
+
+	return prefix + "-" + hex.EncodeToString(hash.Sum(nil))
 }
 
 func teamsCacheKey(teams []string) string {
