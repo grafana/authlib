@@ -135,6 +135,11 @@ type TokenExchangeRequest struct {
 // auth API's sign-access-token "subject" object and mirrors the claim set of
 // an ID token.
 type TokenExchangeSubject struct {
+	// Sub is the fully-typed subject as it appears in the ID token's `sub`
+	// claim (e.g. "user:1"). Its identifier part must be the numeric internal
+	// ID, which downstream Grafana resolves via strconv.ParseInt. When empty
+	// the auth API falls back to "<type>:<identifier>".
+	Sub             string   `json:"sub,omitempty"`
 	Identifier      string   `json:"identifier"`
 	Type            string   `json:"type"`
 	Namespace       string   `json:"namespace"`
