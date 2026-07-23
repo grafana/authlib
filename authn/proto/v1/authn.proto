@@ -11,6 +11,10 @@ service AuthnService {
 message AuthenticateRequest {
   string namespace = 1;
   map<string, string> http_headers = 2;
+  // include_oauth_passthrough_headers asks the AuthN service to resolve the
+  // authenticated session's current OAuth tokens and include the supported
+  // passthrough headers in AuthenticateResponse.request_headers.
+  bool include_oauth_passthrough_headers = 3;
 }
 
 enum AuthenticateCode {
