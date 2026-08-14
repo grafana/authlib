@@ -2,7 +2,6 @@ package types
 
 import (
 	"context"
-	"time"
 )
 
 type Permission struct {
@@ -17,7 +16,6 @@ type GetUserPermissionsRequest struct {
 
 type GetUserPermissionsResponse struct {
 	Permissions []Permission
-	CacheUntil  time.Time
 }
 
 type UserPermissionsClient interface {

@@ -69,7 +69,7 @@ func (c *ClientImpl) GetUserPermissions(ctx context.Context, authInfo types.Auth
 	}
 
 	var result types.GetUserPermissionsResponse
-	receivedFirstChunk := false
+	receivedChunk := false
 	for {
 		chunk, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
@@ -79,16 +79,7 @@ func (c *ClientImpl) GetUserPermissions(ctx context.Context, authInfo types.Auth
 			span.RecordError(err)
 			return types.GetUserPermissionsResponse{}, err
 		}
-		if !receivedFirstChunk {
-			if chunk.CacheUntil == nil {
-				return types.GetUserPermissionsResponse{}, fmt.Errorf("%w: missing cache deadline", ErrInvalidUserPermissionsResponse)
-			}
-			if err := chunk.CacheUntil.CheckValid(); err != nil {
-				return types.GetUserPermissionsResponse{}, fmt.Errorf("%w: invalid cache deadline: %v", ErrInvalidUserPermissionsResponse, err)
-			}
-			result.CacheUntil = chunk.CacheUntil.AsTime()
-			receivedFirstChunk = true
-		}
+		receivedChunk = true
 
 		for _, permission := range chunk.Permissions {
 			if permission == nil {
@@ -101,7 +92,7 @@ func (c *ClientImpl) GetUserPermissions(ctx context.Context, authInfo types.Auth
 		}
 	}
 
-	if !receivedFirstChunk {
+	if !receivedChunk {
 		return types.GetUserPermissionsResponse{}, fmt.Errorf("%w: empty stream", ErrInvalidUserPermissionsResponse)
 	}
 

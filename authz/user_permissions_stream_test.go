@@ -3,11 +3,9 @@ package authz
 import (
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/trace/noop"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	authzv1 "github.com/grafana/authlib/authz/proto/v1"
 	"github.com/grafana/authlib/cache"
@@ -15,12 +13,10 @@ import (
 )
 
 func TestClient_GetUserPermissionsRejectsPartialStream(t *testing.T) {
-	cacheUntil := time.Now().UTC().Add(30 * time.Second)
 	backend := cache.NewLocalCache(cache.Config{})
 	fake := &fakeUserPermissionsAuthzClient{stream: &fakeGetUserPermissionsClient{
 		responses: []*authzv1.GetUserPermissionsResponse{{
 			Permissions: []*authzv1.UserPermission{{Action: "dashboards:read", Scope: "dashboards:*"}},
-			CacheUntil:  timestamppb.New(cacheUntil),
 		}},
 		err: errors.New("stream interrupted"),
 	}}
@@ -40,10 +36,8 @@ func TestClient_GetUserPermissionsRejectsPartialStream(t *testing.T) {
 }
 
 func TestClient_GetUserPermissionsSkipCacheFetchesFreshSnapshot(t *testing.T) {
-	cacheUntil := timestamppb.New(time.Now().UTC().Add(30 * time.Second))
 	fake := &fakeUserPermissionsAuthzClient{stream: &fakeGetUserPermissionsClient{responses: []*authzv1.GetUserPermissionsResponse{{
 		Permissions: []*authzv1.UserPermission{{Action: "dashboards:read", Scope: "dashboards:old"}},
-		CacheUntil:  cacheUntil,
 	}}}}
 	client := &ClientImpl{
 		clientV1: fake,
@@ -56,7 +50,6 @@ func TestClient_GetUserPermissionsSkipCacheFetchesFreshSnapshot(t *testing.T) {
 	require.NoError(t, err)
 	fake.stream = &fakeGetUserPermissionsClient{responses: []*authzv1.GetUserPermissionsResponse{{
 		Permissions: []*authzv1.UserPermission{{Action: "dashboards:read", Scope: "dashboards:new"}},
-		CacheUntil:  cacheUntil,
 	}}}
 
 	response, err := client.GetUserPermissions(t.Context(), caller, types.GetUserPermissionsRequest{

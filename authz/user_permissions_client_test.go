@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/trace/noop"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/grafana/authlib/authn"
 	authzv1 "github.com/grafana/authlib/authz/proto/v1"
@@ -20,13 +19,11 @@ import (
 )
 
 func TestClient_GetUserPermissionsBuffersCompleteSnapshot(t *testing.T) {
-	cacheUntil := time.Now().UTC().Add(30 * time.Second).Truncate(time.Second)
 	fake := &fakeUserPermissionsAuthzClient{
 		stream: &fakeGetUserPermissionsClient{
 			responses: []*authzv1.GetUserPermissionsResponse{
 				{
 					Permissions: []*authzv1.UserPermission{{Action: "dashboards:read", Scope: "dashboards:*"}},
-					CacheUntil:  timestamppb.New(cacheUntil),
 				},
 				{
 					Permissions: []*authzv1.UserPermission{{Action: "folders:read", Scope: "folders:uid:team"}},
@@ -50,7 +47,6 @@ func TestClient_GetUserPermissionsBuffersCompleteSnapshot(t *testing.T) {
 			{Action: "dashboards:read", Scope: "dashboards:*"},
 			{Action: "folders:read", Scope: "folders:uid:team"},
 		},
-		CacheUntil: cacheUntil,
 	}, got)
 	require.Equal(t, &authzv1.GetUserPermissionsRequest{
 		Subject:   "user:1",
@@ -60,17 +56,35 @@ func TestClient_GetUserPermissionsBuffersCompleteSnapshot(t *testing.T) {
 	}, fake.req)
 }
 
-func TestClient_GetUserPermissionsCachesUntilServerDeadline(t *testing.T) {
-	cacheUntil := time.Now().UTC().Add(30 * time.Second).Truncate(time.Second)
+func TestClient_GetUserPermissionsCachesWithClientDefaultExpiration(t *testing.T) {
 	fake := &fakeUserPermissionsAuthzClient{
 		stream: &fakeGetUserPermissionsClient{responses: []*authzv1.GetUserPermissionsResponse{{
 			Permissions: []*authzv1.UserPermission{{Action: "dashboards:read", Scope: "dashboards:*"}},
-			CacheUntil:  timestamppb.New(cacheUntil),
+		}}},
+	}
+	backend := &expirationRecordingCache{Cache: cache.NewLocalCache(cache.Config{})}
+	client := &ClientImpl{
+		clientV1: fake,
+		cache:    backend,
+		tracer:   noop.NewTracerProvider().Tracer("test"),
+	}
+	caller := newUserPermissionsCaller(nil)
+	req := types.GetUserPermissionsRequest{Namespace: "stacks-12"}
+
+	_, err := client.GetUserPermissions(t.Context(), caller, req)
+	require.NoError(t, err)
+	require.Equal(t, cache.DefaultExpiration, backend.expiration)
+}
+
+func TestClient_GetUserPermissionsReadsCachedSnapshot(t *testing.T) {
+	fake := &fakeUserPermissionsAuthzClient{
+		stream: &fakeGetUserPermissionsClient{responses: []*authzv1.GetUserPermissionsResponse{{
+			Permissions: []*authzv1.UserPermission{{Action: "dashboards:read", Scope: "dashboards:*"}},
 		}}},
 	}
 	client := &ClientImpl{
 		clientV1: fake,
-		cache:    cache.NewLocalCache(cache.Config{}),
+		cache:    cache.NewLocalCache(cache.Config{Expiry: time.Minute}),
 		tracer:   noop.NewTracerProvider().Tracer("test"),
 	}
 	caller := newUserPermissionsCaller(nil)
@@ -79,15 +93,15 @@ func TestClient_GetUserPermissionsCachesUntilServerDeadline(t *testing.T) {
 	first, err := client.GetUserPermissions(t.Context(), caller, req)
 	require.NoError(t, err)
 	second, err := client.GetUserPermissions(t.Context(), caller, req)
+
 	require.NoError(t, err)
 	require.Equal(t, first, second)
 	require.Equal(t, 1, fake.calls)
 }
 
 func TestClient_InvalidateUserPermissionsEvictsCachedSnapshot(t *testing.T) {
-	cacheUntil := time.Now().UTC().Add(30 * time.Second).Truncate(time.Second)
 	fake := &fakeUserPermissionsAuthzClient{
-		stream: userPermissionsResponseStream(cacheUntil),
+		stream: userPermissionsResponseStream(),
 	}
 	client := &ClientImpl{
 		clientV1: fake,
@@ -99,7 +113,7 @@ func TestClient_InvalidateUserPermissionsEvictsCachedSnapshot(t *testing.T) {
 
 	_, err := client.GetUserPermissions(t.Context(), caller, req)
 	require.NoError(t, err)
-	fake.stream = userPermissionsResponseStream(cacheUntil)
+	fake.stream = userPermissionsResponseStream()
 	require.NoError(t, client.InvalidateUserPermissions(t.Context(), caller, req))
 	_, err = client.GetUserPermissions(t.Context(), caller, req)
 
@@ -107,18 +121,15 @@ func TestClient_InvalidateUserPermissionsEvictsCachedSnapshot(t *testing.T) {
 	require.Equal(t, 2, fake.calls)
 }
 
-func userPermissionsResponseStream(cacheUntil time.Time) *fakeGetUserPermissionsClient {
+func userPermissionsResponseStream() *fakeGetUserPermissionsClient {
 	return &fakeGetUserPermissionsClient{responses: []*authzv1.GetUserPermissionsResponse{{
 		Permissions: []*authzv1.UserPermission{{Action: "dashboards:read", Scope: "dashboards:*"}},
-		CacheUntil:  timestamppb.New(cacheUntil),
 	}}}
 }
 
 func TestClient_GetUserPermissionsRejectsCallerWithoutDelegatedPermission(t *testing.T) {
 	fake := &fakeUserPermissionsAuthzClient{
-		stream: &fakeGetUserPermissionsClient{responses: []*authzv1.GetUserPermissionsResponse{{
-			CacheUntil: timestamppb.New(time.Now().UTC().Add(30 * time.Second)),
-		}}},
+		stream: &fakeGetUserPermissionsClient{responses: []*authzv1.GetUserPermissionsResponse{{}}},
 	}
 	client := &ClientImpl{
 		clientV1: fake,
@@ -170,6 +181,16 @@ type fakeGetUserPermissionsClient struct {
 	grpc.ClientStream
 	responses []*authzv1.GetUserPermissionsResponse
 	err       error
+}
+
+type expirationRecordingCache struct {
+	cache.Cache
+	expiration time.Duration
+}
+
+func (c *expirationRecordingCache) Set(ctx context.Context, key string, value []byte, expiration time.Duration) error {
+	c.expiration = expiration
+	return c.Cache.Set(ctx, key, value, expiration)
 }
 
 func (f *fakeGetUserPermissionsClient) Recv() (*authzv1.GetUserPermissionsResponse, error) {
