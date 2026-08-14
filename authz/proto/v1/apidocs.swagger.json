@@ -330,6 +330,25 @@
         }
       }
     },
+    "v1GetUserPermissionsOptions": {
+      "type": "object",
+      "properties": {
+        "skipcache": {
+          "type": "boolean"
+        }
+      }
+    },
+    "v1GetUserPermissionsResponse": {
+      "type": "object",
+      "properties": {
+        "permissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1UserPermission"
+          }
+        }
+      }
+    },
     "v1ListRequestOptions": {
       "type": "object",
       "properties": {
@@ -358,6 +377,17 @@
         },
         "zookie": {
           "$ref": "#/definitions/v1Zookie"
+        }
+      }
+    },
+    "v1UserPermission": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
         }
       }
     },

@@ -47,6 +47,8 @@ service AuthzService {
       description: "This API checks if a subject is allowed to perform actions on multiple resources in a single request. Maximum 50 checks per request."
     };
   }
+
+  rpc GetUserPermissions(GetUserPermissionsRequest) returns (stream GetUserPermissionsResponse);
 }
 
 message CheckRequest {
@@ -139,4 +141,25 @@ message BatchCheckResponse {
 message BatchCheckResult {
   bool allowed = 1;
   string error = 2;
+}
+
+message GetUserPermissionsRequest {
+  string subject = 1;
+  string namespace = 2;
+  // teams contains contextual team identifiers for the subject.
+  repeated string teams = 3;
+  GetUserPermissionsOptions options = 4;
+}
+
+message GetUserPermissionsOptions {
+  bool skipcache = 1;
+}
+
+message UserPermission {
+  string action = 1;
+  string scope = 2;
+}
+
+message GetUserPermissionsResponse {
+  repeated UserPermission permissions = 1;
 }
