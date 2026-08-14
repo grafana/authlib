@@ -98,7 +98,7 @@ func (c *ClientImpl) GetUserPermissions(ctx context.Context, authInfo types.Auth
 
 	if err := c.cacheUserPermissions(ctx, key, result); err != nil {
 		span.RecordError(err)
-		return types.GetUserPermissionsResponse{}, err
+		span.AddEvent("failed to cache user permissions")
 	}
 
 	span.SetAttributes(attribute.Int("permissions", len(result.Permissions)))

@@ -99,6 +99,28 @@ func TestClient_GetUserPermissionsReadsCachedSnapshot(t *testing.T) {
 	require.Equal(t, 1, fake.calls)
 }
 
+func TestClient_GetUserPermissionsReturnsSnapshotWhenCacheWriteFails(t *testing.T) {
+	expected := []types.Permission{{Action: "dashboards:read", Scope: "dashboards:*"}}
+	fake := &fakeUserPermissionsAuthzClient{
+		stream: &fakeGetUserPermissionsClient{responses: []*authzv1.GetUserPermissionsResponse{{
+			Permissions: []*authzv1.UserPermission{{Action: "dashboards:read", Scope: "dashboards:*"}},
+		}}},
+	}
+	client := &ClientImpl{
+		clientV1: fake,
+		cache: &setErrorCache{
+			Cache: cache.NewLocalCache(cache.Config{}),
+			err:   errors.New("cache unavailable"),
+		},
+		tracer: noop.NewTracerProvider().Tracer("test"),
+	}
+
+	response, err := client.GetUserPermissions(t.Context(), newUserPermissionsCaller(nil), types.GetUserPermissionsRequest{Namespace: "stacks-12"})
+
+	require.NoError(t, err)
+	require.Equal(t, expected, response.Permissions)
+}
+
 func TestClient_InvalidateUserPermissionsEvictsCachedSnapshot(t *testing.T) {
 	fake := &fakeUserPermissionsAuthzClient{
 		stream: userPermissionsResponseStream(),
@@ -186,6 +208,15 @@ type fakeGetUserPermissionsClient struct {
 type expirationRecordingCache struct {
 	cache.Cache
 	expiration time.Duration
+}
+
+type setErrorCache struct {
+	cache.Cache
+	err error
+}
+
+func (c *setErrorCache) Set(context.Context, string, []byte, time.Duration) error {
+	return c.err
 }
 
 func (c *expirationRecordingCache) Set(ctx context.Context, key string, value []byte, expiration time.Duration) error {
