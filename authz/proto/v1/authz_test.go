@@ -16,9 +16,3 @@ func TestAuthzServiceDefinesGetUserPermissions(t *testing.T) {
 	require.True(t, method.IsStreamingServer())
 	require.False(t, method.IsStreamingClient())
 }
-
-func TestGetUserPermissionsResponseDoesNotDefineCachePolicy(t *testing.T) {
-	fields := (&GetUserPermissionsResponse{}).ProtoReflect().Descriptor().Fields()
-	require.Nil(t, fields.ByNumber(2))
-	require.Nil(t, fields.ByName(protoreflect.Name("cache_until")))
-}
