@@ -19,9 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	AuthzService_Check_FullMethodName      = "/authz.v1.AuthzService/Check"
-	AuthzService_List_FullMethodName       = "/authz.v1.AuthzService/List"
-	AuthzService_BatchCheck_FullMethodName = "/authz.v1.AuthzService/BatchCheck"
+	AuthzService_Check_FullMethodName              = "/authz.v1.AuthzService/Check"
+	AuthzService_List_FullMethodName               = "/authz.v1.AuthzService/List"
+	AuthzService_BatchCheck_FullMethodName         = "/authz.v1.AuthzService/BatchCheck"
+	AuthzService_GetUserPermissions_FullMethodName = "/authz.v1.AuthzService/GetUserPermissions"
 )
 
 // AuthzServiceClient is the client API for AuthzService service.
@@ -31,6 +32,7 @@ type AuthzServiceClient interface {
 	Check(ctx context.Context, in *CheckRequest, opts ...grpc.CallOption) (*CheckResponse, error)
 	List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error)
 	BatchCheck(ctx context.Context, in *BatchCheckRequest, opts ...grpc.CallOption) (*BatchCheckResponse, error)
+	GetUserPermissions(ctx context.Context, in *GetUserPermissionsRequest, opts ...grpc.CallOption) (AuthzService_GetUserPermissionsClient, error)
 }
 
 type authzServiceClient struct {
@@ -68,6 +70,38 @@ func (c *authzServiceClient) BatchCheck(ctx context.Context, in *BatchCheckReque
 	return out, nil
 }
 
+func (c *authzServiceClient) GetUserPermissions(ctx context.Context, in *GetUserPermissionsRequest, opts ...grpc.CallOption) (AuthzService_GetUserPermissionsClient, error) {
+	stream, err := c.cc.NewStream(ctx, &AuthzService_ServiceDesc.Streams[0], AuthzService_GetUserPermissions_FullMethodName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &authzServiceGetUserPermissionsClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type AuthzService_GetUserPermissionsClient interface {
+	Recv() (*GetUserPermissionsResponse, error)
+	grpc.ClientStream
+}
+
+type authzServiceGetUserPermissionsClient struct {
+	grpc.ClientStream
+}
+
+func (x *authzServiceGetUserPermissionsClient) Recv() (*GetUserPermissionsResponse, error) {
+	m := new(GetUserPermissionsResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // AuthzServiceServer is the server API for AuthzService service.
 // All implementations must embed UnimplementedAuthzServiceServer
 // for forward compatibility
@@ -75,6 +109,7 @@ type AuthzServiceServer interface {
 	Check(context.Context, *CheckRequest) (*CheckResponse, error)
 	List(context.Context, *ListRequest) (*ListResponse, error)
 	BatchCheck(context.Context, *BatchCheckRequest) (*BatchCheckResponse, error)
+	GetUserPermissions(*GetUserPermissionsRequest, AuthzService_GetUserPermissionsServer) error
 	mustEmbedUnimplementedAuthzServiceServer()
 }
 
@@ -90,6 +125,9 @@ func (UnimplementedAuthzServiceServer) List(context.Context, *ListRequest) (*Lis
 }
 func (UnimplementedAuthzServiceServer) BatchCheck(context.Context, *BatchCheckRequest) (*BatchCheckResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BatchCheck not implemented")
+}
+func (UnimplementedAuthzServiceServer) GetUserPermissions(*GetUserPermissionsRequest, AuthzService_GetUserPermissionsServer) error {
+	return status.Errorf(codes.Unimplemented, "method GetUserPermissions not implemented")
 }
 func (UnimplementedAuthzServiceServer) mustEmbedUnimplementedAuthzServiceServer() {}
 
@@ -158,6 +196,27 @@ func _AuthzService_BatchCheck_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthzService_GetUserPermissions_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GetUserPermissionsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(AuthzServiceServer).GetUserPermissions(m, &authzServiceGetUserPermissionsServer{stream})
+}
+
+type AuthzService_GetUserPermissionsServer interface {
+	Send(*GetUserPermissionsResponse) error
+	grpc.ServerStream
+}
+
+type authzServiceGetUserPermissionsServer struct {
+	grpc.ServerStream
+}
+
+func (x *authzServiceGetUserPermissionsServer) Send(m *GetUserPermissionsResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 // AuthzService_ServiceDesc is the grpc.ServiceDesc for AuthzService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -178,6 +237,12 @@ var AuthzService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _AuthzService_BatchCheck_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "GetUserPermissions",
+			Handler:       _AuthzService_GetUserPermissions_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "proto/v1/authz.proto",
 }

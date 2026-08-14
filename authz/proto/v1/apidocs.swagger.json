@@ -330,6 +330,30 @@
         }
       }
     },
+    "v1GetUserPermissionsOptions": {
+      "type": "object",
+      "properties": {
+        "skipcache": {
+          "type": "boolean"
+        }
+      }
+    },
+    "v1GetUserPermissionsResponse": {
+      "type": "object",
+      "properties": {
+        "permissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1UserPermission"
+          }
+        },
+        "cacheUntil": {
+          "type": "string",
+          "format": "date-time",
+          "description": "cache_until is the absolute deadline for caching the complete response.\nIt is set only on the first streamed response."
+        }
+      }
+    },
     "v1ListRequestOptions": {
       "type": "object",
       "properties": {
@@ -358,6 +382,17 @@
         },
         "zookie": {
           "$ref": "#/definitions/v1Zookie"
+        }
+      }
+    },
+    "v1UserPermission": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
         }
       }
     },
