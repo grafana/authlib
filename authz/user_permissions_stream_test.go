@@ -35,6 +35,20 @@ func TestClient_GetUserPermissionsRejectsPartialStream(t *testing.T) {
 	require.Error(t, cacheErr)
 }
 
+func TestClient_GetUserPermissionsAcceptsEmptyStream(t *testing.T) {
+	fake := &fakeUserPermissionsAuthzClient{stream: &fakeGetUserPermissionsClient{}}
+	client := &ClientImpl{
+		clientV1: fake,
+		cache:    cache.NewLocalCache(cache.Config{}),
+		tracer:   noop.NewTracerProvider().Tracer("test"),
+	}
+
+	response, err := client.GetUserPermissions(t.Context(), newUserPermissionsCaller(nil), types.GetUserPermissionsRequest{Namespace: "stacks-12"})
+
+	require.NoError(t, err)
+	require.Empty(t, response.Permissions)
+}
+
 func TestClient_GetUserPermissionsSkipCacheFetchesFreshSnapshot(t *testing.T) {
 	fake := &fakeUserPermissionsAuthzClient{stream: &fakeGetUserPermissionsClient{responses: []*authzv1.GetUserPermissionsResponse{{
 		Permissions: []*authzv1.UserPermission{{Action: "dashboards:read", Scope: "dashboards:old"}},

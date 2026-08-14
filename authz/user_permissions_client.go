@@ -69,7 +69,6 @@ func (c *ClientImpl) GetUserPermissions(ctx context.Context, authInfo types.Auth
 	}
 
 	var result types.GetUserPermissionsResponse
-	receivedChunk := false
 	for {
 		chunk, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
@@ -79,7 +78,6 @@ func (c *ClientImpl) GetUserPermissions(ctx context.Context, authInfo types.Auth
 			span.RecordError(err)
 			return types.GetUserPermissionsResponse{}, err
 		}
-		receivedChunk = true
 
 		for _, permission := range chunk.Permissions {
 			if permission == nil {
@@ -90,10 +88,6 @@ func (c *ClientImpl) GetUserPermissions(ctx context.Context, authInfo types.Auth
 				Scope:  permission.Scope,
 			})
 		}
-	}
-
-	if !receivedChunk {
-		return types.GetUserPermissionsResponse{}, fmt.Errorf("%w: empty stream", ErrInvalidUserPermissionsResponse)
 	}
 
 	if err := c.cacheUserPermissions(ctx, key, result); err != nil {
