@@ -1,6 +1,6 @@
 module github.com/grafana/authlib
 
-go 1.25.0
+go 1.26.0
 
 require (
 	github.com/go-jose/go-jose/v4 v4.1.4
@@ -12,7 +12,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/otel v1.44.0
 	go.opentelemetry.io/otel/trace v1.44.0
-	golang.org/x/sync v0.21.0
+	golang.org/x/sync v0.23.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20260414002931-afd174a4e478
 	google.golang.org/grpc v1.81.1
 	google.golang.org/protobuf v1.36.11
