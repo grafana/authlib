@@ -427,7 +427,13 @@ func (c *TokenExchangeClient) setCache(ctx context.Context, token string, key st
 		return fmt.Errorf("failed to extract claims from the token: %v", err)
 	}
 
-	return c.cache.Set(ctx, key, []byte(token), time.Until(claims.Expiry.Time())-cacheLeeway)
+	remaining := time.Until(claims.Expiry.Time())
+	if remaining <= cacheLeeway {
+		// Non-positive cache durations can mean no expiration.
+		return nil
+	}
+
+	return c.cache.Set(ctx, key, []byte(token), remaining-cacheLeeway)
 }
 
 var _ TokenExchanger = StaticTokenExchanger{}
