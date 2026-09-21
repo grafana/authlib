@@ -204,7 +204,7 @@ func signToken(t *testing.T, keyID string, key *ecdsa.PrivateKey, exp time.Time)
 		Algorithm: jose.ES256,
 		Key:       key,
 	}, &jose.SignerOptions{
-		ExtraHeaders: map[jose.HeaderKey]interface{}{
+		ExtraHeaders: map[jose.HeaderKey]any{
 			"kid": keyID,
 			"typ": TokenTypeID,
 		},

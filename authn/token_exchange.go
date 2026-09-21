@@ -295,7 +295,7 @@ func (c *TokenExchangeClient) Exchange(ctx context.Context, r TokenExchangeReque
 		return &TokenExchangeResponse{Token: token}, nil
 	}
 
-	resp, err, _ := c.singlef.Do(key, func() (interface{}, error) {
+	resp, err, _ := c.singlef.Do(key, func() (any, error) {
 		data, err := json.Marshal(&r)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %w", ErrInvalidExchangeResponse, err)

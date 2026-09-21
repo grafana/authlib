@@ -77,7 +77,7 @@ type DefaultKeyRetriever struct {
 func (s *DefaultKeyRetriever) Get(ctx context.Context, keyID string) (*jose.JSONWebKey, error) {
 	jwk, ok := s.getCachedItem(ctx, keyID)
 	if !ok {
-		_, err, _ := s.s.Do("fetch", func() (interface{}, error) {
+		_, err, _ := s.s.Do("fetch", func() (any, error) {
 			jwks, err := s.fetchJWKS(ctx)
 			if err != nil {
 				return nil, err

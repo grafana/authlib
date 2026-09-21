@@ -65,7 +65,7 @@ func TestDefaultKeyRetriever_Get(t *testing.T) {
 		require.Nil(t, key)
 		assert.Equal(t, calls, 2)
 
-		for i := 0; i < 5; i++ {
+		for range 5 {
 			key, err := service.Get(context.Background(), "invalid")
 			require.ErrorIs(t, err, ErrInvalidSigningKey)
 			require.Nil(t, key)
