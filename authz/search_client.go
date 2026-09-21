@@ -176,7 +176,7 @@ func (c *searchClientImpl) Search(ctx context.Context, query searchQuery) (*sear
 		}
 	}
 
-	res, err, _ := c.singlef.Do(key, func() (interface{}, error) {
+	res, err, _ := c.singlef.Do(key, func() (any, error) {
 		v, _ := goquery.Values(query)
 		url := strings.TrimRight(c.cfg.APIURL, "/") + searchPath + "?" + v.Encode()
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, strings.NewReader(key))

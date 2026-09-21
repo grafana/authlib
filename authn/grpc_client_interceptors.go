@@ -74,7 +74,7 @@ func NewGrpcClientInterceptor(tc TokenExchanger, opts ...GrpcClientInterceptorOp
 	return i
 }
 
-func (i *GrpcClientInterceptor) UnaryClientInterceptor(ctx context.Context, method string, req, reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+func (i *GrpcClientInterceptor) UnaryClientInterceptor(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 	ctx, err := i.wrapContext(ctx)
 	if err != nil {
 		return err

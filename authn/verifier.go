@@ -30,7 +30,7 @@ type Claims[T any] struct {
 
 func (c Claims[T]) MarshalJSON() ([]byte, error) {
 	// Create a combined map with fields from both Claims and Rest
-	combined := make(map[string]interface{})
+	combined := make(map[string]any)
 
 	// Marshal jwt.Claims to get standard claims
 	standardClaims, err := json.Marshal(c.Claims)
