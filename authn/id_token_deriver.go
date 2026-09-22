@@ -17,9 +17,10 @@ import (
 	"github.com/grafana/dskit/backoff"
 )
 
-// IDTokenDeriver mints an id token identifying the user or service account embedded in an
-// on-behalf-of access token's actor chain. It is for callers that hold an access token instead of
-// a directly-asserted subject; compare IDTokenSigner, which signs a directly-asserted subject.
+// IDTokenDeriver extracts the user or service account identity embedded in an on-behalf-of
+// access token's actor chain and returns a signed id token for it. It is for callers that hold
+// an access token instead of a directly-asserted subject; compare IDTokenSigner, which signs a
+// directly-asserted subject.
 type IDTokenDeriver interface {
 	DeriveIDToken(ctx context.Context, subjectToken, namespace string) (*DeriveIDTokenResponse, error)
 }

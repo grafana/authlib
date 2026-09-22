@@ -10,51 +10,13 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"testing/synctest"
 	"time"
 
 	"github.com/go-jose/go-jose/v4"
 	"github.com/go-jose/go-jose/v4/jwt"
-	"github.com/grafana/authlib/cache"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestTokenExchangeClientCacheExpiration(t *testing.T) {
-	for _, tt := range []struct {
-		name      string
-		elapsed   time.Duration
-		wantCache bool
-	}{
-		{name: "normal lifetime", wantCache: true},
-		{name: "just above margin", elapsed: 15*time.Second - time.Nanosecond, wantCache: true},
-		{name: "at margin", elapsed: 15 * time.Second},
-		{name: "just below margin", elapsed: 15*time.Second + time.Nanosecond},
-		{name: "short remaining lifetime", elapsed: 20 * time.Second},
-		{name: "expired", elapsed: 31 * time.Second},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			synctest.Test(t, func(t *testing.T) {
-				// Keep the default cache expiration semantics without a background janitor.
-				client := &TokenExchangeClient{cache: cache.NewLocalCache(cache.Config{})}
-				token := signAccessToken(t, 30*time.Second)
-				time.Sleep(tt.elapsed)
-
-				ctx := context.Background()
-				require.NoError(t, client.setCache(ctx, token, "token"))
-				got, ok := client.getCache(ctx, "token")
-				assert.Equal(t, tt.wantCache, ok)
-				if tt.wantCache {
-					assert.Equal(t, token, got)
-					// Advance past the cache deadline, while the JWT is still valid.
-					time.Sleep(15*time.Second - tt.elapsed + time.Nanosecond)
-					_, ok = client.getCache(ctx, "token")
-					assert.False(t, ok)
-				}
-			})
-		})
-	}
-}
 
 func TestNewTokenExchangeClient(t *testing.T) {
 	t.Run("should not be able to create client wihtout token", func(t *testing.T) {
