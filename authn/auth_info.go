@@ -197,7 +197,6 @@ func (a *AuthInfo) GetIDToken() string {
 	return ""
 }
 
-// GetAccessToken implements types.AuthInfo. AuthInfo is built from parsed claims and does not retain the raw access token; returns empty.
 func (a *AuthInfo) GetAccessToken() string {
-	return ""
+	return a.at.token
 }
