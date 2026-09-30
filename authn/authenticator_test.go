@@ -51,6 +51,7 @@ func TestDefaultAuthenticator_Authenticate(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "access-policy:1", info.GetUID())
 		require.Equal(t, "*", info.GetNamespace())
+		require.Equal(t, provider.at, info.GetAccessToken())
 	})
 
 	t.Run("should allow request with access and id token", func(t *testing.T) {
