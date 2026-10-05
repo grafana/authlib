@@ -14,7 +14,8 @@ The `Authlib` library provides a modular and secure approach to handling authent
     - **[unstable / under development]** Multi-tenant client, typically used by multi-tenant applications to enforce service and user access.
 
 ## Documentation
-Please see the [docs directory](docs/) for documentation
+Please see the [docs directory](docs/) for documentation, including the
+[embedded legacy permission-enumeration contract](docs/authorization/legacy-user-permissions.md).
 
 ### License
 This project is licensed under the Apache-2.0 license - see the [LICENSE](LICENSE) file for details.

@@ -7,6 +7,9 @@
   "tags": [
     {
       "name": "AuthzService"
+    },
+    {
+      "name": "LegacyAuthzService"
     }
   ],
   "consumes": [
@@ -348,6 +351,69 @@
           }
         }
       }
+    },
+    "v1LegacyGetUserPermissionsResponse": {
+      "type": "object",
+      "properties": {
+        "permissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1LegacyPermission"
+          },
+          "description": "Preserve duplicates. Clients publish results only after successful EOF."
+        }
+      }
+    },
+    "v1LegacyPermission": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string"
+        }
+      }
+    },
+    "v1LegacyPermissionIdentity": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "uid": {
+          "type": "string",
+          "description": "Untyped UID; type supplies its identity type. Never parse this as an ID."
+        },
+        "internalId": {
+          "type": "string",
+          "format": "int64"
+        },
+        "hasUniqueId": {
+          "type": "boolean"
+        },
+        "orgRole": {
+          "type": "string"
+        },
+        "isGrafanaAdmin": {
+          "type": "boolean"
+        },
+        "teamIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "int64"
+          },
+          "description": "Numeric legacy RBAC memberships and contextual groups are distinct inputs."
+        },
+        "groups": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Trusted assertions from Grafana authentication, not end-user input. The caller\nis authenticated by the transport, independently of this target identity."
     },
     "v1ListRequestOptions": {
       "type": "object",
