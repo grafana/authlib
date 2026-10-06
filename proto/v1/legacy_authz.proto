@@ -24,6 +24,11 @@ message LegacyPermissionIdentity {
   // Numeric legacy RBAC memberships and contextual groups are distinct inputs.
   repeated int64 team_ids = 7;
   repeated string groups = 8;
+  // Preserve the trusted requester's shared-cache key, including empty values.
+  optional string cache_key = 9;
+  // Original namespace for legacy resolution, not a tenant scope override.
+  // When nonempty it must match the request namespace. Empty differs from absent.
+  optional string requester_namespace = 10;
 }
 
 message LegacyGetUserPermissionsRequest {

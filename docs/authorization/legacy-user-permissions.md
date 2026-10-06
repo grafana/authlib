@@ -58,6 +58,15 @@ an error or `Unimplemented` response.
   zero and negative legacy values are transported distinctly, without client
   identity resolution. The handler applies the legacy identity contract.
 - `HasUniqueID` preserves legacy cacheability, including synthetic identities.
+- Optional `CacheKey` preserves the trusted requester's shared-cache key so
+  existing mutation invalidation reaches the same entry. Absence permits a
+  conventional derived key; an explicit empty string must remain empty.
+- Optional `RequesterNamespace` preserves the namespace the original requester
+  supplied to Zanzana resolution, including an explicit empty value. It does not
+  change the request's tenant/evaluation scope. A nonempty value must equal the
+  request `Namespace`; the server must reject conflicting assertions. Absence
+  uses the request namespace. This distinction preserves legacy fallback
+  behavior when the requester had no namespace, particularly for global org.
 - `OrgRole`, `IsGrafanaAdmin`, and `TeamIDs` are trusted requester assertions,
   not instructions to resolve the target's current role or memberships from DB.
 - Numeric `TeamIDs` supply legacy RBAC memberships. String `Groups` supply the

@@ -82,6 +82,7 @@ func (c *LegacyClient) LegacyGetUserPermissions(ctx context.Context, caller type
 			Type: string(req.Identity.Type), Uid: req.Identity.UID, InternalId: internalID,
 			HasUniqueId: req.Identity.HasUniqueID, OrgRole: req.Identity.OrgRole, IsGrafanaAdmin: req.Identity.IsGrafanaAdmin,
 			TeamIds: slices.Clone(req.Identity.TeamIDs), Groups: slices.Clone(req.Identity.Groups),
+			CacheKey: cloneLegacyString(req.Identity.CacheKey), RequesterNamespace: cloneLegacyString(req.Identity.RequesterNamespace),
 		},
 		ReloadCache: req.ReloadCache, SkipZanzanaCache: req.SkipZanzanaCache,
 	})
@@ -109,6 +110,14 @@ func (c *LegacyClient) LegacyGetUserPermissions(ctx context.Context, caller type
 			result.Permissions = append(result.Permissions, types.Permission{Action: permission.Action, Scope: permission.Scope})
 		}
 	}
+}
+
+func cloneLegacyString(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	copy := *value
+	return &copy
 }
 
 func validateLegacyPermissionNamespace(namespace string) error {

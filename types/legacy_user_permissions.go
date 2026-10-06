@@ -34,6 +34,13 @@ type LegacyPermissionIdentity struct {
 	// Groups are the target's selected contextual groups for Zanzana. They must
 	// not be substituted with the authenticated service caller's groups.
 	Groups []string
+	// CacheKey preserves the requester's existing shared-cache identity. An
+	// explicit empty value differs from absence (derive a conventional key).
+	CacheKey *string
+	// RequesterNamespace preserves the original namespace used by legacy
+	// Zanzana resolution, including an explicit empty value. It does not select
+	// tenant scope; a nonempty value must match the request Namespace.
+	RequesterNamespace *string
 }
 
 type LegacyGetUserPermissionsRequest struct {

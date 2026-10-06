@@ -411,6 +411,14 @@
           "items": {
             "type": "string"
           }
+        },
+        "cacheKey": {
+          "type": "string",
+          "description": "Preserve the trusted requester's shared-cache key, including empty values."
+        },
+        "requesterNamespace": {
+          "type": "string",
+          "description": "Original namespace for legacy resolution, not a tenant scope override.\nWhen nonempty it must match the request namespace. Empty differs from absent."
         }
       },
       "description": "Trusted assertions from Grafana authentication, not end-user input. The caller\nis authenticated by the transport, independently of this target identity."
