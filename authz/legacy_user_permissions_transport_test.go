@@ -148,7 +148,7 @@ func TestLegacyAuthzServiceIsSeparate(t *testing.T) {
 	require.Contains(t, server.GetServiceInfo(), "authz.v1.LegacyAuthzService")
 	require.NotContains(t, server.GetServiceInfo(), "authz.v1.AuthzService")
 
-	_, modernImplementsLegacy := any((*ClientImpl)(nil)).(types.LegacyAuthzService)
+	_, modernImplementsLegacy := any((*ClientImpl)(nil)).(types.LegacyAuthzService) //nolint:staticcheck // SA1019: verify the modern client does not implement the deprecated compatibility contract.
 	require.False(t, modernImplementsLegacy)
 	_, legacyImplementsAccess := any((*LegacyClient)(nil)).(types.AccessClient)
 	require.False(t, legacyImplementsAccess)

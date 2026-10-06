@@ -21,7 +21,7 @@ var (
 	ErrInvalidLegacyUserPermissionsResponse = errors.New("invalid legacy user permissions response")
 )
 
-var _ types.LegacyAuthzService = (*LegacyClient)(nil)
+var _ types.LegacyAuthzService = (*LegacyClient)(nil) //nolint:staticcheck // SA1019: this client intentionally implements the deprecated compatibility contract.
 
 // LegacyClient implements only legacy Access Control compatibility operations.
 // It is independent of ClientImpl and has no client-side permission cache.
