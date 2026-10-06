@@ -19,6 +19,7 @@ type GrpcClientInterceptor struct {
 	subjectToken     string
 	aud              []string
 	idTokenExtractor func(context.Context) (string, error)
+	expiresInSeconds int
 }
 
 type GrpcClientInterceptorOption func(*GrpcClientInterceptor)
@@ -57,6 +58,13 @@ func WithClientInterceptorAudience(aud []string) GrpcClientInterceptorOption {
 func WithClientInterceptorSubjectToken(subjectToken string) GrpcClientInterceptorOption {
 	return func(i *GrpcClientInterceptor) {
 		i.subjectToken = subjectToken
+	}
+}
+
+// WithClientInterceptorExpiresInSeconds sets the duration, in seconds, of the token.
+func WithClientInterceptorExpiresInSeconds(expiresInSeconds int) GrpcClientInterceptorOption {
+	return func(i *GrpcClientInterceptor) {
+		i.expiresInSeconds = expiresInSeconds
 	}
 }
 
@@ -102,11 +110,16 @@ func (i *GrpcClientInterceptor) wrapContext(ctx context.Context) (context.Contex
 		md = make(metadata.MD)
 	}
 
-	token, err := i.tc.Exchange(spanCtx, TokenExchangeRequest{
+	req := TokenExchangeRequest{
 		Namespace:    i.namespace,
 		Audiences:    i.aud,
 		SubjectToken: i.subjectToken,
-	})
+	}
+	if i.expiresInSeconds > 0 {
+		req.ExpiresIn = &i.expiresInSeconds
+	}
+
+	token, err := i.tc.Exchange(spanCtx, req)
 	if err != nil {
 		span.RecordError(err)
 		return ctx, err

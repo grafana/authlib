@@ -17,6 +17,7 @@ func TestGrpcClientInterceptor_wrapContext(t *testing.T) {
 		WithClientInterceptorNamespace("some-namespace"),
 		WithClientInterceptorAudience([]string{"some-service"}),
 		WithClientInterceptorSubjectToken("subject-token"),
+		WithClientInterceptorExpiresInSeconds(100),
 		WithClientInterceptorIDTokenExtractor(func(ctx context.Context) (string, error) {
 			idToken, ok := ctx.Value(idKey{}).(string)
 			if !ok {
