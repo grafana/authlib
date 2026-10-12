@@ -50,6 +50,7 @@ func CheckServicePermissions(authInfo types.AuthInfo, group, resource, verb stri
 var allowedWildcardGroups = []string{
 	"*.datasource.grafana.app",
 	"*.ext.grafana.app",
+	"*-app", // app plugin IDs
 }
 
 // IsAllowedWildcardGroup checks if a group is allowed to use wildcard matching.
@@ -63,12 +64,11 @@ func IsAllowedWildcardGroup(group string) bool {
 // check wildcard group matching as well as exact match
 func groupMatches(permissionGroup, requestGroup string) bool {
 	// if granted permission is a wildcard, it must be allowlisted and the request must match
-	if strings.HasPrefix(permissionGroup, "*.") {
+	if suffix, ok := strings.CutPrefix(permissionGroup, "*"); ok {
 		if !slices.Contains(allowedWildcardGroups, permissionGroup) {
 			return false
 		}
-		suffix := permissionGroup[1:]                                // remove leading "*"
-		prefixSegment, ok := strings.CutSuffix(requestGroup, suffix) // e.g. "prometheus.datasource.grafana.app" -> "prometheus"
+		prefixSegment, ok := strings.CutSuffix(requestGroup, suffix) // e.g. "prometheus.datasource.grafana.app" -> "prometheus", "grafana-example-app" -> "grafana-example"
 		if !ok || len(prefixSegment) == 0 {
 			return false
 		}
