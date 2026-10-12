@@ -2,7 +2,7 @@ module github.com/grafana/authlib/types
 
 go 1.25
 
-toolchain go1.27.1
+toolchain go1.27.2
 
 require github.com/stretchr/testify v1.12.1
 
