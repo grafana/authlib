@@ -29,7 +29,7 @@ func (t *tokenCache) getOrFetch(ctx context.Context, key string, fetch func() (s
 		return token, true, nil
 	}
 
-	v, err, _ := t.singlef.Do(key, func() (interface{}, error) {
+	v, err, _ := t.singlef.Do(key, func() (any, error) {
 		token, err := fetch()
 		if err != nil {
 			return nil, err

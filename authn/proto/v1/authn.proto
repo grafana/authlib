@@ -15,6 +15,10 @@ message AuthenticateRequest {
   // authenticated session's current OAuth tokens and include the supported
   // passthrough headers in AuthenticateResponse.request_headers.
   bool include_oauth_passthrough_headers = 3;
+  // audiences are the audiences the token should be signed for. A routing
+  // layer sets them from where the request goes. When empty, the AuthN service
+  // signs the token for its configured audiences.
+  repeated string audiences = 4;
 }
 
 enum AuthenticateCode {
