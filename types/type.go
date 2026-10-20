@@ -3,6 +3,7 @@ package types
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -74,10 +75,5 @@ func ParseType(str string) (IdentityType, error) {
 
 // IsIdentityType returns true if type matches any expected identity type
 func IsIdentityType(typ IdentityType, expected ...IdentityType) bool {
-	for _, e := range expected {
-		if typ == e {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(expected, typ)
 }
