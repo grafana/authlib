@@ -2,6 +2,7 @@ package authz
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"testing"
 
@@ -248,4 +249,54 @@ func TestFilterAuthorized_ForwardsSubresource(t *testing.T) {
 	require.Len(t, fakeClient.batchCheckReqs, 1)
 	require.Len(t, fakeClient.batchCheckReqs[0].Checks, 1)
 	assert.Equal(t, "status", fakeClient.batchCheckReqs[0].Checks[0].Subresource)
+}
+
+func TestFilterAuthorized_SizeHint(t *testing.T) {
+	items := make([]testItem, types.MaxBatchCheckItems+10)
+	for i := range items {
+		items[i] = testItem{name: "item-" + strconv.Itoa(i), folder: "folder1", namespace: "default"}
+	}
+
+	for _, hint := range []int{-1, 1, 20, len(items), 10 * types.MaxBatchCheckItems} {
+		t.Run(fmt.Sprintf("hint=%d", hint), func(t *testing.T) {
+			count := 0
+			for _, err := range FilterAuthorized(ctxWithUser(), types.FixedAccessClient(true), toSeq(items), extractTestItem, WithSizeHint(hint)) {
+				require.NoError(t, err)
+				count++
+			}
+			assert.Equal(t, len(items), count)
+		})
+	}
+}
+
+func BenchmarkFilterAuthorized(b *testing.B) {
+	ctx := ctxWithUser()
+	access := types.FixedAccessClient(true)
+	for _, n := range []int{1, 10, 100, types.MaxBatchCheckItems, 4 * types.MaxBatchCheckItems} {
+		items := make([]testItem, n)
+		for i := range items {
+			items[i] = testItem{name: "item-" + strconv.Itoa(i), folder: "folder1", namespace: "default"}
+		}
+		for _, hinted := range []bool{false, true} {
+			var opts []FilterOption
+			if hinted {
+				opts = append(opts, WithSizeHint(n))
+			}
+			b.Run(fmt.Sprintf("items=%d/hint=%t", n, hinted), func(b *testing.B) {
+				b.ReportAllocs()
+				for b.Loop() {
+					count := 0
+					for _, err := range FilterAuthorized(ctx, access, toSeq(items), extractTestItem, opts...) {
+						if err != nil {
+							b.Fatal(err)
+						}
+						count++
+					}
+					if count != n {
+						b.Fatalf("got %d items, want %d", count, n)
+					}
+				}
+			})
+		}
+	}
 }
