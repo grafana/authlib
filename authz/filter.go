@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"iter"
+	"slices"
 	"strconv"
 	"time"
 
@@ -13,6 +14,10 @@ import (
 
 	"github.com/grafana/authlib/types"
 )
+
+// initialBatchCap is how many items FilterAuthorized buffers before it grows
+// its batch to types.MaxBatchCheckItems, unless WithSizeHint says otherwise.
+const initialBatchCap = 16
 
 // BatchCheckItem represents an item that needs batch authorization.
 type BatchCheckItem struct {
@@ -32,6 +37,8 @@ type BatchCheckItem struct {
 // FilterOptions configures the behavior of FilterAuthorized.
 type FilterOptions struct {
 	Tracer trace.Tracer
+	// SizeHint is the expected number of items, if known. Zero means unknown.
+	SizeHint int
 }
 
 // FilterOption is a function that configures FilterOptions.
@@ -41,6 +48,14 @@ type FilterOption func(*FilterOptions)
 func WithTracer(tracer trace.Tracer) FilterOption {
 	return func(o *FilterOptions) {
 		o.Tracer = tracer
+	}
+}
+
+// WithSizeHint tells FilterAuthorized how many items to expect, so its first
+// batch is sized for them. More items than the hint are still filtered.
+func WithSizeHint(n int) FilterOption {
+	return func(o *FilterOptions) {
+		o.SizeHint = n
 	}
 }
 
@@ -73,8 +88,14 @@ func FilterAuthorized[T any](
 			return
 		}
 
-		batchItems := make([]T, 0, types.MaxBatchCheckItems)
-		batchChecks := make([]types.BatchCheckItem, 0, types.MaxBatchCheckItems)
+		// Most calls filter only a few items, so start small instead of
+		// allocating a full batch up front.
+		batchCap := initialBatchCap
+		if options.SizeHint > 0 {
+			batchCap = min(options.SizeHint, types.MaxBatchCheckItems)
+		}
+		batchItems := make([]T, 0, batchCap)
+		batchChecks := make([]types.BatchCheckItem, 0, batchCap)
 		var currentNamespace string
 
 		flush := func() bool {
@@ -114,6 +135,12 @@ func FilterAuthorized[T any](
 				if !flush() {
 					return
 				}
+			}
+
+			// Grow once to a full batch rather than doubling up to it.
+			if len(batchChecks) == cap(batchChecks) {
+				batchItems = slices.Grow(batchItems, types.MaxBatchCheckItems-len(batchItems))
+				batchChecks = slices.Grow(batchChecks, types.MaxBatchCheckItems-len(batchChecks))
 			}
 
 			currentNamespace = info.Namespace
