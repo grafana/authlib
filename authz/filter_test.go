@@ -109,7 +109,8 @@ func TestFilterAuthorized_MissingAuthInfo(t *testing.T) {
 
 func TestFilterAuthorized_EmptyInput(t *testing.T) {
 	count := 0
-	for range FilterAuthorized(ctxWithUser(), types.FixedAccessClient(true), toSeq(nil), extractTestItem) {
+	for _, err := range FilterAuthorized(ctxWithUser(), types.FixedAccessClient(true), toSeq(nil), extractTestItem) {
+		require.NoError(t, err)
 		count++
 	}
 
@@ -125,7 +126,8 @@ func TestFilterAuthorized_EarlyTermination(t *testing.T) {
 
 	// Only take first item
 	count := 0
-	for range FilterAuthorized(ctxWithUser(), types.FixedAccessClient(true), toSeq(items), extractTestItem) {
+	for _, err := range FilterAuthorized(ctxWithUser(), types.FixedAccessClient(true), toSeq(items), extractTestItem) {
+		require.NoError(t, err)
 		count++
 		if count >= 1 {
 			break
