@@ -1873,6 +1873,82 @@ func TestClient_BatchCheck_ServicePermissions(t *testing.T) {
 	})
 }
 
+// A check the caller only reports to the user needs only get on the type and
+// the grant to ask about the user's permissions, not the verb itself, so a
+// search can show what the user may change without being able to change it.
+// The user is still checked for the real verb.
+func TestClient_BatchCheck_ReportOnly(t *testing.T) {
+	onBehalfOf := func(delegated ...string) *authn.AuthInfo {
+		return authn.NewIDTokenAuthInfo(
+			authn.Claims[authn.AccessTokenClaims]{
+				Claims: jwt.Claims{Subject: "service"},
+				Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: delegated},
+			},
+			&authn.Claims[authn.IDTokenClaims]{
+				Claims: jwt.Claims{Subject: "user:1"},
+				Rest:   authn.IDTokenClaims{Namespace: "stacks-12"},
+			},
+		)
+	}
+	request := func(reportOnly bool) types.BatchCheckRequest {
+		return types.BatchCheckRequest{
+			Namespace:  "stacks-12",
+			ReportOnly: reportOnly,
+			Checks: []types.BatchCheckItem{
+				{CorrelationID: "update", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "update", Name: "dash1"},
+				{CorrelationID: "delete", Group: "dashboards.grafana.app", Resource: "dashboards", Verb: "delete", Name: "dash1"},
+			},
+		}
+	}
+	const canAsk = "authz.grafana.app/userpermissions:get"
+
+	t.Run("allowed to ask: the user is checked for the real verb", func(t *testing.T) {
+		client, authz := setupAccessClient()
+		authz.batchCheckRes = &authzv1.BatchCheckResponse{Results: map[string]*authzv1.BatchCheckResult{
+			"update": {Allowed: true},
+			"delete": {Allowed: false},
+		}}
+
+		resp, err := client.BatchCheck(context.Background(), onBehalfOf("dashboards.grafana.app/dashboards:get", canAsk), request(true))
+		require.NoError(t, err)
+		require.True(t, resp.Results["update"].Allowed)
+		require.False(t, resp.Results["delete"].Allowed)
+		require.True(t, authz.batchCheckCalled)
+		require.Len(t, authz.batchCheckReqs[0].Checks, 2)
+		require.Equal(t, "update", authz.batchCheckReqs[0].Checks[0].Verb)
+		require.Equal(t, "delete", authz.batchCheckReqs[0].Checks[1].Verb)
+	})
+
+	for name, tc := range map[string]struct {
+		caller     *authn.AuthInfo
+		reportOnly bool
+	}{
+		"not report only": {caller: onBehalfOf("dashboards.grafana.app/dashboards:get", canAsk)},
+		"without the grant to ask": {
+			caller: onBehalfOf("dashboards.grafana.app/dashboards:get"), reportOnly: true,
+		},
+		"without get on the type": {
+			caller: onBehalfOf("folders.grafana.app/folders:get", canAsk), reportOnly: true,
+		},
+		"a service acting for itself, with no user to report to": {
+			caller: authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{
+				Claims: jwt.Claims{Subject: "service"},
+				Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", Permissions: []string{"dashboards.grafana.app/dashboards:get", canAsk}},
+			}),
+			reportOnly: true,
+		},
+	} {
+		t.Run(name+": denied without asking AuthZ", func(t *testing.T) {
+			client, authz := setupAccessClient()
+			resp, err := client.BatchCheck(context.Background(), tc.caller, request(tc.reportOnly))
+			require.NoError(t, err)
+			require.False(t, resp.Results["update"].Allowed)
+			require.False(t, resp.Results["delete"].Allowed)
+			require.False(t, authz.batchCheckCalled)
+		})
+	}
+}
+
 func TestClient_BatchCheck_PropagatesTeams(t *testing.T) {
 	client, authz := setupAccessClient()
 	authz.batchCheckRes = &authzv1.BatchCheckResponse{

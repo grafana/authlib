@@ -137,6 +137,13 @@ type BatchCheckRequest struct {
 
 	// SkipCache forces the access checker to skip any caching layer for all checks.
 	SkipCache bool
+
+	// ReportOnly says the caller only reports the answers to the user it acts
+	// for, and does not act on them, as when showing which items the user may
+	// edit. The calling service then needs only get on each item's type and
+	// authz.grafana.app/userpermissions:get, rather than each item's verb. The
+	// user is still checked for the item's verb.
+	ReportOnly bool
 }
 
 // BatchCheckResult represents the result of a single check in a batch.

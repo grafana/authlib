@@ -39,6 +39,9 @@ type FilterOptions struct {
 	Tracer trace.Tracer
 	// SizeHint is the expected number of items, if known. Zero means unknown.
 	SizeHint int
+	// ReportOnly marks the checks as only reported to the user, see
+	// types.BatchCheckRequest.ReportOnly.
+	ReportOnly bool
 }
 
 // FilterOption is a function that configures FilterOptions.
@@ -56,6 +59,14 @@ func WithTracer(tracer trace.Tracer) FilterOption {
 func WithSizeHint(n int) FilterOption {
 	return func(o *FilterOptions) {
 		o.SizeHint = n
+	}
+}
+
+// WithReportOnly marks the checks as only reported to the user, not acted on,
+// see types.BatchCheckRequest.ReportOnly.
+func WithReportOnly() FilterOption {
+	return func(o *FilterOptions) {
+		o.ReportOnly = true
 	}
 }
 
@@ -104,8 +115,9 @@ func FilterAuthorized[T any](
 			}
 
 			batchResp, err := access.BatchCheck(ctx, user, types.BatchCheckRequest{
-				Namespace: currentNamespace,
-				Checks:    batchChecks,
+				Namespace:  currentNamespace,
+				Checks:     batchChecks,
+				ReportOnly: options.ReportOnly,
 			})
 			if err != nil {
 				span.RecordError(err)

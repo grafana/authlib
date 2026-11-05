@@ -346,7 +346,11 @@ func (c *ClientImpl) BatchCheck(ctx context.Context, authInfo types.AuthInfo, re
 		permKey := check.Group + "/" + check.Resource + ":" + check.Verb
 		checkServiceRes, cached := servicePermCache[permKey]
 		if !cached {
-			checkServiceRes = CheckServicePermissions(authInfo, check.Group, check.Resource, check.Verb)
+			if req.ReportOnly {
+				checkServiceRes = CheckServicePermissionsToReport(authInfo, check.Group, check.Resource, check.Verb)
+			} else {
+				checkServiceRes = CheckServicePermissions(authInfo, check.Group, check.Resource, check.Verb)
+			}
 			servicePermCache[permKey] = checkServiceRes
 		}
 

@@ -271,6 +271,35 @@ func TestFilterAuthorized_SizeHint(t *testing.T) {
 	}
 }
 
+// recordingAccessClient allows everything and records each batch request.
+type recordingAccessClient struct {
+	types.AccessClient
+	requests []types.BatchCheckRequest
+}
+
+func (c *recordingAccessClient) BatchCheck(ctx context.Context, id types.AuthInfo, req types.BatchCheckRequest) (types.BatchCheckResponse, error) {
+	c.requests = append(c.requests, req)
+	return c.AccessClient.BatchCheck(ctx, id, req)
+}
+
+func TestFilterAuthorized_ReportOnly(t *testing.T) {
+	items := []testItem{{name: "item-1", folder: "folder1", namespace: "default"}}
+	for _, reportOnly := range []bool{false, true} {
+		t.Run(fmt.Sprintf("report only=%t", reportOnly), func(t *testing.T) {
+			access := &recordingAccessClient{AccessClient: types.FixedAccessClient(true)}
+			var opts []FilterOption
+			if reportOnly {
+				opts = append(opts, WithReportOnly())
+			}
+			for _, err := range FilterAuthorized(ctxWithUser(), access, toSeq(items), extractTestItem, opts...) {
+				require.NoError(t, err)
+			}
+			require.Len(t, access.requests, 1)
+			assert.Equal(t, reportOnly, access.requests[0].ReportOnly)
+		})
+	}
+}
+
 func BenchmarkFilterAuthorized(b *testing.B) {
 	ctx := ctxWithUser()
 	access := types.FixedAccessClient(true)

@@ -46,6 +46,22 @@ func CheckServicePermissions(authInfo types.AuthInfo, group, resource, verb stri
 	return res
 }
 
+// CheckServicePermissionsToReport is CheckServicePermissions for a check whose
+// answer the caller only reports to the user it acts for (see
+// types.BatchCheckRequest.ReportOnly). Telling users what they may do is what
+// authz.grafana.app/userpermissions:get allows, so a service holding it may ask
+// about any verb on a type it may get. A service acting for itself is checked
+// as usual, as there is no user to report to.
+func CheckServicePermissionsToReport(authInfo types.AuthInfo, group, resource, verb string) ServiceEvaluationResult {
+	res := CheckServicePermissions(authInfo, group, resource, verb)
+	if res.Allowed || res.ServiceCall {
+		return res
+	}
+	res.Allowed = CheckServicePermissions(authInfo, group, resource, "get").Allowed &&
+		CheckServicePermissions(authInfo, "authz.grafana.app", "userpermissions", "get").Allowed
+	return res
+}
+
 // allowedWildcardGroups are the only permission groups that may use wildcard matching; all others require exact match.
 var allowedWildcardGroups = []string{
 	"*.datasource.grafana.app",
