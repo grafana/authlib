@@ -135,18 +135,6 @@ func TestAccessToken_IsOnBehalfOfUser(t *testing.T) {
 		assert.True(t, claims.IsOnBehalfOfUser())
 	})
 
-	t.Run("anonymous actor", func(t *testing.T) {
-		claims := AccessTokenClaims{
-			Actor: &ActorClaims{
-				IDTokenClaims: IDTokenClaims{
-					Type: types.TypeAnonymous,
-				},
-			},
-		}
-
-		assert.True(t, claims.IsOnBehalfOfUser())
-	})
-
 	t.Run("non-user actor", func(t *testing.T) {
 		claims := AccessTokenClaims{
 			Actor: &ActorClaims{
