@@ -103,6 +103,41 @@ func TestAccessToken_getIdentityActor(t *testing.T) {
 		actor := claims.getIdentityActor()
 		assert.Equal(t, "nested-user-actor", actor.Subject)
 	})
+
+	t.Run("innermost anonymous actor", func(t *testing.T) {
+		claims := AccessTokenClaims{
+			Actor: &ActorClaims{
+				Subject: "outer-service-actor",
+				IDTokenClaims: IDTokenClaims{
+					Type: types.TypeAccessPolicy,
+				},
+				Actor: &ActorClaims{
+					Subject: "anonymous-actor",
+					IDTokenClaims: IDTokenClaims{
+						Type: types.TypeAnonymous,
+					},
+				},
+			},
+		}
+
+		actor := claims.getIdentityActor()
+		assert.Equal(t, "anonymous-actor", actor.Subject)
+	})
+
+	t.Run("render actor is not an identity actor", func(t *testing.T) {
+		claims := AccessTokenClaims{
+			Actor: &ActorClaims{
+				Subject: "render-actor",
+				IDTokenClaims: IDTokenClaims{
+					Type: types.TypeRenderService,
+				},
+			},
+		}
+
+		actor := claims.getIdentityActor()
+		var nilActor *ActorClaims
+		assert.Equal(t, nilActor, actor)
+	})
 }
 
 func TestAccessToken_IsOnBehalfOfUser(t *testing.T) {
@@ -133,6 +168,30 @@ func TestAccessToken_IsOnBehalfOfUser(t *testing.T) {
 		}
 
 		assert.True(t, claims.IsOnBehalfOfUser())
+	})
+
+	t.Run("anonymous actor", func(t *testing.T) {
+		claims := AccessTokenClaims{
+			Actor: &ActorClaims{
+				IDTokenClaims: IDTokenClaims{
+					Type: types.TypeAnonymous,
+				},
+			},
+		}
+
+		assert.True(t, claims.IsOnBehalfOfUser())
+	})
+
+	t.Run("render actor", func(t *testing.T) {
+		claims := AccessTokenClaims{
+			Actor: &ActorClaims{
+				IDTokenClaims: IDTokenClaims{
+					Type: types.TypeRenderService,
+				},
+			},
+		}
+
+		assert.False(t, claims.IsOnBehalfOfUser())
 	})
 
 	t.Run("non-user actor", func(t *testing.T) {
