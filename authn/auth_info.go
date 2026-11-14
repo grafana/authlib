@@ -73,12 +73,22 @@ func (a *AuthInfo) GetIdentifier() string {
 	if a.id != nil {
 		return a.id.Rest.Identifier
 	}
-	return strings.TrimPrefix(a.GetSubject(), string(types.TypeAccessPolicy)+":")
+	subject := a.GetSubject()
+	return strings.TrimPrefix(subject, string(serviceIdentityType(subject))+":")
 }
 
 func (a *AuthInfo) GetIdentityType() types.IdentityType {
 	if a.id != nil {
 		return a.id.Rest.Type
+	}
+	return serviceIdentityType(a.GetSubject())
+}
+
+// serviceIdentityType returns the type of a service subject (no user or ID token behind it).
+// Anything that is not a plugin is an access policy.
+func serviceIdentityType(subject string) types.IdentityType {
+	if strings.HasPrefix(subject, string(types.TypePlugin)+":") {
+		return types.TypePlugin
 	}
 	return types.TypeAccessPolicy
 }
@@ -159,7 +169,7 @@ func (a *AuthInfo) GetTokenPermissions() []string {
 	// we should not check token permission but delegated permissions instead
 	// If it's a service acting on behalf of a second service
 	// we currently just check the first service permissions
-	if a.id != nil && a.id.Rest.Type != types.TypeAccessPolicy {
+	if a.id != nil && !types.IsIdentityType(a.id.Rest.Type, types.TypeAccessPolicy, types.TypePlugin) {
 		return []string{}
 	}
 	return a.at.Rest.Permissions

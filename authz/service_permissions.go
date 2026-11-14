@@ -9,7 +9,7 @@ import (
 
 // ServiceEvaluationResult contains the result of a service permission check along with debug information
 type ServiceEvaluationResult struct {
-	// ServiceCall indicates if the call was made by a service (access policy) identity
+	// ServiceCall indicates if the call was made by a service (access policy or plugin) identity
 	// False indicates an on-behalf-of call (delegated permissions), user permissions should be checked.
 	ServiceCall bool
 	// Allowed indicates if the permission check passed. This does not imply that the user is allowed,
@@ -31,11 +31,11 @@ type ServiceEvaluationResult struct {
 // call which is not done here.
 //
 // CheckServicePermissions verifies if the service has the required permissions for an action:
-// - For direct service calls (access policy), it checks the service's own permissions.
+// - For direct service calls (access policy or plugin), it checks the service's own permissions.
 // - For calls made on behalf of a user (on-behalf-of), it checks the service's delegated permissions.
 func CheckServicePermissions(authInfo types.AuthInfo, group, resource, verb string) ServiceEvaluationResult {
 	res := ServiceEvaluationResult{
-		ServiceCall: types.IsIdentityType(authInfo.GetIdentityType(), types.TypeAccessPolicy),
+		ServiceCall: types.IsIdentityType(authInfo.GetIdentityType(), types.TypeAccessPolicy, types.TypePlugin),
 	}
 	if res.ServiceCall {
 		res.Permissions = authInfo.GetTokenPermissions()
