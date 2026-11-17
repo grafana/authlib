@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -155,6 +156,10 @@ func (r TokenExchangeRequest) hash() (string, error) {
 	}
 
 	br := strings.Builder{}
+	if r.ExpiresIn != nil {
+		br.WriteString(strconv.Itoa(*r.ExpiresIn))
+	}
+	br.WriteByte(':')
 	br.WriteString(r.Namespace)
 	br.WriteByte('-')
 	audiences := make([]string, len(r.Audiences))
