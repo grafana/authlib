@@ -169,7 +169,7 @@ func (c *ClientImpl) Check(ctx context.Context, authInfo types.AuthInfo, req typ
 		return checkResponseDenied, namespaceMismatchError(authInfo.GetNamespace(), req.Namespace)
 	}
 
-	checkServiceRes := CheckServicePermissions(authInfo, req.Group, req.Resource, req.Verb)
+	checkServiceRes := CheckServicePermissions(authInfo, req.Group, req.Resource, req.Subresource, req.Verb)
 
 	span.SetAttributes(attribute.String("subject", authInfo.GetSubject()))
 	span.SetAttributes(attribute.String("namespace", req.Namespace))
@@ -266,7 +266,7 @@ func (c *ClientImpl) Compile(ctx context.Context, authInfo types.AuthInfo, list 
 		return nil, nil, namespaceMismatchError(authInfo.GetNamespace(), list.Namespace)
 	}
 
-	checkServiceRes := CheckServicePermissions(authInfo, list.Group, list.Resource, list.Verb)
+	checkServiceRes := CheckServicePermissions(authInfo, list.Group, list.Resource, list.Subresource, list.Verb)
 
 	span.SetAttributes(attribute.String("namespace", list.Namespace))
 	span.SetAttributes(attribute.String("group", list.Group))
@@ -338,15 +338,14 @@ func (c *ClientImpl) BatchCheck(ctx context.Context, authInfo types.AuthInfo, re
 	// Build the proto request
 	protoChecks := make([]*authzv1.BatchCheckItem, 0, len(req.Checks))
 
-	// Cache service permission results to avoid redundant checks for the same Group/Resource/Verb
-	servicePermCache := make(map[string]ServiceEvaluationResult)
+	// Cache service permission results across items targeting the same operation.
+	servicePermCache := make(map[[4]string]ServiceEvaluationResult)
 
 	for _, check := range req.Checks {
-		// Use cached result if available for this Group/Resource/Verb combination
-		permKey := check.Group + "/" + check.Resource + ":" + check.Verb
+		permKey := [4]string{check.Group, check.Resource, check.Subresource, check.Verb}
 		checkServiceRes, cached := servicePermCache[permKey]
 		if !cached {
-			checkServiceRes = CheckServicePermissions(authInfo, check.Group, check.Resource, check.Verb)
+			checkServiceRes = CheckServicePermissions(authInfo, check.Group, check.Resource, check.Subresource, check.Verb)
 			servicePermCache[permKey] = checkServiceRes
 		}
 

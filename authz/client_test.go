@@ -288,7 +288,7 @@ func TestHasPermissionInToken(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := hasPermissionInToken(tt.tokenPermissions, tt.group, tt.resource, tt.verb)
+			got := hasPermissionInToken(tt.tokenPermissions, tt.group, tt.resource, "", tt.verb)
 			require.Equal(t, tt.want, got)
 		})
 	}
@@ -709,7 +709,7 @@ func TestClient_Check_CacheKeyCollision(t *testing.T) {
 	caller := authn.NewIDTokenAuthInfo(
 		authn.Claims[authn.AccessTokenClaims]{
 			Claims: jwt.Claims{Subject: "service"},
-			Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards:get"}},
+			Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"dashboards.grafana.app/dashboards/status:get", "dashboards.grafana.app/dashboards/name-status:get"}},
 		},
 		&authn.Claims[authn.IDTokenClaims]{
 			Claims: jwt.Claims{Subject: "user:1"},
@@ -1987,4 +1987,123 @@ func (f *FakeAuthzServiceClient) BatchCheck(ctx context.Context, in *authzv1.Bat
 	return &authzv1.BatchCheckResponse{
 		Results: results,
 	}, nil
+}
+
+func subresourceCaller(permissions []string, delegated bool) *authn.AuthInfo {
+	claims := authn.AccessTokenClaims{Namespace: "stacks-12", Permissions: permissions}
+	if delegated {
+		claims.Actor = &authn.ActorClaims{Subject: "user:1", IDTokenClaims: authn.IDTokenClaims{Type: types.TypeUser, Identifier: "1"}}
+		claims.Permissions = []string{"unrelated.grafana.app:*"}
+		claims.DelegatedPermissions = permissions
+	}
+	return authn.NewAccessTokenAuthInfo(authn.Claims[authn.AccessTokenClaims]{Claims: jwt.Claims{Subject: "service"}, Rest: claims})
+}
+
+func TestClient_SubresourcePermissions(t *testing.T) {
+	const parent = "dashboard.grafana.app/dashboards:get"
+	const subresource = "dashboard.grafana.app/dashboards/annotations:get"
+	for _, tc := range []struct {
+		name        string
+		permissions []string
+		want        bool
+	}{
+		{"parent only", []string{parent}, false},
+		{"exact subresource", []string{subresource}, true},
+		{"sibling subresource", []string{"dashboard.grafana.app/dashboards/status:get"}, false},
+		{"combined", []string{parent, subresource}, true},
+		{"group-wide", []string{"dashboard.grafana.app:get"}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client, server := setupAccessClient()
+			caller := subresourceCaller(tc.permissions, false)
+			result, err := client.Check(t.Context(), caller, types.CheckRequest{
+				Namespace: "stacks-12", Group: "dashboard.grafana.app", Resource: "dashboards",
+				Subresource: "annotations", Verb: "get", Name: "item",
+			}, "")
+			require.NoError(t, err)
+			require.Equal(t, tc.want, result.Allowed)
+
+			checker, _, err := client.Compile(t.Context(), caller, types.ListRequest{
+				Namespace: "stacks-12", Group: "dashboard.grafana.app", Resource: "dashboards",
+				Subresource: "annotations", Verb: "list",
+			})
+			require.NoError(t, err)
+			require.Equal(t, tc.want, checker("item", ""))
+			require.Empty(t, server.checkReqs)
+			require.Empty(t, server.listReqs)
+		})
+	}
+}
+
+func TestClient_DelegatedSubresourcePermissions(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		permission  string
+		userAllowed bool
+		wantAllowed bool
+		wantCalls   int
+	}{
+		{"token denies", "dashboard.grafana.app/dashboards:get", true, false, 0},
+		{"user denies", "dashboard.grafana.app/dashboards/annotations:get", false, false, 1},
+		{"both allow", "dashboard.grafana.app/dashboards/annotations:get", true, true, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client, server := setupAccessClient()
+			server.checkRes = &authzv1.CheckResponse{Allowed: tc.userAllowed}
+			caller := subresourceCaller([]string{tc.permission}, true)
+			result, err := client.Check(t.Context(), caller, types.CheckRequest{
+				Namespace: "stacks-12", Group: "dashboard.grafana.app", Resource: "dashboards",
+				Subresource: "annotations", Verb: "get", Name: "item",
+			}, "")
+			require.NoError(t, err)
+			require.Equal(t, tc.wantAllowed, result.Allowed)
+			require.Len(t, server.checkReqs, tc.wantCalls)
+		})
+	}
+}
+
+func TestClient_BatchCheckSeparatesSubresourcePermissions(t *testing.T) {
+	parent := types.BatchCheckItem{CorrelationID: "parent", Group: "dashboard.grafana.app", Resource: "dashboards", Verb: "get"}
+	subresource := types.BatchCheckItem{CorrelationID: "subresource", Group: parent.Group, Resource: parent.Resource, Subresource: "annotations", Verb: "get"}
+	sibling := types.BatchCheckItem{CorrelationID: "sibling", Group: parent.Group, Resource: parent.Resource, Subresource: "status", Verb: "get"}
+	for _, tc := range []struct {
+		name   string
+		checks []types.BatchCheckItem
+	}{
+		{"parent first", []types.BatchCheckItem{parent, subresource, sibling}},
+		{"subresource first", []types.BatchCheckItem{subresource, sibling, parent}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client, server := setupAccessClient()
+			caller := subresourceCaller([]string{"dashboard.grafana.app/dashboards/annotations:get"}, false)
+			result, err := client.BatchCheck(t.Context(), caller, types.BatchCheckRequest{
+				Namespace: "stacks-12", Checks: tc.checks,
+			})
+			require.NoError(t, err)
+			require.Equal(t, map[string]types.BatchCheckResult{
+				"parent":      {Allowed: false},
+				"subresource": {Allowed: true},
+				"sibling":     {Allowed: false},
+			}, result.Results)
+			require.Empty(t, server.batchCheckReqs)
+		})
+	}
+}
+
+func TestClient_SubresourceNamespaceIsolation(t *testing.T) {
+	for _, delegated := range []bool{false, true} {
+		client, server := setupAccessClient()
+		caller := subresourceCaller([]string{"dashboard.grafana.app:*"}, delegated)
+		req := types.CheckRequest{Namespace: "stacks-99", Group: "dashboard.grafana.app", Resource: "dashboards", Subresource: "annotations", Verb: "get"}
+		result, err := client.Check(context.Background(), caller, req, "")
+		require.Error(t, err)
+		require.False(t, result.Allowed)
+		_, _, err = client.Compile(context.Background(), caller, types.ListRequest{Namespace: req.Namespace, Group: req.Group, Resource: req.Resource, Subresource: req.Subresource, Verb: req.Verb})
+		require.Error(t, err)
+		_, err = client.BatchCheck(context.Background(), caller, types.BatchCheckRequest{Namespace: req.Namespace, Checks: []types.BatchCheckItem{{CorrelationID: "one", Group: req.Group, Resource: req.Resource, Subresource: req.Subresource, Verb: req.Verb}}})
+		require.Error(t, err)
+		require.Empty(t, server.checkReqs)
+		require.Empty(t, server.listReqs)
+		require.Empty(t, server.batchCheckReqs)
+	}
 }
