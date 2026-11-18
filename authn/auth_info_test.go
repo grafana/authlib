@@ -143,6 +143,22 @@ func TestAuthInfo_GetTokenPermissions(t *testing.T) {
 			},
 			expectedResult: []string{"read", "write"},
 		},
+		{
+			name: "ID token with plugin type, return access token permissions",
+			authInfo: &AuthInfo{
+				at: Claims[AccessTokenClaims]{
+					Rest: AccessTokenClaims{
+						Permissions: []string{"read", "write"},
+					},
+				},
+				id: &Claims[IDTokenClaims]{
+					Rest: IDTokenClaims{
+						Type: types.TypePlugin,
+					},
+				},
+			},
+			expectedResult: []string{"read", "write"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -534,6 +550,18 @@ func TestAuthInfo_GetIdentifier(t *testing.T) {
 			},
 			expected: "identifier2",
 		},
+		{
+			name: "No ID token, plugin subject, return plugin identifier from subject",
+			authInfo: &AuthInfo{
+				at: Claims[AccessTokenClaims]{
+					Claims: jwt.Claims{
+						Subject: "plugin:grafana-example-app",
+					},
+				},
+				id: nil,
+			},
+			expected: "grafana-example-app",
+		},
 	}
 
 	for _, tt := range tests {
@@ -737,6 +765,49 @@ func TestAuthInfo_GetExtra_InnermostServiceIdentity(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.expected, tt.authInfo.GetExtra())
+		})
+	}
+}
+
+func TestAuthInfo_GetIdentityType(t *testing.T) {
+	tests := []struct {
+		name     string
+		authInfo *AuthInfo
+		expected types.IdentityType
+	}{
+		{
+			name:     "ID token, return ID token type",
+			authInfo: &AuthInfo{id: &Claims[IDTokenClaims]{Rest: IDTokenClaims{Type: types.TypeUser}}},
+			expected: types.TypeUser,
+		},
+		{
+			name:     "No ID token, access policy subject",
+			authInfo: &AuthInfo{at: Claims[AccessTokenClaims]{Claims: jwt.Claims{Subject: "access-policy:abc"}}},
+			expected: types.TypeAccessPolicy,
+		},
+		{
+			name:     "No ID token, plugin subject",
+			authInfo: &AuthInfo{at: Claims[AccessTokenClaims]{Claims: jwt.Claims{Subject: "plugin:grafana-example-app"}}},
+			expected: types.TypePlugin,
+		},
+		{
+			name: "No ID token, plugin subject with a non-identity actor",
+			authInfo: &AuthInfo{at: Claims[AccessTokenClaims]{
+				Claims: jwt.Claims{Subject: "plugin:grafana-example-app"},
+				Rest:   AccessTokenClaims{Actor: &ActorClaims{Subject: "plugin:grafana-example-app"}},
+			}},
+			expected: types.TypePlugin,
+		},
+		{
+			name:     "No ID token, subject without a known type keeps the access policy default",
+			authInfo: &AuthInfo{at: Claims[AccessTokenClaims]{Claims: jwt.Claims{Subject: "at_subject"}}},
+			expected: types.TypeAccessPolicy,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, tt.authInfo.GetIdentityType())
 		})
 	}
 }
