@@ -128,8 +128,7 @@ func TestParseNamespace(t *testing.T) {
 			},
 		},
 		{
-			name:      "invalid stack id in deprecated claim (must be an int)",
-			expectErr: true,
+			name:      "deprecated stack namespace with nonnumeric id is unrecognized",
 			namespace: "stack-abcdef",
 			expected: NamespaceInfo{
 				OrgID: -1,
@@ -160,11 +159,10 @@ func TestParseNamespace(t *testing.T) {
 			},
 		},
 		{
-			name:      "valid stack is read from deprecated claim",
+			name:      "deprecated stack namespace with numeric id is unrecognized",
 			namespace: "stack-1",
 			expected: NamespaceInfo{
-				OrgID:   1,
-				StackID: 1,
+				OrgID: -1,
 			},
 		},
 		{
