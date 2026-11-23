@@ -54,6 +54,20 @@ func TestDefaultAuthenticator_Authenticate(t *testing.T) {
 		require.Equal(t, provider.at, info.GetAccessToken())
 	})
 
+	t.Run("should allow request with a plugin access token", func(t *testing.T) {
+		provider := fakeTokenProvider{at: signAtToken(t, "plugin:grafana-example-app", AccessTokenClaims{
+			Namespace:   "*",
+			Permissions: []string{"dashboard.grafana.app/dashboards:get"},
+		})}
+
+		info, err := authenticator.Authenticate(context.Background(), provider)
+		require.NoError(t, err)
+		require.Equal(t, "plugin:grafana-example-app", info.GetUID())
+		require.Equal(t, types.TypePlugin, info.GetIdentityType())
+		require.Equal(t, "grafana-example-app", info.GetIdentifier())
+		require.Equal(t, []string{"dashboard.grafana.app/dashboards:get"}, info.GetTokenPermissions())
+	})
+
 	t.Run("should allow request with access and id token", func(t *testing.T) {
 		provider := fakeTokenProvider{
 			at: signAtToken(t, "access-policy:1", AccessTokenClaims{Namespace: "*"}),
