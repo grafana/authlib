@@ -33,7 +33,9 @@ type ServiceEvaluationResult struct {
 // CheckServicePermissions verifies if the service has the required permissions for an action:
 // - For direct service calls (access policy), it checks the service's own permissions.
 // - For calls made on behalf of a user (on-behalf-of), it checks the service's delegated permissions.
-func CheckServicePermissions(authInfo types.AuthInfo, group, resource, verb string) ServiceEvaluationResult {
+//
+// Pass an empty subresource to check the parent resource.
+func CheckServicePermissions(authInfo types.AuthInfo, group, resource, subresource, verb string) ServiceEvaluationResult {
 	res := ServiceEvaluationResult{
 		ServiceCall: types.IsIdentityType(authInfo.GetIdentityType(), types.TypeAccessPolicy),
 	}
@@ -42,7 +44,7 @@ func CheckServicePermissions(authInfo types.AuthInfo, group, resource, verb stri
 	} else {
 		res.Permissions = authInfo.GetTokenDelegatedPermissions()
 	}
-	res.Allowed = hasPermissionInToken(res.Permissions, group, resource, verb)
+	res.Allowed = hasPermissionInToken(res.Permissions, group, resource, subresource, verb)
 	return res
 }
 
@@ -79,7 +81,7 @@ func groupMatches(permissionGroup, requestGroup string) bool {
 	return permissionGroup == requestGroup
 }
 
-func hasPermissionInToken(tokenPermissions []string, group, resource, verb string) bool {
+func hasPermissionInToken(tokenPermissions []string, group, resource, subresource, verb string) bool {
 	verbs := []string{verb}
 
 	// we always map list to get for authz
@@ -88,26 +90,16 @@ func hasPermissionInToken(tokenPermissions []string, group, resource, verb strin
 		verbs = append(verbs, "get")
 	}
 
-	for _, p := range tokenPermissions {
-		parts := strings.SplitN(p, ":", 2)
-		if len(parts) != 2 {
+	for _, permission := range tokenPermissions {
+		p, ok := ParseTokenPermission(permission)
+		if !ok || !groupMatches(p.Group, group) {
 			continue
 		}
-		pVerb := parts[1]
-		if pVerb != "*" && !slices.Contains(verbs, pVerb) {
+		if p.Verb != "*" && !slices.Contains(verbs, p.Verb) {
 			continue
 		}
-
-		parts = strings.SplitN(parts[0], "/", 2)
-		switch len(parts) {
-		case 1:
-			if groupMatches(parts[0], group) {
-				return true
-			}
-		case 2:
-			if groupMatches(parts[0], group) && parts[1] == resource {
-				return true
-			}
+		if p.Resource == "" || (p.Resource == resource && p.Subresource == subresource) {
+			return true
 		}
 	}
 	return false

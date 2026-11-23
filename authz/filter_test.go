@@ -221,7 +221,7 @@ func TestFilterAuthorized_ForwardsSubresource(t *testing.T) {
 			Claims: jwt.Claims{Subject: "access-policy"},
 			Rest: authn.AccessTokenClaims{
 				Namespace:            "*",
-				DelegatedPermissions: []string{"test.grafana.app/items:get"},
+				DelegatedPermissions: []string{"test.grafana.app/items/status:get"},
 			},
 		},
 		&authn.Claims[authn.IDTokenClaims]{

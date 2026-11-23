@@ -41,7 +41,7 @@ func (c *ClientImpl) GetUserPermissions(ctx context.Context, authInfo types.Auth
 	if !types.NamespaceMatches(authInfo.GetNamespace(), req.Namespace) {
 		return types.GetUserPermissionsResponse{}, namespaceMismatchError(authInfo.GetNamespace(), req.Namespace)
 	}
-	servicePermission := CheckServicePermissions(authInfo, "authz.grafana.app", "userpermissions", "get")
+	servicePermission := CheckServicePermissions(authInfo, "authz.grafana.app", "userpermissions", "", "get")
 	if !servicePermission.Allowed {
 		return types.GetUserPermissionsResponse{}, ErrUserPermissionsDenied
 	}
