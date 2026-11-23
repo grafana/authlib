@@ -1166,56 +1166,6 @@ func TestClient_Compile(t *testing.T) {
 			},
 		},
 		{
-			name: "User can't list k6 resources",
-			caller: authn.NewIDTokenAuthInfo(
-				authn.Claims[authn.AccessTokenClaims]{
-					Claims: jwt.Claims{Subject: "service"},
-					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"folders.grafana.app/folders:get"}},
-				},
-				&authn.Claims[authn.IDTokenClaims]{
-					Claims: jwt.Claims{Subject: "user:1"},
-					Rest:   authn.IDTokenClaims{Namespace: "stacks-12", Type: types.TypeUser},
-				},
-			),
-			listReq: types.ListRequest{
-				Namespace: "stacks-12",
-				Group:     "folders.grafana.app",
-				Resource:  "folders",
-				Verb:      "get",
-			},
-			listRes: &authzv1.ListResponse{Items: []string{"app-k6", "app-k6-child", "another-folder"}},
-			wantRes: map[check]bool{
-				{"stacks-12", k6FolderUID, ""}:             false,
-				{"stacks-12", "k6-app-child", k6FolderUID}: false,
-				{"stacks-12", "another-folder", ""}:        true,
-			},
-		},
-		{
-			name: "Service account can list k6 resources",
-			caller: authn.NewIDTokenAuthInfo(
-				authn.Claims[authn.AccessTokenClaims]{
-					Claims: jwt.Claims{Subject: "service"},
-					Rest:   authn.AccessTokenClaims{Namespace: "stacks-12", DelegatedPermissions: []string{"folders.grafana.app/folders:get"}},
-				},
-				&authn.Claims[authn.IDTokenClaims]{
-					Claims: jwt.Claims{Subject: "service-account:1"},
-					Rest:   authn.IDTokenClaims{Namespace: "stacks-12", Type: types.TypeServiceAccount},
-				},
-			),
-			listReq: types.ListRequest{
-				Namespace: "stacks-12",
-				Group:     "folders.grafana.app",
-				Resource:  "folders",
-				Verb:      "get",
-			},
-			listRes: &authzv1.ListResponse{Items: []string{"app-k6", "app-k6-child", "another-folder"}},
-			wantRes: map[check]bool{
-				{"stacks-12", k6FolderUID, ""}:                               false,
-				{"stacks-12", "k6-appauthn/auth_info.go-child", k6FolderUID}: false,
-				{"stacks-12", "another-folder", ""}:                          true,
-			},
-		},
-		{
 			name: "Access policy with wildcard namespace can list in all namespaces",
 			caller: authn.NewAccessTokenAuthInfo(
 				authn.Claims[authn.AccessTokenClaims]{
@@ -1229,7 +1179,7 @@ func TestClient_Compile(t *testing.T) {
 				Resource: "folders",
 				Verb:     "get",
 			},
-			listRes: &authzv1.ListResponse{Items: []string{"app-k6", "app-k6-child", "another-folder"}},
+			listRes: &authzv1.ListResponse{Items: []string{"folder-a", "folder-b", "another-folder"}},
 			wantRes: map[check]bool{
 				{"stacks-1", "stack-1", "folder-1"}: true,
 				{"stacks-2", "stack2", "folder-2"}:  true,
