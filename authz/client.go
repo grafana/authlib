@@ -24,8 +24,6 @@ import (
 
 var (
 	checkResponseDenied = types.CheckResponse{Allowed: false, Zookie: types.NoopZookie{}}
-
-	k6FolderUID = "k6-app"
 )
 
 var (
@@ -98,11 +96,6 @@ func NewClient(cc grpc.ClientConnInterface, opts ...AuthzClientOption) *ClientIm
 func (c *ClientImpl) check(ctx context.Context, authInfo types.AuthInfo, req *types.CheckRequest, folder string) (bool, int64, error) {
 	ctx, span := c.tracer.Start(ctx, "ClientImpl.hasAccess")
 	defer span.End()
-
-	idIsServiceAccount := types.IsIdentityType(authInfo.GetIdentityType(), types.TypeServiceAccount)
-	if !idIsServiceAccount && (req.Name == k6FolderUID || folder == k6FolderUID) {
-		return false, time.Now().UnixMilli(), nil
-	}
 
 	teams := authInfo.GetGroups()
 	key := checkCacheKey(authInfo.GetSubject(), teams, req, folder)
@@ -279,7 +272,7 @@ func (c *ClientImpl) Compile(ctx context.Context, authInfo types.AuthInfo, list 
 	if checkServiceRes.ServiceCall {
 		// No user => check on the service permissions only
 		if checkServiceRes.Allowed {
-			return allowAllChecker(true), types.NoopZookie{}, nil
+			return allowAllChecker(), types.NoopZookie{}, nil
 		}
 		return denyAllChecker, types.NoopZookie{}, nil
 	}
@@ -295,7 +288,7 @@ func (c *ClientImpl) Compile(ctx context.Context, authInfo types.AuthInfo, list 
 		return denyAllChecker, types.NoopZookie{}, err
 	}
 
-	return checker.fn(authInfo), checker.Zookie(), nil
+	return checker.fn(), checker.Zookie(), nil
 }
 
 // BatchCheck performs multiple access checks in a single request.
@@ -562,15 +555,7 @@ func (c *ClientImpl) getCachedItemChecker(ctx context.Context, key string) (*ite
 
 var denyAllChecker = func(name, folder string) bool { return false }
 
-func allowAllChecker(isServiceAccount bool) types.ItemChecker {
-	return func(name, folder string) bool {
-		if !isServiceAccount && (name == k6FolderUID || folder == k6FolderUID) {
-			return false
-		}
-
-		return true
-	}
-}
+func allowAllChecker() types.ItemChecker { return func(name, folder string) bool { return true } }
 
 type itemChecker struct {
 	All       bool
@@ -609,10 +594,9 @@ func newItemChecker(resp *authzv1.ListResponse) *itemChecker {
 }
 
 // fn generates a ItemChecker function that can check user access to items.
-func (c *itemChecker) fn(authInfo types.AuthInfo) types.ItemChecker {
-	idIsSvcAccount := types.IsIdentityType(authInfo.GetIdentityType(), types.TypeServiceAccount)
+func (c *itemChecker) fn() types.ItemChecker {
 	if c.All {
-		return allowAllChecker(idIsSvcAccount)
+		return allowAllChecker()
 	}
 
 	if len(c.Items) == 0 && len(c.Folders) == 0 {
@@ -620,9 +604,6 @@ func (c *itemChecker) fn(authInfo types.AuthInfo) types.ItemChecker {
 	}
 
 	return func(name, folder string) bool {
-		if !idIsSvcAccount && (name == k6FolderUID || folder == k6FolderUID) {
-			return false
-		}
 		return c.Items[name] || c.Folders[folder]
 	}
 }
